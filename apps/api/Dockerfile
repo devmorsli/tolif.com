@@ -1,11 +1,15 @@
 FROM mcr.microsoft.com/dotnet/sdk:10.0 AS build
 WORKDIR /src
 
-COPY Tolif.Domain/Tolif.Domain.csproj         Tolif.Domain/
-COPY Tolif.Application/Tolif.Application.csproj Tolif.Application/
+# Copy all csproj files + solution first for layer-cached restore
+COPY Tolif.Domain/Tolif.Domain.csproj             Tolif.Domain/
+COPY Tolif.Application/Tolif.Application.csproj   Tolif.Application/
 COPY Tolif.Infrastructure/Tolif.Infrastructure.csproj Tolif.Infrastructure/
-COPY Tolif.API/Tolif.API.csproj               Tolif.API/
-RUN dotnet restore Tolif.API/Tolif.API.csproj
+COPY Tolif.API/Tolif.API.csproj                   Tolif.API/
+COPY Tolif.slnx .
+
+# Restore entire solution so every project's packages are fully cached
+RUN dotnet restore Tolif.slnx
 
 COPY . .
 RUN dotnet publish Tolif.API/Tolif.API.csproj -c Release -o /app/publish --no-restore
