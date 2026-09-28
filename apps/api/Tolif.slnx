@@ -1,0 +1,6 @@
+<Solution>
+  <Project Path="Tolif.API/Tolif.API.csproj" />
+  <Project Path="Tolif.Application/Tolif.Application.csproj" />
+  <Project Path="Tolif.Domain/Tolif.Domain.csproj" />
+  <Project Path="Tolif.Infrastructure/Tolif.Infrastructure.csproj" />
+</Solution>
