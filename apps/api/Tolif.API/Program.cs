@@ -2,6 +2,7 @@ using System.Text;
 using System.Threading.RateLimiting;
 using Amazon.S3;
 using Amazon.S3.Model;
+using Amazon.S3.Util;
 using Hangfire;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Identity;
@@ -122,7 +123,7 @@ try
     {
         var s3     = app.Services.GetRequiredService<IAmazonS3>();
         var bucket = app.Configuration["S3_BUCKET"] ?? app.Configuration["MINIO_BUCKET"] ?? "tolif";
-        var exists = await s3.DoesS3BucketExistAsync(bucket);
+        var exists = await AmazonS3Util.DoesS3BucketExistV2Async(s3, bucket);
         if (!exists)
         {
             await s3.PutBucketAsync(new PutBucketRequest { BucketName = bucket, UseClientRegion = true });
