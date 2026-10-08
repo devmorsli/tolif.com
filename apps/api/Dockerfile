@@ -16,6 +16,10 @@ RUN dotnet publish Tolif.API/Tolif.API.csproj -c Release -o /app/publish --no-re
 
 FROM mcr.microsoft.com/dotnet/aspnet:10.0 AS runtime
 WORKDIR /app
+# Install Liberation fonts so WatermarkService can render text on Linux
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    fonts-liberation \
+    && rm -rf /var/lib/apt/lists/*
 RUN mkdir -p /app/dataprotection-keys
 COPY --from=build /app/publish .
 EXPOSE 8080

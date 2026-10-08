@@ -3,29 +3,62 @@
 import { AnimatePresence, motion } from "framer-motion";
 import Link from "next/link";
 import { ArrowLeft } from "lucide-react";
+import { useEffect, Suspense } from "react";
+import { useSearchParams } from "next/navigation";
 import { useWizardStore } from "@/store/wizardStore";
+import { getPublicTemplate, parseUploadSlots } from "@/lib/public-api";
 import { WizardProgress } from "@/components/wizard/WizardProgress";
-import { Step1Template } from "@/components/wizard/Step1Template";
-import { Step2Upload } from "@/components/wizard/Step2Upload";
+import { Step1SetupPortrait } from "@/components/wizard/Step1SetupPortrait";
 import { Step3Generating } from "@/components/wizard/Step3Generating";
-import { Step4Preview } from "@/components/wizard/Step4Preview";
-import { Step5Product } from "@/components/wizard/Step5Product";
+import { Step3PreviewOrder } from "@/components/wizard/Step3PreviewOrder";
+import { Step4Cart } from "@/components/wizard/Step4Cart";
 
 const stepComponents = {
-  1: Step1Template,
-  2: Step2Upload,
-  3: Step3Generating,
-  4: Step4Preview,
-  5: Step5Product,
+  1: Step1SetupPortrait,
+  2: Step3Generating,
+  3: Step3PreviewOrder,
+  4: Step4Cart,
 };
+
+// Reads ?template=slug and pre-selects the template when landing on step 1 directly
+function TemplateAutoSelect() {
+  const searchParams = useSearchParams();
+  const { selectedTemplate, selectTemplate, step } = useWizardStore();
+
+  useEffect(() => {
+    // If we're already past step 1 (came from template detail page), don't touch state
+    if (step > 1) return;
+    const slug = searchParams.get("template");
+    if (!slug || selectedTemplate) return;
+
+    getPublicTemplate(slug).then((t) => {
+      if (!t) return;
+      selectTemplate({
+        id: t.id,
+        slug: t.slug,
+        name: t.name,
+        category: t.category,
+        style: t.style,
+        uploadSlots: parseUploadSlots(t.uploadSlotsJson),
+      });
+    });
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  return null;
+}
 
 export default function CreatePage() {
   const step = useWizardStore((s) => s.step);
-  const StepComponent = stepComponents[step];
-  const isGenerating = step === 3;
+  const StepComponent = stepComponents[step as keyof typeof stepComponents];
+  const isGenerating = step === 2;
 
   return (
     <div className="min-h-screen bg-[#FAF6F0] flex flex-col">
+      <Suspense fallback={null}>
+        <TemplateAutoSelect />
+      </Suspense>
+
       {/* Top bar */}
       <header className="bg-white border-b border-[#E4D8CC] sticky top-0 z-40">
         <div className="max-w-5xl mx-auto px-6 h-14 flex items-center justify-between gap-6">
@@ -39,7 +72,6 @@ export default function CreatePage() {
 
           <WizardProgress current={step} />
 
-          {/* Spacer to balance layout */}
           <div className="w-24" />
         </div>
       </header>

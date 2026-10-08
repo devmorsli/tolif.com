@@ -6,12 +6,16 @@ import { Plus, Minus } from "lucide-react";
 
 const faqs = [
   {
+    q: "What kinds of portraits can I create?",
+    a: "Any kind — families, couples, solo portraits, friends, and people with pets. We offer 8 different artistic styles including classic oil painting, impressionist, watercolour, golden hour, and digital art. More templates are added regularly.",
+  },
+  {
     q: "How realistic will my portrait look?",
-    a: "Our AI is trained specifically for portrait recreation. It captures facial features, expressions, and your pet's unique markings with impressive accuracy. The quality depends on the reference photos — clear, well-lit images give the best results.",
+    a: "Our AI captures facial features, expressions, and each person's unique likeness with impressive accuracy. The quality depends on the reference photos — clear, well-lit images where faces are visible give the best results.",
   },
   {
     q: "What kind of photos should I upload?",
-    a: "Use clear, recent photos with good lighting where both the person and pet face the camera. Avoid heavy filters, sunglasses, or partial faces. The clearer the photo, the better the AI can recreate your likeness.",
+    a: "Use clear, recent photos with good lighting where each person faces the camera. Avoid heavy filters, sunglasses, or partial faces. The clearer the photo, the better the AI can recreate the likeness.",
   },
   {
     q: "How long does the preview take?",

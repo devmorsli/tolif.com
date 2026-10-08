@@ -96,6 +96,7 @@ services:
       - api
     environment:
       NEXT_PUBLIC_API_URL: http://localhost:5000
+      API_INTERNAL_URL: http://api:8080
       NODE_ENV: production
     ports:
       - "3000:3000"

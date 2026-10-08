@@ -2,8 +2,10 @@
 
 import { useState, useEffect } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
 import { ShoppingBag, Menu, X } from "lucide-react";
+import { useWizardStore } from "@/store/wizardStore";
 
 const navLinks = [
   { href: "/portraits", label: "Templates" },
@@ -12,8 +14,20 @@ const navLinks = [
 ];
 
 export function Header() {
-  const [scrolled, setScrolled] = useState(false);
-  const [menuOpen, setMenuOpen] = useState(false);
+  const [scrolled, setScrolled]   = useState(false);
+  const [menuOpen, setMenuOpen]   = useState(false);
+  const router                    = useRouter();
+  const { selectedVariant, goTo } = useWizardStore();
+  const cartCount                 = selectedVariant ? 1 : 0;
+
+  const handleCartClick = () => {
+    if (selectedVariant) {
+      goTo(4);
+      router.push("/create");
+    } else {
+      router.push("/create");
+    }
+  };
 
   useEffect(() => {
     const handler = () => setScrolled(window.scrollY > 40);
@@ -56,9 +70,15 @@ export function Header() {
           <div className="flex items-center gap-3">
             <button
               aria-label="Cart"
+              onClick={handleCartClick}
               className="relative w-9 h-9 flex items-center justify-center rounded-full hover:bg-[#F2EAE0] transition-colors"
             >
               <ShoppingBag size={18} className="text-[#1A1714]" />
+              {cartCount > 0 && (
+                <span className="absolute -top-0.5 -right-0.5 w-4 h-4 bg-[#C4622D] text-white text-[9px] font-bold rounded-full flex items-center justify-center">
+                  {cartCount}
+                </span>
+              )}
             </button>
 
             <Link

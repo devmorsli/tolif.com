@@ -13,42 +13,6 @@ const fadeUp = {
   }),
 };
 
-// Decorative portrait placeholder cards
-const portraits = [
-  {
-    id: 1,
-    gradient: "from-[#C4622D]/20 via-[#E8A838]/10 to-[#2D4A3E]/20",
-    label: "Woman & Golden Retriever",
-    rotation: "-6deg",
-    scale: 1,
-    top: "5%",
-    left: "4%",
-    delay: "0s",
-    size: "w-44 h-56",
-  },
-  {
-    id: 2,
-    gradient: "from-[#2D4A3E]/20 via-[#C4622D]/15 to-[#D4942A]/20",
-    label: "Couple & Labrador",
-    rotation: "4deg",
-    scale: 1,
-    top: "18%",
-    left: "48%",
-    delay: "0.8s",
-    size: "w-52 h-64",
-  },
-  {
-    id: 3,
-    gradient: "from-[#D4942A]/20 via-[#F0D5C0]/30 to-[#C4622D]/15",
-    label: "Man & Cat",
-    rotation: "-3deg",
-    scale: 1,
-    top: "55%",
-    left: "18%",
-    delay: "1.6s",
-    size: "w-40 h-52",
-  },
-];
 
 export function HeroSection() {
   return (
@@ -86,13 +50,13 @@ export function HeroSection() {
             animate="show"
             className="text-6xl sm:text-7xl lg:text-8xl font-display font-light text-[#1A1714] leading-[0.95] tracking-tight"
           >
-            Your bond,
+            Every story
             <br />
             <em className="text-[#C4622D] not-italic font-medium">
-              painted
+              deserves
             </em>
             <br />
-            forever.
+            a portrait.
           </motion.h1>
 
           {/* Subtext */}
@@ -103,8 +67,9 @@ export function HeroSection() {
             animate="show"
             className="mt-7 text-lg text-[#8C7B6B] leading-relaxed max-w-md font-light"
           >
-            Upload your photo and your pet's photo. Our AI recreates a
-            beautiful portrait — your faces, your story, one timeless image.
+            Upload your photos — families, couples, individuals, pets — and our
+            AI recreates a beautiful portrait in the style you choose. Your
+            faces, your story, one timeless image.
           </motion.p>
 
           {/* CTA row */}
@@ -159,77 +124,108 @@ export function HeroSection() {
                 ))}
                 <span className="text-sm font-semibold text-[#1A1714] ml-1">4.9</span>
               </div>
-              <p className="text-xs text-[#8C7B6B] mt-0.5">Loved by 2,400+ pet owners</p>
+              <p className="text-xs text-[#8C7B6B] mt-0.5">Loved by 2,400+ customers worldwide</p>
             </div>
           </motion.div>
         </div>
 
-        {/* ── Right: Floating portrait frames ── */}
-        <div className="relative h-[540px] hidden lg:block">
-          {portraits.map((p) => (
-            <motion.div
-              key={p.id}
-              initial={{ opacity: 0, scale: 0.88, y: 20 }}
-              animate={{ opacity: 1, scale: 1, y: 0 }}
-              transition={{
-                delay: 0.4 + p.id * 0.15,
-                duration: 0.9,
-                ease: "easeOut" as const,
-              }}
-              className={`absolute ${p.size} portrait-frame overflow-hidden`}
-              style={{
-                top: p.top,
-                left: p.left,
-                transform: `rotate(${p.rotation})`,
-                animationDelay: p.delay,
-              }}
-            >
-              {/* Gradient portrait placeholder */}
-              <div
-                className={`w-full h-full bg-gradient-to-br ${p.gradient} flex flex-col items-center justify-end p-3`}
+        {/* ── Right: 2×2 portrait grid ── */}
+        <div className="hidden lg:flex items-center justify-center">
+          <div className="grid grid-cols-2 gap-4 items-end">
+            {/* Col 1: big top, small bottom */}
+            <div className="flex flex-col gap-4 items-end">
+              {/* Card 1 — big */}
+              <motion.div
+                initial={{ opacity: 0, scale: 0.88, y: 20 }}
+                animate={{ opacity: 1, scale: 1, y: 0 }}
+                transition={{ delay: 0.5, duration: 0.9, ease: "easeOut" }}
+                className="portrait-frame overflow-hidden"
+                style={{ width: 200, height: 260, transform: "rotate(-3deg)" }}
               >
-                {/* Simulated portrait silhouette */}
-                <div className="absolute inset-0 flex items-center justify-center opacity-20">
-                  <div className="w-16 h-16 rounded-full bg-[#8C7B6B]" />
+                <div className="w-full h-full bg-gradient-to-br from-[#C4622D]/25 via-[#E8A838]/15 to-[#F0D5C0]/30 flex flex-col items-center justify-end p-3">
+                  <div className="absolute inset-0 flex items-center justify-center opacity-25">
+                    <div className="flex gap-1 items-end">
+                      <div className="w-9 h-9 rounded-full bg-[#8C7B6B]" />
+                      <div className="w-7 h-7 rounded-full bg-[#C4622D]" />
+                      <div className="w-5 h-5 rounded-full bg-[#8C7B6B]" />
+                    </div>
+                  </div>
+                  <div className="relative z-10 w-full bg-white/60 backdrop-blur-sm rounded-sm px-2 py-1.5 text-center">
+                    <p className="text-[10px] font-medium text-[#1A1714]">Family &amp; Dog</p>
+                  </div>
                 </div>
-                <div className="absolute bottom-16 left-1/2 -translate-x-1/2 w-10 h-10 rounded-full bg-[#C4622D]/30" />
-                <div className="relative z-10 w-full bg-white/60 backdrop-blur-sm rounded-sm px-2 py-1.5 text-center">
-                  <p className="text-[10px] font-medium text-[#1A1714] leading-tight">{p.label}</p>
+              </motion.div>
+
+              {/* Card 3 — small */}
+              <motion.div
+                initial={{ opacity: 0, scale: 0.88, y: 20 }}
+                animate={{ opacity: 1, scale: 1, y: 0 }}
+                transition={{ delay: 0.9, duration: 0.9, ease: "easeOut" }}
+                className="portrait-frame overflow-hidden"
+                style={{ width: 155, height: 200, transform: "rotate(-2deg)" }}
+              >
+                <div className="w-full h-full bg-gradient-to-br from-[#2D4A3E]/25 via-[#4A7A66]/15 to-[#D4942A]/20 flex flex-col items-center justify-end p-3">
+                  <div className="absolute inset-0 flex items-center justify-center opacity-25 flex-col gap-1">
+                    <div className="w-10 h-10 rounded-full bg-[#2D4A3E]" />
+                    <div className="w-14 h-3 rounded-full bg-[#2D4A3E]/60" />
+                  </div>
+                  <div className="relative z-10 w-full bg-white/60 backdrop-blur-sm rounded-sm px-2 py-1.5 text-center">
+                    <p className="text-[10px] font-medium text-[#1A1714]">Grandfather</p>
+                  </div>
                 </div>
-              </div>
+              </motion.div>
+            </div>
 
-              {/* Floating animation overlay */}
-              <div
-                className="absolute inset-0"
-                style={{
-                  animation: `float-slow ${5 + p.id}s ease-in-out infinite`,
-                  animationDelay: p.delay,
-                }}
-              />
-            </motion.div>
-          ))}
+            {/* Col 2: small top, big bottom */}
+            <div className="flex flex-col gap-4 items-start">
+              {/* Card 2 — small */}
+              <motion.div
+                initial={{ opacity: 0, scale: 0.88, y: 20 }}
+                animate={{ opacity: 1, scale: 1, y: 0 }}
+                transition={{ delay: 0.7, duration: 0.9, ease: "easeOut" }}
+                className="portrait-frame overflow-hidden"
+                style={{ width: 155, height: 200, transform: "rotate(3deg)" }}
+              >
+                <div className="w-full h-full bg-gradient-to-br from-[#D4942A]/25 via-[#F5E6C8]/30 to-[#C4622D]/20 flex flex-col items-center justify-end p-3">
+                  <div className="absolute inset-0 flex items-center justify-center opacity-25 flex-col gap-1">
+                    <div className="w-8 h-8 rounded-full bg-[#D4942A]" />
+                    <div className="w-5 h-3 rounded-full bg-[#D4942A]/60" />
+                  </div>
+                  <div className="relative z-10 w-full bg-white/60 backdrop-blur-sm rounded-sm px-2 py-1.5 text-center">
+                    <p className="text-[10px] font-medium text-[#1A1714]">Birthday Portrait</p>
+                  </div>
+                </div>
+              </motion.div>
 
-          {/* Price badge floating */}
-          <motion.div
-            initial={{ opacity: 0, scale: 0.8 }}
-            animate={{ opacity: 1, scale: 1 }}
-            transition={{ delay: 1.2, duration: 0.5 }}
-            className="absolute bottom-12 right-0 bg-white rounded-2xl shadow-xl border border-[#E4D8CC] px-5 py-4"
-          >
-            <p className="text-xs text-[#8C7B6B] uppercase tracking-wider font-medium">Starting from</p>
-            <p className="text-3xl font-display font-semibold text-[#1A1714] mt-0.5">€19.99</p>
-            <p className="text-xs text-[#8C7B6B] mt-1">Digital download</p>
-          </motion.div>
-
-          {/* Preview badge */}
-          <motion.div
-            initial={{ opacity: 0, x: -20 }}
-            animate={{ opacity: 1, x: 0 }}
-            transition={{ delay: 1.5, duration: 0.5 }}
-            className="absolute top-4 right-4 bg-[#2D4A3E] text-white rounded-xl px-4 py-2.5 text-xs font-medium"
-          >
-            ✓ Free preview
-          </motion.div>
+              {/* Card 4 — big */}
+              <motion.div
+                initial={{ opacity: 0, scale: 0.88, y: 20 }}
+                animate={{ opacity: 1, scale: 1, y: 0 }}
+                transition={{ delay: 1.1, duration: 0.9, ease: "easeOut" }}
+                className="portrait-frame overflow-hidden relative"
+                style={{ width: 200, height: 260, transform: "rotate(3deg)" }}
+              >
+                <div className="w-full h-full bg-gradient-to-br from-[#8B2E0A]/20 via-[#C4622D]/15 to-[#2D4A3E]/25 flex flex-col items-center justify-end p-3">
+                  <div className="absolute inset-0 flex items-center justify-center opacity-25 flex-col gap-1">
+                    <div className="w-9 h-9 rounded-full bg-[#8B2E0A]" />
+                  </div>
+                  <div className="relative z-10 w-full bg-white/60 backdrop-blur-sm rounded-sm px-2 py-1.5 text-center">
+                    <p className="text-[10px] font-medium text-[#1A1714]">General&apos;s Portrait</p>
+                  </div>
+                </div>
+                {/* Free preview pill */}
+                <motion.div
+                  initial={{ opacity: 0, scale: 0.8 }}
+                  animate={{ opacity: 1, scale: 1 }}
+                  transition={{ delay: 1.8, duration: 0.4 }}
+                  className="absolute -top-3 -right-4 bg-[#2D4A3E] text-white rounded-full px-3 py-1 text-[10px] font-medium shadow-md z-20 whitespace-nowrap"
+                  style={{ transform: "rotate(-3deg)" }}
+                >
+                  Free preview
+                </motion.div>
+              </motion.div>
+            </div>
+          </div>
         </div>
       </div>
 

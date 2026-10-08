@@ -28,8 +28,8 @@ export default function PrivacyPage() {
           body: "Under GDPR you have the right to: access the personal data we hold about you; request correction of inaccurate data; request deletion of your data ('right to be forgotten'); object to processing; request data portability. To exercise any of these rights, email hello@tolif.com.",
         },
         {
-          title: "5. Cookies",
-          body: "We use essential cookies for the website to function and analytics cookies (with your consent) to understand how visitors use the site. You can manage cookies via the consent banner or your browser settings.",
+          title: "5. Cookies & tracking pixels",
+          body: "We use essential cookies for the website to function. With your consent, we also use advertising and analytics pixels:\n\n• Google Analytics 4 — tracks page views and conversion events.\n• Google Ads — measures which ads led to purchases.\n• Meta Pixel (Facebook / Instagram) — records purchase events and page views so we can measure the performance of our Facebook and Instagram ads and build relevant audiences. Meta may use this data according to its own Data Policy.\n• TikTok Pixel — measures the performance of our TikTok ads.\n\nNone of these pixels receive your uploaded portrait photos. You can manage or withdraw consent via the cookie settings link in the footer. See our full Cookie Policy for details.",
         },
         {
           title: "6. Third-party services",

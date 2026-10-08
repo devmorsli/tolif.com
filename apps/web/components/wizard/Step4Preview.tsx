@@ -9,7 +9,6 @@ export function Step4Preview() {
     selectedTemplate,
     previewUrl,
     regenerationsLeft,
-    decrementRegenerations,
     setGenerationStatus,
     goTo,
     next,
@@ -18,7 +17,7 @@ export function Step4Preview() {
 
   const handleRegenerate = () => {
     if (regenerationsLeft <= 0) return;
-    decrementRegenerations();
+    // Don't decrement locally — backend is the source of truth.
     setGenerationStatus("idle");
     goTo(3);
   };
@@ -44,7 +43,7 @@ export function Step4Preview() {
             transition={{ duration: 0.6 }}
             className="relative rounded-2xl overflow-hidden portrait-frame"
           >
-            {previewUrl && previewUrl !== "/placeholder-preview.jpg" ? (
+            {previewUrl ? (
               // eslint-disable-next-line @next/next/no-img-element
               <img
                 src={previewUrl}
@@ -52,7 +51,6 @@ export function Step4Preview() {
                 className="w-full aspect-[3/4] object-cover"
               />
             ) : (
-              /* Placeholder when no real preview yet */
               <div className="w-full aspect-[3/4] bg-gradient-to-br from-[#C4622D]/20 via-[#E8A838]/15 to-[#2D4A3E]/20 flex flex-col items-center justify-center gap-4">
                 <span className="text-7xl opacity-30">🧑🐕</span>
                 <p className="text-[#8C7B6B] text-sm">Portrait preview</p>

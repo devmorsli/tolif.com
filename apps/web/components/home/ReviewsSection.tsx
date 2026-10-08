@@ -10,9 +10,9 @@ const reviews = [
     name: "Sophie M.",
     location: "Amsterdam, NL",
     avatar: "👩‍🦰",
-    pet: "Luna, Golden Retriever",
+    subject: "Family Portrait",
     rating: 5,
-    text: "I ordered this as a birthday gift for my mum and she cried when she saw it. The likeness is incredible — it looks like an actual oil painting. Already ordering one for myself!",
+    text: "I ordered the family portrait as a birthday gift for my mum and she cried when she saw it. The likeness is incredible — it looks like an actual oil painting. Already ordering one for myself!",
     product: "Framed Print 50×70cm",
     date: "2 weeks ago",
   },
@@ -21,9 +21,9 @@ const reviews = [
     name: "Marco R.",
     location: "Milan, IT",
     avatar: "🧔",
-    pet: "Oscar, Persian Cat",
+    subject: "Couple Portrait",
     rating: 5,
-    text: "I was skeptical about AI portraits, but this is genuinely beautiful. The style, the colours, the way they captured Oscar's personality — I'm blown away.",
+    text: "I was skeptical about AI portraits, but this is genuinely beautiful. The style, the colours, the way they captured our expressions — my girlfriend and I are blown away. Perfect anniversary gift.",
     product: "Canvas 30×40cm",
     date: "1 month ago",
   },
@@ -32,9 +32,9 @@ const reviews = [
     name: "Emma L.",
     location: "London, UK",
     avatar: "👩",
-    pet: "Biscuit & Mochi (2 cats)",
+    subject: "Best Friends",
     rating: 5,
-    text: "Ordered the multiple pets template for me and my two cats. The preview came back in minutes and it was already stunning. Hung it in the living room and everyone asks about it.",
+    text: "Ordered the best friends watercolour template for me and my two sisters. The preview came back in minutes and it was already stunning. Hung it in the living room and everyone asks about it.",
     product: "Digital + Poster",
     date: "3 weeks ago",
   },
@@ -43,7 +43,7 @@ const reviews = [
     name: "Lukas B.",
     location: "Berlin, DE",
     avatar: "👨‍🦱",
-    pet: "Bruno, Beagle",
+    subject: "Solo Studio Portrait",
     rating: 5,
     text: "The quality of the high-res file is incredible. Printed it at A1 and it's absolutely sharp. Customer support was amazing when I needed a slight regeneration — no questions asked.",
     product: "Digital Download",
@@ -76,7 +76,7 @@ export function ReviewsSection() {
             Customer Stories
           </span>
           <h2 className="text-5xl font-display font-light text-white leading-tight">
-            Pet lovers who
+            People who
             <br />
             <em className="not-italic font-medium text-[#D4942A]">treasure their portraits</em>
           </h2>
@@ -115,7 +115,7 @@ export function ReviewsSection() {
 
               {/* Product purchased */}
               <div className="text-xs text-[#D4942A]/70 font-medium">
-                {review.product}
+                {review.subject} · {review.product}
               </div>
 
               {/* Reviewer */}

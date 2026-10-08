@@ -15,6 +15,7 @@ public class Template : BaseEntity
     public AiProvider? AiProviderOverride { get; set; }
     public bool IsActive { get; set; } = true;
     public int SortOrder { get; set; }
+    public string? Style { get; set; }          // e.g. "Oil Painting", "Watercolour"
     public string? SeoTitle { get; set; }
     public string? SeoDescription { get; set; }
     public string? OgImageKey { get; set; }

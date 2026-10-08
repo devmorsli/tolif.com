@@ -10,7 +10,7 @@ const steps = [
     icon: Upload,
     title: "Upload your photos",
     description:
-      "Choose a template, then upload a clear photo of yourself and one of your pet. Our AI reads faces and fur — the better your photo, the more stunning the result.",
+      "Choose a template — family, couple, solo, or pet — then upload clear photos of the people or animals to include. The better your photo, the more stunning the result.",
     color: "#C4622D",
     bg: "#F9ECE4",
   },
@@ -19,7 +19,7 @@ const steps = [
     icon: Wand2,
     title: "AI creates your portrait",
     description:
-      "Our AI recreates the template portrait with your exact likeness and your pet's. A watermarked preview is ready in minutes for you to review and love.",
+      "Our AI recreates the template portrait with everyone's exact likeness. A watermarked preview is ready in minutes for you to review — and if you'd like changes, regenerate for free.",
     color: "#D4942A",
     bg: "#FDF4E3",
   },

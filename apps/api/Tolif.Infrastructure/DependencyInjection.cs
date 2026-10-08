@@ -8,7 +8,10 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Tolif.Application.Interfaces;
+using Tolif.Infrastructure.AI;
+using Tolif.Infrastructure.Jobs;
 using Tolif.Infrastructure.Persistence;
+using Tolif.Infrastructure.Services;
 using Tolif.Infrastructure.Storage;
 
 namespace Tolif.Infrastructure;
@@ -26,6 +29,7 @@ public static class DependencyInjection
                 npgsql => npgsql.MigrationsAssembly(typeof(ApplicationDbContext).Assembly.GetName().Name)));
 
         services.AddScoped<IApplicationDbContext>(sp => sp.GetRequiredService<ApplicationDbContext>());
+        services.AddScoped<ISettingsService, SettingsService>();
 
         // ── Identity ────────────────────────────────────────────────────────
         services.AddIdentity<AdminUser, IdentityRole>(opts =>
@@ -53,11 +57,45 @@ public static class DependencyInjection
             var s3Config = new AmazonS3Config
             {
                 ServiceURL = endpoint,
-                ForcePathStyle = true   // required for MinIO and most S3-compatible services
+                ForcePathStyle = true
             };
             return new AmazonS3Client(new BasicAWSCredentials(accessKey, secretKey), s3Config);
         });
         services.AddScoped<IStorageService, S3StorageService>();
+        services.AddSingleton<IWatermarkService, WatermarkService>();
+
+        // ── AI Providers ────────────────────────────────────────────────────
+        // Register concrete providers (used by FallbackImageGenerationProvider)
+        services.AddScoped<GeminiImageGenerationProvider>();
+        services.AddScoped<FalAiImageGenerationProvider>();
+        services.AddScoped<OpenAiImageGenerationProvider>();
+        // FallbackImageGenerationProvider is the main IImageGenerationProvider used everywhere
+        services.AddScoped<IImageGenerationProvider, FallbackImageGenerationProvider>();
+
+        // ── Email ──────────────────────────────────────────────────────────
+        services.AddHttpClient("resend");
+        services.AddScoped<MailKitEmailService>();
+        services.AddScoped<ResendEmailService>();
+        services.AddScoped<IEmailService, RoutingEmailService>();
+        services.AddScoped<IOrderEmailService, OrderEmailService>();
+
+        // ── Analytics ─────────────────────────────────────────────────────
+        services.AddScoped<IAnalyticsService, AnalyticsService>();
+
+        // ── Print providers ────────────────────────────────────────────────
+        services.AddHttpClient("printful");
+        services.AddHttpClient("printify");
+        services.AddScoped<IPrintfulService, PrintfulService>();
+        // Register both as IPrintProvider for the SubmitPrintOrderJob to resolve
+        services.AddScoped<IPrintProvider, PrintfulAdapterService>();
+        services.AddScoped<IPrintProvider, PrintifyService>();
+
+        // ── Background jobs ────────────────────────────────────────────────
+        services.AddScoped<GenerateHighResJob>();
+        services.AddScoped<SendOrderEmailJob>();
+        services.AddScoped<SubmitPrintOrderJob>();
+        services.AddScoped<DeleteExpiredPhotosJob>();
+        services.AddScoped<CleanupOrphanedUploadsJob>();
 
         // ── Hangfire ────────────────────────────────────────────────────────
         services.AddHangfire(hf => hf

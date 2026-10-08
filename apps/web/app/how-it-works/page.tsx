@@ -8,7 +8,7 @@ import { ArrowRight } from "lucide-react";
 
 export const metadata: Metadata = {
   title: "How It Works",
-  description: "Three simple steps to get a stunning AI portrait of you and your pet. Upload, preview for free, then order.",
+  description: "Three simple steps to get a stunning AI portrait — families, couples, solo, pets and groups. Upload, preview for free, then order.",
 };
 
 export default function HowItWorksPage() {

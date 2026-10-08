@@ -51,6 +51,10 @@ public static class DbSeeder
         await UpsertSettingAsync(db, "store.language.default", "en");
         await UpsertSettingAsync(db, "store.languages.supported", "en");
         await UpsertSettingAsync(db, "print.provider.active", "Printful");
+        await UpsertSettingAsync(db, "email.provider",     "smtp");
+        await UpsertSettingAsync(db, "email.fromAddress",  "noreply@tolif.com");
+        await UpsertSettingAsync(db, "email.fromName",     "Tolif");
+        await UpsertSettingAsync(db, "resend.apiKey",      "");
 
         // ── Products ───────────────────────────────────────────────────────
         if (!await db.Products.AnyAsync())
@@ -60,7 +64,7 @@ public static class DbSeeder
             var framed  = new Product { Name = "Framed Print",     Type = ProductType.FramedPrint, SortOrder = 2 };
             var canvas  = new Product { Name = "Canvas",           Type = ProductType.Canvas,  SortOrder = 3 };
 
-            digital.Variants.Add(new ProductVariant { Size = "Digital (High-Res PNG)", Price = 19.99m, Currency = "EUR" });
+            digital.Variants.Add(new ProductVariant { Size = "Digital (High-Res PNG)", Price = 9.99m,  Currency = "USD" });
             poster.Variants.Add(new ProductVariant  { Size = "30×40 cm",               Price = 34.99m, Currency = "EUR" });
             poster.Variants.Add(new ProductVariant  { Size = "50×70 cm",               Price = 44.99m, Currency = "EUR" });
             framed.Variants.Add(new ProductVariant  { Size = "30×40 cm",               Price = 59.99m, Currency = "EUR" });

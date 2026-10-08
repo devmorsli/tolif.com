@@ -3,19 +3,23 @@ import Link from "next/link";
 const footerLinks = {
   Shop: [
     { href: "/portraits", label: "All Templates" },
-    { href: "/portraits?category=dogs", label: "Dogs" },
-    { href: "/portraits?category=cats", label: "Cats" },
-    { href: "/portraits?category=couples", label: "Couples & Pets" },
+    { href: "/portraits?category=Families", label: "Families" },
+    { href: "/portraits?category=Couples", label: "Couples" },
+    { href: "/portraits?category=Pets", label: "Pets" },
+    { href: "/portraits?category=Groups", label: "Groups" },
   ],
   Help: [
     { href: "/how-it-works", label: "How It Works" },
     { href: "/faq", label: "FAQ" },
     { href: "/contact", label: "Contact" },
+    { href: "/about", label: "About Us" },
   ],
   Legal: [
     { href: "/privacy", label: "Privacy Policy" },
     { href: "/terms", label: "Terms of Service" },
-    { href: "/refunds", label: "Refund Policy" },
+    { href: "/refunds", label: "No-Refund Policy" },
+    { href: "/shipping", label: "Shipping Policy" },
+    { href: "/cookies", label: "Cookie Policy" },
   ],
 };
 
@@ -28,7 +32,7 @@ export function Footer() {
           <div className="col-span-2 md:col-span-1">
             <span className="text-3xl font-display font-semibold tracking-tight">tolif</span>
             <p className="mt-4 text-sm text-white/60 leading-relaxed max-w-xs">
-              Beautiful AI portraits of you and your pet, crafted with love. Digital downloads and premium prints shipped worldwide.
+              Beautiful AI portraits for families, couples, individuals and pets. Digital downloads and premium prints shipped worldwide.
             </p>
           </div>
 
@@ -56,7 +60,7 @@ export function Footer() {
 
         <div className="mt-16 pt-8 border-t border-white/10 flex flex-col sm:flex-row items-center justify-between gap-4 text-xs text-white/40">
           <span>© {new Date().getFullYear()} Tolif. All rights reserved.</span>
-          <span>Made with ♥ for pet lovers everywhere</span>
+          <span>Made with ♥ for every story worth telling</span>
         </div>
       </div>
     </footer>

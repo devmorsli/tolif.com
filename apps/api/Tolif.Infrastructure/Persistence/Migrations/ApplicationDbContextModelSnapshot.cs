@@ -678,6 +678,9 @@ namespace Tolif.Infrastructure.Persistence.Migrations
                     b.Property<int>("SortOrder")
                         .HasColumnType("integer");
 
+                    b.Property<string>("Style")
+                        .HasColumnType("text");
+
                     b.Property<string>("TemplateImageKey")
                         .IsRequired()
                         .HasColumnType("text");
