@@ -17,7 +17,9 @@ services:
 
   # ── MinIO (S3-compatible object storage) ────────────────────────────────────
   minio:
-    image: ghcr.io/minio/minio:latest
+    build:
+      context: ./docker/minio
+      dockerfile: Dockerfile
     restart: unless-stopped
     command: server /data --console-address ":9001"
     environment:
