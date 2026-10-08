@@ -13,50 +13,12 @@ import {
 } from "lucide-react";
 import {
   parseUploadSlots, templateImageUrl, categoryGradient,
-  type PublicTemplate,
+  getPublicReviews, type PublicTemplate, type PublicReview,
 } from "@/lib/public-api";
 import { useWizardStore } from "@/store/wizardStore";
 
 // ── Static data ───────────────────────────────────────────────────────────────
 
-const ALL_REVIEWS = [
-  {
-    id: 1, name: "Sophie M.", location: "Amsterdam, NL", avatar: "👩‍🦰",
-    categories: ["Families", "Groups"],
-    rating: 5, date: "2 weeks ago", product: "Framed Print 50×70 cm",
-    text: "I ordered this as a birthday gift for my mum and she cried when she saw it. The likeness is incredible — it looks like an actual oil painting.",
-  },
-  {
-    id: 2, name: "Marco R.", location: "Milan, IT", avatar: "🧔",
-    categories: ["Couples"],
-    rating: 5, date: "1 month ago", product: "Canvas 30×40 cm",
-    text: "I was skeptical about AI portraits, but this is genuinely beautiful. My girlfriend and I are completely blown away. Perfect anniversary gift.",
-  },
-  {
-    id: 3, name: "Emma L.", location: "London, UK", avatar: "👩",
-    categories: ["Families", "Groups", "Solo"],
-    rating: 5, date: "3 weeks ago", product: "Digital + Poster",
-    text: "The preview came back in minutes and it was already stunning. Hung it in the living room and everyone asks about it.",
-  },
-  {
-    id: 4, name: "Lukas B.", location: "Berlin, DE", avatar: "👨‍🦱",
-    categories: ["Solo"],
-    rating: 5, date: "5 days ago", product: "Digital Download",
-    text: "Quality is incredible. Printed it at A1 and it is absolutely sharp. Customer support was amazing when I wanted a slight adjustment.",
-  },
-  {
-    id: 5, name: "Camille D.", location: "Paris, FR", avatar: "👩‍🦳",
-    categories: ["Pets"],
-    rating: 5, date: "1 week ago", product: "Framed Print",
-    text: "My dog's portrait made me sob happy tears. Every fur detail, every expression — captured perfectly. Already gifting one to my mum for Christmas.",
-  },
-  {
-    id: 6, name: "Jonas H.", location: "Zürich, CH", avatar: "🧑",
-    categories: ["Couples", "Families"],
-    rating: 5, date: "2 months ago", product: "Canvas 50×70 cm",
-    text: "Ordered for our wedding anniversary. The romantic portrait style is exactly what I imagined. Will absolutely order again.",
-  },
-];
 
 const FAQS = [
   {
@@ -187,6 +149,7 @@ export function TemplateDetailClient({
   const [tipsOpen, setTipsOpen] = useState(false);
   const [launching, setLaunching] = useState(false);
   const [openFaq, setOpenFaq] = useState<number | null>(null);
+  const [reviews, setReviews] = useState<PublicReview[]>([]);
 
   const trustRef = useRef<HTMLDivElement>(null);
   const stepsRef = useRef<HTMLDivElement>(null);
@@ -201,6 +164,10 @@ export function TemplateDetailClient({
   const relatedInView = useInView(relatedRef, { once: true, margin: "-40px" });
 
   const imgUrl = templateImageUrl(template.templateImageKey);
+
+  useEffect(() => {
+    getPublicReviews().then(setReviews);
+  }, []);
 
   useEffect(() => {
     const cur = useWizardStore.getState().selectedTemplate;
@@ -236,9 +203,7 @@ export function TemplateDetailClient({
   const circumference = 2 * Math.PI * radius;
   const dash         = circumference * (requiredSlots.length > 0 ? uploadedRequired / requiredSlots.length : 0);
 
-  // Category-relevant reviews (fall back to all if not enough)
-  const categoryReviews = ALL_REVIEWS.filter((r) => r.categories.includes(template.category));
-  const displayReviews  = categoryReviews.length >= 3 ? categoryReviews.slice(0, 3) : ALL_REVIEWS.slice(0, 3);
+  const displayReviews = reviews.slice(0, 3);
 
   return (
     <>
@@ -654,14 +619,30 @@ export function TemplateDetailClient({
                   transition={{ delay: i * 0.1, duration: 0.6 }}
                   className="bg-white/8 backdrop-blur-sm border border-white/10 rounded-2xl p-6 flex flex-col gap-4 hover:bg-white/12 transition-colors"
                 >
+                  {r.mediaUrl && (
+                    <div className="w-full h-28 rounded-xl overflow-hidden bg-white/5">
+                      <img src={r.mediaUrl} alt="Review media" className="w-full h-full object-cover"
+                        onError={(e) => { (e.currentTarget.parentElement as HTMLDivElement).style.display = "none"; }} />
+                    </div>
+                  )}
                   <StarRow n={r.rating} />
                   <p className="text-white/80 text-sm leading-relaxed flex-1">&ldquo;{r.text}&rdquo;</p>
-                  <div className="text-xs text-[#D4942A]/70 font-medium">{r.product}</div>
+                  <div className="text-xs text-[#D4942A]/70 font-medium">
+                    {r.subject}{r.product ? ` · ${r.product}` : ""}
+                  </div>
                   <div className="flex items-center gap-3 pt-3 border-t border-white/10">
-                    <div className="w-9 h-9 rounded-full bg-white/10 flex items-center justify-center text-lg">{r.avatar}</div>
+                    {r.profilePhotoUrl ? (
+                      <img src={r.profilePhotoUrl} alt={r.name}
+                        className="w-9 h-9 rounded-full object-cover shrink-0"
+                        onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = "none"; }} />
+                    ) : (
+                      <div className="w-9 h-9 rounded-full bg-white/10 flex items-center justify-center text-white text-xs font-bold shrink-0">
+                        {r.name.split(" ").map((p) => p[0] ?? "").join("").toUpperCase().slice(0, 2)}
+                      </div>
+                    )}
                     <div>
                       <p className="text-white text-sm font-medium">{r.name}</p>
-                      <p className="text-white/40 text-xs">{r.location} · {r.date}</p>
+                      <p className="text-white/40 text-xs">{r.location}</p>
                     </div>
                   </div>
                 </motion.div>

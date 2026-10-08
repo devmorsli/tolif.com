@@ -23,6 +23,7 @@ public class ApplicationDbContext : IdentityDbContext<AdminUser>, IApplicationDb
     public DbSet<DiscountCode> DiscountCodes => Set<DiscountCode>();
     public DbSet<Setting> Settings => Set<Setting>();
     public DbSet<AnalyticsEvent> AnalyticsEvents => Set<AnalyticsEvent>();
+    public DbSet<Review> Reviews => Set<Review>();
 
     protected override void OnModelCreating(ModelBuilder builder)
     {

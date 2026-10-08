@@ -132,6 +132,80 @@ export async function getPublicTemplate(slug: string): Promise<PublicTemplate | 
   }
 }
 
+// ── Reviews ────────────────────────────────────────────────────────────────────
+
+export interface PublicReview {
+  id: number;
+  name: string;
+  location: string;
+  profilePhotoUrl: string | null;
+  subject: string;
+  rating: number;
+  text: string;
+  product: string | null;
+  mediaUrl: string | null;
+}
+
+const REVIEW_FALLBACK: PublicReview[] = [
+  {
+    id: 1,
+    name: "Sophie M.",
+    location: "Amsterdam, NL",
+    profilePhotoUrl: null,
+    subject: "Family Portrait",
+    rating: 5,
+    text: "I ordered the family portrait as a birthday gift for my mum and she cried when she saw it. The likeness is incredible — it looks like an actual oil painting. Already ordering one for myself!",
+    product: "Framed Print 50×70cm",
+    mediaUrl: null,
+  },
+  {
+    id: 2,
+    name: "Marco R.",
+    location: "Milan, IT",
+    profilePhotoUrl: null,
+    subject: "Couple Portrait",
+    rating: 5,
+    text: "I was skeptical about AI portraits, but this is genuinely beautiful. The style, the colours, the way they captured our expressions — my girlfriend and I are blown away. Perfect anniversary gift.",
+    product: "Canvas 30×40cm",
+    mediaUrl: null,
+  },
+  {
+    id: 3,
+    name: "Emma L.",
+    location: "London, UK",
+    profilePhotoUrl: null,
+    subject: "Best Friends",
+    rating: 5,
+    text: "Ordered the best friends watercolour template for me and my two sisters. The preview came back in minutes and it was already stunning. Hung it in the living room and everyone asks about it.",
+    product: "Digital + Poster",
+    mediaUrl: null,
+  },
+  {
+    id: 4,
+    name: "Lukas B.",
+    location: "Berlin, DE",
+    profilePhotoUrl: null,
+    subject: "Solo Studio Portrait",
+    rating: 5,
+    text: "The quality of the high-res file is incredible. Printed it at A1 and it's absolutely sharp. Customer support was amazing when I needed a slight regeneration — no questions asked.",
+    product: "Digital Download",
+    mediaUrl: null,
+  },
+];
+
+export async function getPublicReviews(): Promise<PublicReview[]> {
+  try {
+    const res = await fetch(`${getApiBase()}/api/reviews`, {
+      next: { revalidate: 60 },
+    });
+    if (!res.ok) return REVIEW_FALLBACK;
+    const data: PublicReview[] = await res.json();
+    return data.length > 0 ? data : REVIEW_FALLBACK;
+  } catch {
+    return REVIEW_FALLBACK;
+  }
+}
+
 export function templateImageUrl(key: string): string {
   if (!key) return "";
   // Always uses the public URL — this is called from client components

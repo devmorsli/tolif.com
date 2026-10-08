@@ -118,6 +118,57 @@ public static class DbSeeder
             );
         }
 
+        // ── Reviews ────────────────────────────────────────────────────────────
+        if (!await db.Reviews.AnyAsync())
+        {
+            db.Reviews.AddRange(
+                new Review
+                {
+                    Name      = "Sophie M.",
+                    Location  = "Amsterdam, NL",
+                    Subject   = "Family Portrait",
+                    Rating    = 5,
+                    Text      = "I ordered the family portrait as a birthday gift for my mum and she cried when she saw it. The likeness is incredible — it looks like an actual oil painting. Already ordering one for myself!",
+                    Product   = "Framed Print 50×70cm",
+                    IsVisible = true,
+                    CreatedAt = DateTime.UtcNow.AddDays(-14)
+                },
+                new Review
+                {
+                    Name      = "Marco R.",
+                    Location  = "Milan, IT",
+                    Subject   = "Couple Portrait",
+                    Rating    = 5,
+                    Text      = "I was skeptical about AI portraits, but this is genuinely beautiful. The style, the colours, the way they captured our expressions — my girlfriend and I are blown away. Perfect anniversary gift.",
+                    Product   = "Canvas 30×40cm",
+                    IsVisible = true,
+                    CreatedAt = DateTime.UtcNow.AddDays(-30)
+                },
+                new Review
+                {
+                    Name      = "Emma L.",
+                    Location  = "London, UK",
+                    Subject   = "Best Friends",
+                    Rating    = 5,
+                    Text      = "Ordered the best friends watercolour template for me and my two sisters. The preview came back in minutes and it was already stunning. Hung it in the living room and everyone asks about it.",
+                    Product   = "Digital + Poster",
+                    IsVisible = true,
+                    CreatedAt = DateTime.UtcNow.AddDays(-21)
+                },
+                new Review
+                {
+                    Name      = "Lukas B.",
+                    Location  = "Berlin, DE",
+                    Subject   = "Solo Studio Portrait",
+                    Rating    = 5,
+                    Text      = "The quality of the high-res file is incredible. Printed it at A1 and it's absolutely sharp. Customer support was amazing when I needed a slight regeneration — no questions asked.",
+                    Product   = "Digital Download",
+                    IsVisible = true,
+                    CreatedAt = DateTime.UtcNow.AddDays(-5)
+                }
+            );
+        }
+
         await db.SaveChangesAsync();
     }
 

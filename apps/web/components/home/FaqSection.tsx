@@ -35,7 +35,7 @@ const faqs = [
   },
   {
     q: "What if I'm not satisfied with my purchase?",
-    a: "We offer a full refund if you're not happy with the final result. Just contact us within 14 days of purchase and we'll make it right — no questions asked.",
+    a: "All sales are final. Because each portrait is created on demand exclusively for you, we do not offer refunds or exchanges. We provide a free watermarked preview before any payment is required — you can review it and regenerate up to 5 times before purchasing. The only exception is if a technical failure occurs on our end (e.g. you were charged but never received your file) — in that case contact us at hello@tolif.com.",
   },
 ];
 

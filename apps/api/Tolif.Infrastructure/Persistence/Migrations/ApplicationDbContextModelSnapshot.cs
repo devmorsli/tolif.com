@@ -627,6 +627,53 @@ namespace Tolif.Infrastructure.Persistence.Migrations
                     b.ToTable("Settings");
                 });
 
+            modelBuilder.Entity("Tolif.Domain.Entities.Review", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<bool>("IsVisible")
+                        .HasColumnType("boolean");
+
+                    b.Property<string>("Location")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<string>("MediaKey")
+                        .HasColumnType("text");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<string>("Product")
+                        .HasColumnType("text");
+
+                    b.Property<string>("ProfilePhotoKey")
+                        .HasColumnType("text");
+
+                    b.Property<int>("Rating")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("Subject")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<string>("Text")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.HasKey("Id");
+
+                    b.ToTable("Reviews");
+                });
+
             modelBuilder.Entity("Tolif.Domain.Entities.Template", b =>
                 {
                     b.Property<Guid>("Id")

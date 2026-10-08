@@ -17,6 +17,7 @@ public interface IApplicationDbContext
     DbSet<DiscountCode> DiscountCodes { get; }
     DbSet<Setting> Settings { get; }
     DbSet<AnalyticsEvent> AnalyticsEvents { get; }
+    DbSet<Review> Reviews { get; }
 
     Task<int> SaveChangesAsync(CancellationToken cancellationToken = default);
 }

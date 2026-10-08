@@ -371,3 +371,51 @@ export async function addVariant(productId: string, size: string, price: number,
 export async function deleteVariant(id: string) {
   return apiFetch<void>(`/api/admin/products/variants/${id}`, { method: "DELETE" });
 }
+
+// ── Reviews ───────────────────────────────────────────────────────────────────
+
+export interface AdminReview {
+  id: number;
+  name: string;
+  location: string;
+  profilePhotoKey: string | null;
+  subject: string;
+  rating: number;
+  text: string;
+  product: string | null;
+  mediaKey: string | null;
+  isVisible: boolean;
+  createdAt: string;
+}
+
+export async function getAdminReviews(): Promise<AdminReview[]> {
+  return apiFetch<AdminReview[]>("/api/admin/reviews");
+}
+
+export async function createAdminReview(form: FormData): Promise<AdminReview> {
+  const token = typeof window !== "undefined" ? localStorage.getItem("admin_token") : null;
+  const res = await fetch(`${API_BASE}/api/admin/reviews`, {
+    method: "POST",
+    headers: token ? { Authorization: `Bearer ${token}` } : {},
+    body: form,
+    credentials: "include",
+  });
+  if (!res.ok) throw new Error(await res.text().catch(() => `HTTP ${res.status}`));
+  return res.json();
+}
+
+export async function updateAdminReview(id: number, form: FormData): Promise<AdminReview> {
+  const token = typeof window !== "undefined" ? localStorage.getItem("admin_token") : null;
+  const res = await fetch(`${API_BASE}/api/admin/reviews/${id}`, {
+    method: "PUT",
+    headers: token ? { Authorization: `Bearer ${token}` } : {},
+    body: form,
+    credentials: "include",
+  });
+  if (!res.ok) throw new Error(await res.text().catch(() => `HTTP ${res.status}`));
+  return res.json();
+}
+
+export async function deleteAdminReview(id: number): Promise<void> {
+  return apiFetch<void>(`/api/admin/reviews/${id}`, { method: "DELETE" });
+}

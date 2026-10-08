@@ -103,23 +103,13 @@ public class AdminTemplatesController(IApplicationDbContext db) : ControllerBase
 
     // ── DELETE /api/admin/templates/{id} ──────────────────────────────────────
     [HttpDelete("{id:guid}")]
-    public async Task<IActionResult> Delete(Guid id, [FromBody] DeleteTemplateRequest? req, CancellationToken ct)
+    public async Task<IActionResult> Delete(Guid id, CancellationToken ct)
     {
         var template = await db.Templates.FindAsync([id], ct);
         if (template is null)
             return NotFound();
 
-        if (req?.Hard == true)
-        {
-            db.Templates.Remove(template);
-        }
-        else
-        {
-            // Soft delete — deactivate
-            template.IsActive  = false;
-            template.UpdatedAt = DateTime.UtcNow;
-        }
-
+        db.Templates.Remove(template);
         await db.SaveChangesAsync(ct);
         return NoContent();
     }
@@ -205,4 +195,3 @@ public record TemplateResponseDto(
     DateTime UpdatedAt
 );
 
-public record DeleteTemplateRequest(bool Hard = false);
