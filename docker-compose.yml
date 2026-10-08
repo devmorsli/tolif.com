@@ -17,7 +17,7 @@ services:
 
   # ── MinIO (S3-compatible object storage) ────────────────────────────────────
   minio:
-    image: minio/minio:latest
+    image: ghcr.io/minio/minio:latest
     restart: unless-stopped
     command: server /data --console-address ":9001"
     environment:
