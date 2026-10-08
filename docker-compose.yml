@@ -79,7 +79,7 @@ services:
       ADMIN_EMAIL: ${ADMIN_EMAIL:-admin@tolif.com}
       ADMIN_PASSWORD: ${ADMIN_PASSWORD:-Admin@12345!}
       JWT_SECRET: ${JWT_SECRET:-change_me_jwt_secret_min_32_chars_long}
-      ALLOWED_ORIGINS: http://localhost:3000,http://localhost:80
+      ALLOWED_ORIGINS: ${ALLOWED_ORIGINS:-http://localhost:3000,http://localhost:80}
       DATA_PROTECTION_KEYS_PATH: /app/dataprotection-keys
     volumes:
       - dp_keys:/app/dataprotection-keys
@@ -95,7 +95,7 @@ services:
     depends_on:
       - api
     environment:
-      NEXT_PUBLIC_API_URL: http://localhost:5000
+      NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-http://localhost:5000}
       API_INTERNAL_URL: http://api:8080
       NODE_ENV: production
     ports:
