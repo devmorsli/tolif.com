@@ -1,4 +1,9 @@
 {$DOMAIN:localhost} {
+    # Allow uploads up to 50 MB (matches API limit for portrait photo uploads)
+    request_body {
+        max_size 50MB
+    }
+
     reverse_proxy /api/* api:8080
     reverse_proxy /health/* api:8080
     reverse_proxy /hangfire/* api:8080
