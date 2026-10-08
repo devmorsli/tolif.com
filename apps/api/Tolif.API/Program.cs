@@ -1,5 +1,7 @@
 using System.Text;
 using System.Threading.RateLimiting;
+using Amazon.S3;
+using Amazon.S3.Model;
 using Hangfire;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Identity;
@@ -114,6 +116,23 @@ try
         .AddDbContextCheck<ApplicationDbContext>("database");
 
     var app = builder.Build();
+
+    // ── Ensure MinIO bucket exists ────────────────────────────────────────────
+    try
+    {
+        var s3     = app.Services.GetRequiredService<IAmazonS3>();
+        var bucket = app.Configuration["S3_BUCKET"] ?? app.Configuration["MINIO_BUCKET"] ?? "tolif";
+        var exists = await s3.DoesS3BucketExistAsync(bucket);
+        if (!exists)
+        {
+            await s3.PutBucketAsync(new PutBucketRequest { BucketName = bucket, UseClientRegion = true });
+            Log.Information("MinIO bucket '{Bucket}' created", bucket);
+        }
+    }
+    catch (Exception ex)
+    {
+        Log.Warning(ex, "Could not ensure MinIO bucket exists — will retry on next request");
+    }
 
     // ── Seed database ─────────────────────────────────────────────────────────
     using (var scope = app.Services.CreateScope())
