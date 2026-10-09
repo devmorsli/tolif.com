@@ -55,6 +55,11 @@ public static class DbSeeder
         await UpsertSettingAsync(db, "ai.provider.fallback_order", "Gemini,FalAi,OpenAi");
         await UpsertSettingAsync(db, "ai.preview.regen_limit", "5");
         await UpsertSettingAsync(db, "ai.preview.regen_limit_enabled", "true");
+        await UpsertSettingAsync(db, "regen.enabled", "true");
+        await UpsertSettingAsync(db, "regen.maxPerSession", "5");
+        await UpsertSettingAsync(db, "store.maintenance.enabled", "false");
+        await UpsertSettingAsync(db, "store.maintenance.password", "");
+        await UpsertSettingAsync(db, "store.maintenance.message", "We're currently doing some maintenance. We'll be back shortly!");
         await UpsertSettingAsync(db, "gdpr.photo_retention_days_paid", "30");
         await UpsertSettingAsync(db, "gdpr.photo_retention_days_abandoned", "7");
         await UpsertSettingAsync(db, "store.language.default", "en");

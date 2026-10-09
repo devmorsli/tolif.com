@@ -2,10 +2,10 @@
 
 import { useEffect, useState } from "react";
 import { motion } from "framer-motion";
-import { ShoppingBag, TrendingUp, Clock, Camera, ArrowRight } from "lucide-react";
+import { ShoppingBag, TrendingUp, Clock, Camera, ArrowRight, Wrench, Zap, Loader2, Eye, EyeOff } from "lucide-react";
 import { AdminGuard } from "@/components/admin/AdminGuard";
 import { AdminSidebar } from "@/components/admin/AdminSidebar";
-import { getDashboard, type DashboardStats } from "@/lib/admin-api";
+import { getDashboard, getSettings, saveSetting, type DashboardStats } from "@/lib/admin-api";
 import Link from "next/link";
 
 const STATUS_COLORS: Record<string, string> = {
@@ -34,6 +34,184 @@ function StatCard({ icon: Icon, label, value, color }: {
     </motion.div>
   );
 }
+
+// ── Store Controls ─────────────────────────────────────────────────────────────
+
+function StoreControls() {
+  const [maintenanceEnabled, setMaintenanceEnabled] = useState(false);
+  const [maintenancePassword, setMaintenancePassword] = useState("");
+  const [maintenanceMessage, setMaintenanceMessage] = useState("");
+  const [regenEnabled, setRegenEnabled] = useState(true);
+  const [showPassword, setShowPassword] = useState(false);
+  const [loadingSettings, setLoadingSettings] = useState(true);
+  const [savingMaintenance, setSavingMaintenance] = useState(false);
+  const [savingRegen, setSavingRegen] = useState(false);
+  const [savedKey, setSavedKey] = useState<string | null>(null);
+
+  useEffect(() => {
+    getSettings()
+      .then((settings) => {
+        const get = (key: string) => settings.find((s) => s.key === key)?.value ?? "";
+        setMaintenanceEnabled(get("store.maintenance.enabled") === "true");
+        setMaintenancePassword(get("store.maintenance.password"));
+        setMaintenanceMessage(get("store.maintenance.message"));
+        setRegenEnabled(get("regen.enabled") !== "false");
+      })
+      .catch(() => {})
+      .finally(() => setLoadingSettings(false));
+  }, []);
+
+  const flash = (key: string) => {
+    setSavedKey(key);
+    setTimeout(() => setSavedKey(null), 2000);
+  };
+
+  const saveMaintenance = async () => {
+    setSavingMaintenance(true);
+    try {
+      await saveSetting("store.maintenance.enabled", String(maintenanceEnabled));
+      await saveSetting("store.maintenance.password", maintenancePassword);
+      await saveSetting("store.maintenance.message", maintenanceMessage);
+      flash("maintenance");
+    } finally {
+      setSavingMaintenance(false);
+    }
+  };
+
+  const toggleRegen = async (value: boolean) => {
+    setRegenEnabled(value);
+    setSavingRegen(true);
+    try {
+      await saveSetting("regen.enabled", String(value));
+      flash("regen");
+    } finally {
+      setSavingRegen(false);
+    }
+  };
+
+  if (loadingSettings) {
+    return (
+      <div className="bg-white rounded-2xl border border-[#E4D8CC] p-6 flex items-center justify-center h-32">
+        <Loader2 size={20} className="animate-spin text-[#C4622D]" />
+      </div>
+    );
+  }
+
+  return (
+    <div className="bg-white rounded-2xl border border-[#E4D8CC] overflow-hidden">
+      <div className="px-6 py-4 border-b border-[#E4D8CC]">
+        <h2 className="font-medium text-[#1A1714]">Store Controls</h2>
+        <p className="text-xs text-[#8C7B6B] mt-0.5">Maintenance mode and AI generation</p>
+      </div>
+
+      <div className="divide-y divide-[#F2EAE0]">
+
+        {/* ── AI Generation toggle ─────────────────────────────────────────── */}
+        <div className="px-6 py-5">
+          <div className="flex items-start justify-between gap-4">
+            <div className="flex items-center gap-3">
+              <div className={`w-9 h-9 rounded-xl flex items-center justify-center ${regenEnabled ? "bg-[#E6EEE9] text-[#2D4A3E]" : "bg-[#F9ECE4] text-[#C4622D]"}`}>
+                <Zap size={16} />
+              </div>
+              <div>
+                <p className="text-sm font-medium text-[#1A1714]">AI Image Generation</p>
+                <p className="text-xs text-[#8C7B6B] mt-0.5">
+                  {regenEnabled ? "Customers can generate and regenerate portraits" : "Generation is disabled — customers will see an error"}
+                </p>
+              </div>
+            </div>
+            <div className="flex items-center gap-2 shrink-0">
+              {savedKey === "regen" && <span className="text-xs text-[#2D4A3E] font-medium">Saved ✓</span>}
+              {savingRegen
+                ? <Loader2 size={16} className="animate-spin text-[#C4622D]" />
+                : (
+                  <button
+                    onClick={() => toggleRegen(!regenEnabled)}
+                    className={`relative w-12 h-6 rounded-full transition-colors duration-200 ${regenEnabled ? "bg-[#2D4A3E]" : "bg-[#E4D8CC]"}`}
+                  >
+                    <span className={`absolute top-0.5 w-5 h-5 bg-white rounded-full shadow transition-all duration-200 ${regenEnabled ? "left-6" : "left-0.5"}`} />
+                  </button>
+                )
+              }
+            </div>
+          </div>
+        </div>
+
+        {/* ── Maintenance mode ─────────────────────────────────────────────── */}
+        <div className="px-6 py-5">
+          <div className="flex items-start justify-between gap-4 mb-4">
+            <div className="flex items-center gap-3">
+              <div className={`w-9 h-9 rounded-xl flex items-center justify-center ${maintenanceEnabled ? "bg-amber-100 text-amber-600" : "bg-[#F2EAE0] text-[#C4622D]"}`}>
+                <Wrench size={16} />
+              </div>
+              <div>
+                <p className="text-sm font-medium text-[#1A1714]">Maintenance Mode</p>
+                <p className="text-xs text-[#8C7B6B] mt-0.5">
+                  {maintenanceEnabled ? "Store is offline — only staff with the password can access it" : "Store is live and accessible to everyone"}
+                </p>
+              </div>
+            </div>
+            <div className="flex items-center gap-2 shrink-0">
+              {savedKey === "maintenance" && <span className="text-xs text-[#2D4A3E] font-medium">Saved ✓</span>}
+              <button
+                onClick={() => setMaintenanceEnabled((v) => !v)}
+                className={`relative w-12 h-6 rounded-full transition-colors duration-200 ${maintenanceEnabled ? "bg-amber-400" : "bg-[#E4D8CC]"}`}
+              >
+                <span className={`absolute top-0.5 w-5 h-5 bg-white rounded-full shadow transition-all duration-200 ${maintenanceEnabled ? "left-6" : "left-0.5"}`} />
+              </button>
+            </div>
+          </div>
+
+          {/* Password + message fields */}
+          <div className="space-y-3 pl-12">
+            <div>
+              <label className="text-xs font-medium text-[#5A4E46] mb-1.5 block">Bypass password</label>
+              <div className="relative">
+                <input
+                  type={showPassword ? "text" : "password"}
+                  value={maintenancePassword}
+                  onChange={(e) => setMaintenancePassword(e.target.value)}
+                  placeholder="Staff-only bypass password"
+                  className="w-full pr-10 pl-3 py-2.5 rounded-xl border border-[#E4D8CC] bg-[#FAF6F0] text-sm text-[#1A1714] placeholder:text-[#C8BAB0] focus:outline-none focus:ring-2 focus:ring-[#C4622D]/25 focus:border-[#C4622D]/60 transition-all"
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword((v) => !v)}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-[#B0A090] hover:text-[#1A1714] transition-colors"
+                >
+                  {showPassword ? <EyeOff size={14} /> : <Eye size={14} />}
+                </button>
+              </div>
+            </div>
+
+            <div>
+              <label className="text-xs font-medium text-[#5A4E46] mb-1.5 block">Message shown to visitors</label>
+              <input
+                type="text"
+                value={maintenanceMessage}
+                onChange={(e) => setMaintenanceMessage(e.target.value)}
+                placeholder="We'll be back shortly!"
+                className="w-full px-3 py-2.5 rounded-xl border border-[#E4D8CC] bg-[#FAF6F0] text-sm text-[#1A1714] placeholder:text-[#C8BAB0] focus:outline-none focus:ring-2 focus:ring-[#C4622D]/25 focus:border-[#C4622D]/60 transition-all"
+              />
+            </div>
+
+            <button
+              onClick={saveMaintenance}
+              disabled={savingMaintenance}
+              className="flex items-center gap-2 bg-[#1A1714] disabled:opacity-60 text-white text-xs font-semibold px-4 py-2 rounded-xl transition-all hover:bg-[#2D2520]"
+            >
+              {savingMaintenance ? <Loader2 size={12} className="animate-spin" /> : null}
+              {savingMaintenance ? "Saving…" : "Save maintenance settings"}
+            </button>
+          </div>
+        </div>
+
+      </div>
+    </div>
+  );
+}
+
+// ── Dashboard ───────────────────────────────────────────────────────────────────
 
 function DashboardContent() {
   const [stats, setStats] = useState<DashboardStats | null>(null);
@@ -69,6 +247,11 @@ function DashboardContent() {
               <span className="text-amber-600">The admin UI is ready — start the API server to connect live data.</span>
             </div>
           )}
+
+          {/* Store controls — always visible */}
+          <div className="mb-8">
+            <StoreControls />
+          </div>
 
           {stats && (
             <>

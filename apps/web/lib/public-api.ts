@@ -212,3 +212,14 @@ export function templateImageUrl(key: string): string {
   const base = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:5000";
   return `${base}/api/storage/preview?key=${encodeURIComponent(key)}`;
 }
+
+export async function getMaintenanceStatus(): Promise<{ enabled: boolean; message: string }> {
+  try {
+    const base = getApiBase();
+    const res = await fetch(`${base}/api/settings/maintenance`, { next: { revalidate: 30 } });
+    if (!res.ok) return { enabled: false, message: "" };
+    return res.json();
+  } catch {
+    return { enabled: false, message: "" };
+  }
+}
