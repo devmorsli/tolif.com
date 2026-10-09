@@ -12,6 +12,18 @@ import {
 } from "@/lib/public-api";
 import { Check, ImageIcon, Search, X, SlidersHorizontal } from "lucide-react";
 
+// eslint-disable-next-line @next/next/no-img-element
+function TemplateThumb({ imgUrl, name, category }: { imgUrl: string; name: string; category: string }) {
+  const [err, setErr] = useState(false);
+  if (imgUrl && !err)
+    return <img src={imgUrl} alt={name} onError={() => setErr(true)} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" />;
+  return (
+    <div className={`w-full h-full bg-gradient-to-br ${categoryGradient(category)} flex items-center justify-center`}>
+      <ImageIcon size={32} className="text-[#C4622D]/30" />
+    </div>
+  );
+}
+
 // ── Constants ──────────────────────────────────────────────────────────────────
 
 const CATEGORIES = ["All", "Families", "Couples", "Solo", "Pets", "Groups"];
@@ -365,18 +377,7 @@ export function Step1Template() {
                   >
                     {/* Image */}
                     <div className="h-44 overflow-hidden relative">
-                      {imgUrl ? (
-                        // eslint-disable-next-line @next/next/no-img-element
-                        <img
-                          src={imgUrl}
-                          alt={t.name}
-                          className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
-                        />
-                      ) : (
-                        <div className={`w-full h-full bg-gradient-to-br ${categoryGradient(t.category)} flex items-center justify-center`}>
-                          <ImageIcon size={32} className="text-[#C4622D]/30" />
-                        </div>
-                      )}
+                      <TemplateThumb imgUrl={imgUrl} name={t.name} category={t.category} />
                       {/* Style badge */}
                       {t.style && (
                         <div className="absolute top-2.5 left-2.5">

@@ -21,6 +21,18 @@ import {
   ChevronDown,
 } from "lucide-react";
 
+// eslint-disable-next-line @next/next/no-img-element
+function TemplateThumb({ imgUrl, name, category }: { imgUrl: string; name: string; category: string }) {
+  const [err, setErr] = useState(false);
+  if (imgUrl && !err)
+    return <img src={imgUrl} alt={name} onError={() => setErr(true)} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" />;
+  return (
+    <div className={`w-full h-full bg-gradient-to-br ${categoryGradient(category)} flex items-center justify-center`}>
+      <ImageIcon size={24} className="text-[#C4622D]/30" />
+    </div>
+  );
+}
+
 const tips = [
   "Clear, well-lit face looking toward the camera",
   "Avoid heavy filters, sunglasses, or partial faces",
@@ -107,19 +119,7 @@ function TemplatePicker({
                     }`}
                   >
                     <div className="h-28 overflow-hidden relative">
-                      {imgUrl ? (
-                        <img
-                          src={imgUrl}
-                          alt={t.name}
-                          className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
-                        />
-                      ) : (
-                        <div
-                          className={`w-full h-full bg-gradient-to-br ${categoryGradient(t.category)} flex items-center justify-center`}
-                        >
-                          <ImageIcon size={24} className="text-[#C4622D]/30" />
-                        </div>
-                      )}
+                      <TemplateThumb imgUrl={imgUrl} name={t.name} category={t.category} />
                       {isSelected && (
                         <div className="absolute inset-0 bg-[#C4622D]/10 flex items-center justify-center">
                           <div className="w-7 h-7 rounded-full bg-[#C4622D] flex items-center justify-center">

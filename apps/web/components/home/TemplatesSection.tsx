@@ -22,6 +22,7 @@ function TemplateCard({
   index: number;
   inView: boolean;
 }) {
+  const [imgError, setImgError] = useState(false);
   const imgUrl = templateImageUrl(template.templateImageKey);
 
   return (
@@ -38,10 +39,11 @@ function TemplateCard({
           style={{ aspectRatio: "3/4" }}
         >
           {/* Image or gradient placeholder */}
-          {imgUrl ? (
+          {imgUrl && !imgError ? (
             <img
               src={imgUrl}
               alt={template.name}
+              onError={() => setImgError(true)}
               className="absolute inset-0 w-full h-full object-cover transition-transform duration-700 ease-out group-hover:scale-105"
             />
           ) : (

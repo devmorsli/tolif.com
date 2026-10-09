@@ -17,6 +17,19 @@ import {
 } from "@/lib/public-api";
 import { useWizardStore } from "@/store/wizardStore";
 
+// ── Small component to handle image load errors gracefully ────────────────────
+// eslint-disable-next-line @next/next/no-img-element
+function TemplateImg({ imgUrl, name, category, className }: { imgUrl: string; name: string; category: string; className?: string; iconSize?: number }) {
+  const [err, setErr] = useState(false);
+  if (imgUrl && !err)
+    return <img src={imgUrl} alt={name} onError={() => setErr(true)} className={className ?? "w-full h-full object-cover"} />;
+  return (
+    <div className={`w-full h-full bg-gradient-to-br ${categoryGradient(category)} flex items-center justify-center`}>
+      <ImageIcon size={40} className="text-[#C4622D]/20" />
+    </div>
+  );
+}
+
 // ── Static data ───────────────────────────────────────────────────────────────
 
 
@@ -233,13 +246,7 @@ export function TemplateDetailClient({
                 className="lg:sticky lg:top-28"
               >
                 <div className="relative rounded-3xl overflow-hidden aspect-[3/4] shadow-xl shadow-[#1A1714]/10">
-                  {imgUrl ? (
-                    <img src={imgUrl} alt={template.name} className="w-full h-full object-cover" />
-                  ) : (
-                    <div className={`w-full h-full bg-gradient-to-br ${categoryGradient(template.category)} flex items-center justify-center`}>
-                      <ImageIcon size={64} className="text-[#C4622D]/20" />
-                    </div>
-                  )}
+                  <TemplateImg imgUrl={imgUrl} name={template.name} category={template.category} />
                   {template.style && (
                     <div className="absolute top-4 left-4 bg-white/80 backdrop-blur-sm text-[#8C7B6B] text-xs font-medium px-3 py-1.5 rounded-full border border-white/60">
                       {template.style}
@@ -461,17 +468,7 @@ export function TemplateDetailClient({
                       >
                         {/* Portrait-ratio image */}
                         <div className="relative overflow-hidden" style={{ aspectRatio: "3/4" }}>
-                          {rImgUrl ? (
-                            <img
-                              src={rImgUrl}
-                              alt={t.name}
-                              className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
-                            />
-                          ) : (
-                            <div className={`w-full h-full bg-gradient-to-br ${categoryGradient(t.category)} flex items-center justify-center`}>
-                              <ImageIcon size={32} className="text-[#C4622D]/20" />
-                            </div>
-                          )}
+                          <TemplateImg imgUrl={rImgUrl} name={t.name} category={t.category} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" />
 
                           {/* Style badge */}
                           {t.style && (

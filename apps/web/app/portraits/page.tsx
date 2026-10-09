@@ -38,6 +38,7 @@ const SORT_OPTIONS = [
 // ── Template card ──────────────────────────────────────────────────────────────
 
 function TemplateCard({ template, index }: { template: PublicTemplate; index: number }) {
+  const [imgError, setImgError] = useState(false);
   const imgUrl = templateImageUrl(template.templateImageKey);
 
   return (
@@ -52,11 +53,12 @@ function TemplateCard({ template, index }: { template: PublicTemplate; index: nu
         <div className="relative overflow-hidden rounded-2xl bg-[#1A1714]" style={{ aspectRatio: "3/4" }}>
 
           {/* Image */}
-          {imgUrl ? (
+          {imgUrl && !imgError ? (
             // eslint-disable-next-line @next/next/no-img-element
             <img
               src={imgUrl}
               alt={template.name}
+              onError={() => setImgError(true)}
               className="absolute inset-0 w-full h-full object-cover transition-transform duration-700 ease-out group-hover:scale-105"
             />
           ) : (
