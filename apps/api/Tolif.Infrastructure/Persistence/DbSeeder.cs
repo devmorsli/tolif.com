@@ -24,7 +24,8 @@ public static class DbSeeder
         }
 
         // ── Admin user ─────────────────────────────────────────────────────
-        if (await userManager.FindByEmailAsync(adminEmail) is null)
+        var existingAdmin = await userManager.FindByEmailAsync(adminEmail);
+        if (existingAdmin is null)
         {
             var admin = new AdminUser
             {
@@ -36,6 +37,14 @@ public static class DbSeeder
             };
             await userManager.CreateAsync(admin, adminPassword);
             await userManager.AddToRoleAsync(admin, "Admin");
+        }
+        else
+        {
+            // Ensure password stays in sync with the configured ADMIN_PASSWORD
+            var token = await userManager.GeneratePasswordResetTokenAsync(existingAdmin);
+            await userManager.ResetPasswordAsync(existingAdmin, token, adminPassword);
+            if (!await userManager.IsInRoleAsync(existingAdmin, "Admin"))
+                await userManager.AddToRoleAsync(existingAdmin, "Admin");
         }
 
         // ── Default settings ───────────────────────────────────────────────
