@@ -154,7 +154,6 @@ public class CheckoutController(
                     {
                         Name        = $"{variant.Product?.Name ?? "AI Portrait"} — {variant.Size}",
                         Description = "Custom AI-generated portrait by Tolif",
-                        Images      = [],
                     },
                 },
                 Quantity = req.Quantity,
