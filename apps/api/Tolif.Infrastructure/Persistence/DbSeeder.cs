@@ -73,16 +73,31 @@ public static class DbSeeder
             var framed  = new Product { Name = "Framed Print",     Type = ProductType.FramedPrint, SortOrder = 2 };
             var canvas  = new Product { Name = "Canvas",           Type = ProductType.Canvas,  SortOrder = 3 };
 
-            digital.Variants.Add(new ProductVariant { Size = "Digital (High-Res PNG)", Price = 9.99m,  Currency = "USD" });
-            poster.Variants.Add(new ProductVariant  { Size = "30×40 cm",               Price = 34.99m, Currency = "EUR" });
-            poster.Variants.Add(new ProductVariant  { Size = "50×70 cm",               Price = 44.99m, Currency = "EUR" });
-            framed.Variants.Add(new ProductVariant  { Size = "30×40 cm",               Price = 59.99m, Currency = "EUR" });
-            framed.Variants.Add(new ProductVariant  { Size = "50×70 cm",               Price = 79.99m, Currency = "EUR" });
-            canvas.Variants.Add(new ProductVariant  { Size = "30×40 cm",               Price = 64.99m, Currency = "EUR" });
-            canvas.Variants.Add(new ProductVariant  { Size = "50×70 cm",               Price = 89.99m, Currency = "EUR" });
-
             db.Products.AddRange(digital, poster, framed, canvas);
         }
+
+        // ── Sync variants to match storefront prices/sizes (runs on every startup) ─
+        // Sizes mirror the frontend SIZES array: 12×16 in = 30 × 40 cm,
+        //   18×24 in = 45 × 60 cm, 24×36 in = 60 × 90 cm.
+        // Prices mirror the frontend POSTER_BASE / CANVAS_BASE / FRAME_ADDON / DIGITAL_PRICE.
+        await SyncVariantsAsync(db, ProductType.Digital, [
+            ("Digital (High-Res PNG)", 49m, "USD"),
+        ]);
+        await SyncVariantsAsync(db, ProductType.Poster, [
+            ("30 × 40 cm",  49m, "USD"),
+            ("45 × 60 cm",  69m, "USD"),
+            ("60 × 90 cm",  99m, "USD"),
+        ]);
+        await SyncVariantsAsync(db, ProductType.FramedPrint, [
+            ("30 × 40 cm",  99m, "USD"),
+            ("45 × 60 cm", 119m, "USD"),
+            ("60 × 90 cm", 149m, "USD"),
+        ]);
+        await SyncVariantsAsync(db, ProductType.Canvas, [
+            ("30 × 40 cm",  69m, "USD"),
+            ("45 × 60 cm",  99m, "USD"),
+            ("60 × 90 cm", 149m, "USD"),
+        ]);
 
         // ── Templates (6 across categories) ───────────────────────────────
         if (!await db.Templates.AnyAsync())
@@ -201,5 +216,47 @@ public static class DbSeeder
         var existing = await db.Settings.FirstOrDefaultAsync(s => s.Key == key);
         if (existing is null)
             db.Settings.Add(new Setting { Key = key, Value = value });
+    }
+
+    /// <summary>
+    /// Ensures the variants for a product type exactly match <paramref name="expected"/>.
+    /// Removes variants not in the list, adds missing ones, updates prices on existing ones.
+    /// This keeps the DB in sync with the storefront pricing/sizes on every startup.
+    /// </summary>
+    private static async Task SyncVariantsAsync(
+        ApplicationDbContext db,
+        ProductType type,
+        (string Size, decimal Price, string Currency)[] expected)
+    {
+        var product = await db.Products
+            .Include(p => p.Variants)
+            .FirstOrDefaultAsync(p => p.Type == type);
+
+        if (product is null) return;
+
+        // Remove variants no longer in the expected list
+        var toRemove = product.Variants
+            .Where(v => !expected.Any(e => e.Size == v.Size))
+            .ToList();
+        db.ProductVariants.RemoveRange(toRemove);
+
+        foreach (var (size, price, currency) in expected)
+        {
+            var existing = product.Variants.FirstOrDefault(v => v.Size == size);
+            if (existing is null)
+            {
+                product.Variants.Add(new ProductVariant
+                {
+                    Size     = size,
+                    Price    = price,
+                    Currency = currency,
+                });
+            }
+            else
+            {
+                existing.Price    = price;
+                existing.Currency = currency;
+            }
+        }
     }
 }

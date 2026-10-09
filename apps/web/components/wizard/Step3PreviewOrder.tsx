@@ -1,10 +1,14 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import type { ReactNode } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { RefreshCw, Download, ShoppingCart, Check } from "lucide-react";
 import { useWizardStore } from "@/store/wizardStore";
+
+// ── API product types (from GET /api/products) ────────────────────────────────
+interface ApiVariant { id: string; size: string; price: number; currency: string; }
+interface ApiProduct { id: string; type: string; variants: ApiVariant[]; }
 
 // ── Types ──────────────────────────────────────────────────────────────────────
 type Format  = "digital" | "poster" | "canvas";
@@ -322,6 +326,16 @@ export function Step3PreviewOrder() {
   const [size, setSize]     = useState<SizeKey>("18x24");
   const [unit, setUnit]     = useState<Unit>("in");
 
+  // Fetch real variant IDs from the API so checkout receives a valid GUID
+  const [apiProducts, setApiProducts] = useState<ApiProduct[]>([]);
+  const apiBase = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:5000";
+  useEffect(() => {
+    fetch(`${apiBase}/api/products`)
+      .then((r) => r.json())
+      .then(setApiProducts)
+      .catch(() => {});
+  }, [apiBase]);
+
   const digitalOnly = format === "digital";
   const printFormat = (format === "digital" ? "poster" : format) as "poster" | "canvas";
   const activeFrame = printFormat === "canvas" ? "none" : frame;
@@ -346,8 +360,23 @@ export function Step3PreviewOrder() {
       : `${printFormat === "poster" ? "Poster" : "Canvas"} · ${sizeLabel} ${unit}${
           activeFrame !== "none" ? ` · ${cap(activeFrame.replace("-", " "))} frame` : ""
         }`;
+
+    // Look up the real DB variant GUID
+    const productType = digitalOnly
+      ? "digital"
+      : format === "canvas"
+      ? "canvas"
+      : activeFrame !== "none"
+      ? "framedprint"
+      : "poster";
+    const targetSize = digitalOnly ? null : `${sizeObj.cmLabel} cm`; // e.g. "45 × 60 cm"
+    const apiProduct = apiProducts.find((p) => p.type === productType);
+    const apiVariant = apiProduct?.variants.find(
+      (v) => digitalOnly || v.size === targetSize
+    );
+
     selectVariant({
-      id: `${printFormat}-${activeFrame}-${size}${digitalOnly ? "-digital" : ""}`,
+      id: apiVariant?.id ?? `${printFormat}-${activeFrame}-${size}${digitalOnly ? "-digital" : ""}`,
       productName,
       size: `${sizeLabel} ${unit}`,
       price: totalPrice,
