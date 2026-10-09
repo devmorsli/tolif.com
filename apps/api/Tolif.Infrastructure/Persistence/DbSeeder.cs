@@ -226,41 +226,47 @@ public static class DbSeeder
     /// <summary>
     /// Ensures the variants for a product type exactly match <paramref name="expected"/>.
     /// Removes variants not in the list, adds missing ones, updates prices on existing ones.
-    /// This keeps the DB in sync with the storefront pricing/sizes on every startup.
+    /// Uses ExecuteDeleteAsync for removals (direct SQL, no change-tracker involvement) to
+    /// avoid DbUpdateConcurrencyException when mixing deletes+updates in one SaveChanges.
     /// </summary>
     private static async Task SyncVariantsAsync(
         ApplicationDbContext db,
         ProductType type,
         (string Size, decimal Price, string Currency)[] expected)
     {
-        var product = await db.Products
-            .Include(p => p.Variants)
-            .FirstOrDefaultAsync(p => p.Type == type);
+        var product = await db.Products.FirstOrDefaultAsync(p => p.Type == type);
 
         if (product is null) return;
 
-        // Remove variants no longer in the expected list
-        var toRemove = product.Variants
-            .Where(v => !expected.Any(e => e.Size == v.Size))
-            .ToList();
-        db.ProductVariants.RemoveRange(toRemove);
+        var expectedSizes = expected.Select(e => e.Size).ToHashSet();
+
+        // Delete stale variants directly (bypasses change tracker → no concurrency token conflict)
+        await db.ProductVariants
+            .Where(v => v.ProductId == product.Id && !expectedSizes.Contains(v.Size))
+            .ExecuteDeleteAsync();
+
+        // Reload remaining variants fresh so the change tracker has clean state
+        var existing = await db.ProductVariants
+            .Where(v => v.ProductId == product.Id)
+            .ToListAsync();
 
         foreach (var (size, price, currency) in expected)
         {
-            var existing = product.Variants.FirstOrDefault(v => v.Size == size);
-            if (existing is null)
+            var variant = existing.FirstOrDefault(v => v.Size == size);
+            if (variant is null)
             {
-                product.Variants.Add(new ProductVariant
+                db.ProductVariants.Add(new ProductVariant
                 {
-                    Size     = size,
-                    Price    = price,
-                    Currency = currency,
+                    ProductId = product.Id,
+                    Size      = size,
+                    Price     = price,
+                    Currency  = currency,
                 });
             }
             else
             {
-                existing.Price    = price;
-                existing.Currency = currency;
+                variant.Price    = price;
+                variant.Currency = currency;
             }
         }
     }
