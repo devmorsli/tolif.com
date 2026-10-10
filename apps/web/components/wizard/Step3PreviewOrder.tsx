@@ -16,7 +16,7 @@ type Frame   = "black" | "red-oak" | "white" | "none";
 type SizeKey = "12x16" | "18x24" | "24x36";
 type Unit    = "in" | "cm";
 
-// ── Pricing ────────────────────────────────────────────────────────────────────
+// ── Pricing fallbacks (used when API hasn't loaded yet) ────────────────────────
 const POSTER_BASE: Record<SizeKey, number> = { "12x16": 49, "18x24": 69, "24x36": 99 };
 const CANVAS_BASE: Record<SizeKey, number> = { "12x16": 69, "18x24": 99, "24x36": 149 };
 const FRAME_ADDON   = 50;
@@ -31,6 +31,34 @@ const SIZES: { key: SizeKey; inLabel: string; cmLabel: string; badge?: string }[
 function calcPrice(format: Format, frame: Frame, size: SizeKey): number {
   const base = format === "poster" ? POSTER_BASE[size] : CANVAS_BASE[size];
   return base + (frame !== "none" ? FRAME_ADDON : 0);
+}
+
+// ── Live-price helpers ─────────────────────────────────────────────────────────
+function getLiveVariant(
+  fmt: Format,
+  activeFr: "black" | "red-oak" | "white" | "none",
+  sz: SizeKey,
+  products: ApiProduct[]
+): ApiVariant | undefined {
+  const isDigital = fmt === "digital";
+  const printFmt = (isDigital ? "poster" : fmt) as "poster" | "canvas";
+  const fr = printFmt === "canvas" ? "none" : activeFr;
+  const productType = isDigital ? "digital"
+    : printFmt === "canvas" ? "canvas"
+    : fr !== "none" ? "framedprint"
+    : "poster";
+  const prod = products.find((p) => p.type === productType);
+  if (!prod) return undefined;
+  if (isDigital) return prod.variants[0];
+  const sizeObj = SIZES.find((s) => s.key === sz)!;
+  const targetSize = `${sizeObj.cmLabel} cm`;
+  return prod.variants.find((v) => v.size === targetSize);
+}
+
+function priceSym(currency: string): string {
+  if (currency === "EUR") return "€";
+  if (currency === "GBP") return "£";
+  return "$";
 }
 
 // ── Mockup helpers ─────────────────────────────────────────────────────────────
@@ -345,6 +373,45 @@ export function Step3PreviewOrder() {
   const sizeLabel   = unit === "in" ? sizeObj.inLabel : sizeObj.cmLabel;
   const sizeStep    = format === "poster" ? 3 : 2;
 
+  // Live prices from API (fall back to hardcoded constants while loading)
+  const liveVariant   = getLiveVariant(format, activeFrame, size, apiProducts);
+  const livePrice     = liveVariant?.price    ?? totalPrice;
+  const liveCurrency  = liveVariant?.currency ?? "USD";
+  const sym           = priceSym(liveCurrency);
+
+  // "From $X" for format selector cards
+  const posterProd   = apiProducts.find((p) => p.type === "poster");
+  const canvasProd   = apiProducts.find((p) => p.type === "canvas");
+  const digitalProd  = apiProducts.find((p) => p.type === "digital");
+  const posterFrom   = posterProd && posterProd.variants.length
+    ? Math.min(...posterProd.variants.map((v) => v.price))
+    : POSTER_BASE["12x16"];
+  const canvasFrom   = canvasProd && canvasProd.variants.length
+    ? Math.min(...canvasProd.variants.map((v) => v.price))
+    : CANVAS_BASE["12x16"];
+  const digitalLive  = digitalProd?.variants[0]?.price ?? DIGITAL_PRICE;
+  const baseSym      = priceSym(posterProd?.variants[0]?.currency ?? liveCurrency);
+
+  // Per-size price helper (for size selector rows)
+  const sizeRowPrice = (sz: SizeKey): number => {
+    const v = getLiveVariant(format, activeFrame, sz, apiProducts);
+    return v?.price ?? calcPrice(format, activeFrame, sz);
+  };
+
+  // Summary breakdown: base print price (no frame) + frame addon
+  const basePosterVariant = posterProd?.variants.find(
+    (v) => v.size === `${sizeObj.cmLabel} cm`
+  );
+  const baseCanvasVariant = canvasProd?.variants.find(
+    (v) => v.size === `${sizeObj.cmLabel} cm`
+  );
+  const basePrintPrice = printFormat === "canvas"
+    ? (baseCanvasVariant?.price ?? CANVAS_BASE[size])
+    : (basePosterVariant?.price ?? POSTER_BASE[size]);
+  const frameAddonPrice = (activeFrame !== "none" && liveVariant && basePosterVariant)
+    ? liveVariant.price - basePosterVariant.price
+    : FRAME_ADDON;
+
   const handleRegenerate = () => {
     if (regenerationsLeft <= 0) return;
     // Don't decrement locally — backend is the source of truth.
@@ -379,8 +446,8 @@ export function Step3PreviewOrder() {
       id: apiVariant?.id ?? `${printFormat}-${activeFrame}-${size}${digitalOnly ? "-digital" : ""}`,
       productName,
       size: `${sizeLabel} ${unit}`,
-      price: totalPrice,
-      currency: "USD",
+      price: apiVariant?.price ?? totalPrice,
+      currency: apiVariant?.currency ?? "USD",
       type: digitalOnly
         ? "digital"
         : printFormat === "canvas"
@@ -437,9 +504,9 @@ export function Step3PreviewOrder() {
             <div className="grid grid-cols-3 gap-3">
               {(
                 [
-                  { key: "poster"  as Format, label: "Poster print",  sub: `From $${POSTER_BASE["12x16"]}`, emoji: "🖼️", highlight: false },
-                  { key: "canvas"  as Format, label: "Canvas print",  sub: `From $${CANVAS_BASE["12x16"]}`, emoji: "🎨", highlight: false },
-                  { key: "digital" as Format, label: "Digital only", sub: `$${DIGITAL_PRICE}`, emoji: "⬇️", highlight: true },
+                  { key: "poster"  as Format, label: "Poster print",  sub: `From ${baseSym}${posterFrom}`, emoji: "🖼️", highlight: false },
+                  { key: "canvas"  as Format, label: "Canvas print",  sub: `From ${baseSym}${canvasFrom}`, emoji: "🎨", highlight: false },
+                  { key: "digital" as Format, label: "Digital only", sub: `${baseSym}${digitalLive}`, emoji: "⬇️", highlight: true },
                 ] as const
               ).map(({ key, label, sub, emoji, highlight }) => {
                 const active = format === key;
@@ -603,7 +670,7 @@ export function Step3PreviewOrder() {
 
             <div className="space-y-2">
               {SIZES.map(({ key, inLabel, cmLabel, badge }) => {
-                const p      = calcPrice(format, activeFrame, key);
+                const p      = sizeRowPrice(key);
                 const active = size === key;
                 return (
                   <button
@@ -638,7 +705,7 @@ export function Step3PreviewOrder() {
                       transition={{ duration: 0.18 }}
                       className="ml-auto font-display font-semibold text-[#1A1714] text-base"
                     >
-                      ${p}
+                      {sym}{p}
                     </motion.span>
                   </button>
                 );
@@ -666,7 +733,7 @@ export function Step3PreviewOrder() {
                     {sizeLabel} {unit}
                   </span>
                   <span className="font-medium text-[#1A1714]">
-                    ${printFormat === "poster" ? POSTER_BASE[size] : CANVAS_BASE[size]}
+                    {sym}{basePrintPrice}
                   </span>
                 </div>
                 {activeFrame !== "none" && (
@@ -674,7 +741,7 @@ export function Step3PreviewOrder() {
                     <span className="text-[#8C7B6B]">
                       {activeFrame === "red-oak" ? "Red oak" : activeFrame.charAt(0).toUpperCase() + activeFrame.slice(1)} wood frame
                     </span>
-                    <span className="font-medium text-[#1A1714]">+${FRAME_ADDON}</span>
+                    <span className="font-medium text-[#1A1714]">+{sym}{frameAddonPrice}</span>
                   </div>
                 )}
                 <div className="flex items-center justify-between text-sm">
@@ -688,13 +755,13 @@ export function Step3PreviewOrder() {
             <div className="flex items-center justify-between">
               <span className="font-semibold text-[#1A1714]">Total</span>
               <motion.span
-                key={totalPrice}
+                key={livePrice}
                 initial={{ opacity: 0, y: -8 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ duration: 0.22 }}
                 className="font-display font-semibold text-3xl text-[#1A1714]"
               >
-                ${totalPrice}
+                {sym}{livePrice}
               </motion.span>
             </div>
 
@@ -703,7 +770,7 @@ export function Step3PreviewOrder() {
               className="w-full flex items-center justify-center gap-2 bg-[#C4622D] hover:bg-[#9E4A1E] text-white font-semibold py-4 rounded-full text-sm transition-all duration-200 hover:shadow-lg hover:shadow-[#C4622D]/25 hover:-translate-y-0.5"
             >
               <ShoppingCart size={15} />
-              Continue to cart — ${totalPrice}
+              Continue to cart — {sym}{livePrice}
             </button>
 
             <p className="text-center text-[10px] text-[#8C7B6B] leading-relaxed">

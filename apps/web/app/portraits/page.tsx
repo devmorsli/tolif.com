@@ -52,15 +52,20 @@ function TemplateCard({ template, index }: { template: PublicTemplate; index: nu
       <Link href={`/portraits/${template.slug}`} className="group block">
         <div className="relative overflow-hidden rounded-2xl bg-[#1A1714]" style={{ aspectRatio: "3/4" }}>
 
-          {/* Image */}
+          {/* Portrait inside frame window */}
           {imgUrl && !imgError ? (
-            // eslint-disable-next-line @next/next/no-img-element
-            <img
-              src={imgUrl}
-              alt={template.name}
-              onError={() => setImgError(true)}
-              className="absolute inset-0 w-full h-full object-cover transition-transform duration-700 ease-out group-hover:scale-105"
-            />
+            <div
+              className="absolute overflow-hidden"
+              style={{ top: "11.67%", left: "21.67%", width: "57.5%", height: "77.5%", zIndex: 0 }}
+            >
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                src={imgUrl}
+                alt={template.name}
+                onError={() => setImgError(true)}
+                className="w-full h-full object-cover transition-transform duration-700 ease-out group-hover:scale-105"
+              />
+            </div>
           ) : (
             <div
               className={`absolute inset-0 bg-gradient-to-br ${categoryGradient(template.category)} flex items-center justify-center`}
@@ -75,20 +80,20 @@ function TemplateCard({ template, index }: { template: PublicTemplate; index: nu
             src="/mockups/frame-black-12x16.png"
             alt=""
             aria-hidden
-            className="absolute inset-0 w-full h-full pointer-events-none select-none z-[2]"
+            className="absolute inset-0 w-full h-full pointer-events-none select-none z-10"
             style={{ objectFit: "fill" }}
             draggable={false}
           />
 
           {/* Style badge */}
-          <div className="absolute top-3 left-3 z-10">
+          <div className="absolute top-3 left-3 z-20">
             <span className="bg-black/45 backdrop-blur-md text-white/90 text-[10px] font-medium tracking-wide px-2.5 py-1 rounded-full border border-white/10">
               {template.style}
             </span>
           </div>
 
           {/* Bottom gradient + info */}
-          <div className="absolute inset-x-0 bottom-0 z-10 bg-gradient-to-t from-black/85 via-black/35 to-transparent pt-16 pb-4 px-4">
+          <div className="absolute inset-x-0 bottom-0 z-20 bg-gradient-to-t from-black/85 via-black/35 to-transparent pt-16 pb-4 px-4">
             <p className="text-[9px] font-semibold tracking-[3px] uppercase text-white/45 mb-1">
               {template.category}
             </p>
@@ -98,7 +103,7 @@ function TemplateCard({ template, index }: { template: PublicTemplate; index: nu
           </div>
 
           {/* Hover CTA */}
-          <div className="absolute inset-0 z-20 flex items-center justify-center bg-black/0 group-hover:bg-black/20 transition-colors duration-300">
+          <div className="absolute inset-0 z-30 flex items-center justify-center bg-black/0 group-hover:bg-black/20 transition-colors duration-300">
             <span className="flex items-center gap-1.5 bg-[#C4622D] text-white text-xs font-bold tracking-wide px-5 py-2.5 rounded-full opacity-0 group-hover:opacity-100 translate-y-3 group-hover:translate-y-0 transition-all duration-300 shadow-xl shadow-black/40">
               Create yours <ArrowRight size={12} />
             </span>
