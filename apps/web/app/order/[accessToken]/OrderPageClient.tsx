@@ -307,7 +307,7 @@ export function OrderPageClient({
             What Happens Next
           </p>
           <div className="space-y-4">
-            {order.hasDigital && (
+            {order.hasDigital && isPaid && (
               <div className="flex gap-3">
                 <div className="w-8 h-8 rounded-lg bg-[#C4622D]/10 flex items-center justify-center shrink-0 mt-0.5">
                   <Download size={14} className="text-[#C4622D]" />
@@ -317,6 +317,19 @@ export function OrderPageClient({
                   <p className="text-xs text-[#8C7B6B] mt-0.5 leading-relaxed">
                     Download your high-resolution portrait (without watermark) using the button below.
                     Your secure link stays active for 30 days.
+                  </p>
+                </div>
+              </div>
+            )}
+            {order.hasDigital && !isPaid && (
+              <div className="flex gap-3">
+                <div className="w-8 h-8 rounded-lg bg-[#C4622D]/10 flex items-center justify-center shrink-0 mt-0.5">
+                  <Clock size={14} className="text-[#C4622D]" />
+                </div>
+                <div>
+                  <p className="text-sm font-semibold text-[#1A1714]">Awaiting payment</p>
+                  <p className="text-xs text-[#8C7B6B] mt-0.5 leading-relaxed">
+                    Your digital file will be available here once payment is confirmed.
                   </p>
                 </div>
               </div>
@@ -360,7 +373,7 @@ export function OrderPageClient({
           transition={{ delay: 0.8, duration: 0.5 }}
           className="space-y-3"
         >
-          {order.hasDigital && (
+          {order.hasDigital && isPaid && (
             <a
               href={downloadUrl}
               className="w-full flex items-center justify-center gap-2 py-4 rounded-full

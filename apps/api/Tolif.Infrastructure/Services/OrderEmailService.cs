@@ -318,4 +318,117 @@ public class OrderEmailService(IEmailService email, ISettingsService settings) :
             PlainTextBody: plain
         ), ct);
     }
+
+    public async Task SendAbandonmentEmailAsync(Order order, CancellationToken ct = default)
+    {
+        var siteUrl     = await settings.GetAsync("site.url", ct) ?? "https://tolif.com";
+        var apiUrl      = await settings.GetAsync("api.url",  ct) ?? siteUrl;
+        var orderNumber = OrderHelper.FormatNumber(order);
+        var resumeUrl   = $"{siteUrl}/order/{order.AccessToken}";
+        var newUrl      = $"{siteUrl}/create";
+        var greeting    = order.CustomerName is { Length: > 0 } n ? $"Hi {n}," : "Hello,";
+
+        var firstSession = order.Items
+            .Select(i => i.PortraitSession)
+            .FirstOrDefault(s => s?.WatermarkedPreviewKey != null);
+
+        var portraitSection = firstSession is not null
+            ? $"""
+              <tr>
+                <td style="background:#1A1714;padding:0;line-height:0;font-size:0;">
+                  <img
+                    src="{apiUrl}/api/portraits/{firstSession.Id}/preview"
+                    alt="Your Tolif portrait"
+                    width="600"
+                    style="display:block;width:100%;max-width:600px;height:auto;object-fit:cover;max-height:360px;"
+                  />
+                </td>
+              </tr>
+              """
+            : "";
+
+        var html = $"""
+            <!DOCTYPE html>
+            <html>
+            <head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"></head>
+            <body style="margin:0;padding:0;background:#F5F0EA;font-family:Georgia,'Times New Roman',serif;">
+              <table width="100%" cellpadding="0" cellspacing="0" style="background:#F5F0EA;padding:40px 16px;">
+                <tr><td align="center">
+                  <table width="600" cellpadding="0" cellspacing="0" style="max-width:600px;width:100%;background:#FFFEF9;border-radius:20px;overflow:hidden;box-shadow:0 4px 40px rgba(26,23,20,0.12);">
+
+                    <tr>
+                      <td style="background:#1A1714;padding:28px 40px;text-align:center;">
+                        <p style="margin:0;font-size:9px;letter-spacing:6px;color:#F5E6D3;text-transform:uppercase;font-weight:500;">Tolif Portrait Studio</p>
+                      </td>
+                    </tr>
+
+                    {portraitSection}
+
+                    <tr>
+                      <td style="padding:40px 40px 32px;">
+                        <p style="margin:0 0 8px;font-size:11px;letter-spacing:4px;color:#C4622D;text-transform:uppercase;font-weight:600;">Your portrait is waiting</p>
+                        <h1 style="margin:0 0 20px;font-size:28px;font-weight:300;color:#1A1714;line-height:1.3;">{greeting}<br>You were so close!</h1>
+                        <p style="margin:0 0 28px;font-size:14px;color:#5A4E46;line-height:1.7;">
+                          You created a beautiful portrait but didn't complete your order.
+                          Your portrait is still saved — pick up where you left off.
+                        </p>
+
+                        <table cellpadding="0" cellspacing="0" style="margin:0 auto 20px;">
+                          <tr>
+                            <td style="background:#C4622D;border-radius:40px;">
+                              <a href="{resumeUrl}" style="display:block;padding:14px 36px;font-size:14px;font-weight:600;color:#FFFFFF;text-decoration:none;letter-spacing:0.5px;white-space:nowrap;">
+                                Complete my portrait →
+                              </a>
+                            </td>
+                          </tr>
+                        </table>
+
+                        <p style="margin:0;font-size:12px;color:#A89080;text-align:center;line-height:1.6;">
+                          Order ref: <span style="font-family:monospace;color:#8C7B6B;">{orderNumber}</span>
+                          &nbsp;·&nbsp;
+                          <a href="{newUrl}" style="color:#A89080;text-decoration:underline;">Start a new portrait instead</a>
+                        </p>
+                      </td>
+                    </tr>
+
+                    <tr>
+                      <td style="background:#1A1714;padding:22px 40px;text-align:center;border-radius:0 0 20px 20px;">
+                        <p style="margin:0 0 5px;font-size:9px;letter-spacing:4px;color:#F5E6D3;text-transform:uppercase;font-weight:500;">Tolif Portrait Studio</p>
+                        <p style="margin:0;font-size:11px;color:#4A3F38;line-height:1.6;">
+                          © 2026&nbsp;·&nbsp;<a href="{siteUrl}" style="color:#7A6558;text-decoration:none;">tolif.com</a>
+                        </p>
+                      </td>
+                    </tr>
+
+                  </table>
+                </td></tr>
+              </table>
+            </body>
+            </html>
+            """;
+
+        var plain = $"""
+            Your portrait is waiting — {orderNumber}
+
+            {greeting} You were so close!
+
+            You created a portrait but didn't complete your order.
+            Your portrait is still saved — complete it here:
+            {resumeUrl}
+
+            Or start a new portrait:
+            {newUrl}
+
+            ────────────────────────────────────
+            Questions? Email hello@tolif.com
+            © 2026 Tolif Portrait Studio · tolif.com
+            """;
+
+        await email.SendAsync(new EmailMessage(
+            To:            order.CustomerEmail,
+            Subject:       $"Your portrait is waiting for you — {orderNumber}",
+            HtmlBody:      html,
+            PlainTextBody: plain
+        ), ct);
+    }
 }

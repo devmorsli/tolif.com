@@ -150,8 +150,20 @@ export function Step3Generating() {
           }
         }
 
+        // Poll until the preview image is actually available in storage.
+        // The API marks generation complete before the file is fully flushed,
+        // causing a blank image on the next step if we advance immediately.
+        const previewUrl = `${API_BASE}/api/portraits/${sessionId}/preview`;
+        for (let attempt = 0; attempt < 10; attempt++) {
+          try {
+            const check = await fetch(previewUrl, { method: "HEAD" });
+            if (check.ok) break;
+          } catch { /* network glitch — retry */ }
+          if (attempt < 9) await new Promise<void>(r => setTimeout(r, 1500));
+        }
+
         setSessionId(sessionId);
-        setPreviewUrl(`${API_BASE}/api/portraits/${sessionId}/preview`);
+        setPreviewUrl(previewUrl);
         setGenerationStatus("ready");
         next();
       } catch (err: unknown) {

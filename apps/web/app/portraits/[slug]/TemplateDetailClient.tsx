@@ -247,12 +247,22 @@ export function TemplateDetailClient({
               >
                 <div className="relative rounded-3xl overflow-hidden aspect-[3/4] shadow-xl shadow-[#1A1714]/10">
                   <TemplateImg imgUrl={imgUrl} name={template.name} category={template.category} />
+                  {/* Portrait frame overlay */}
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img
+                    src="/mockups/frame-black-12x16.png"
+                    alt=""
+                    aria-hidden
+                    className="absolute inset-0 w-full h-full pointer-events-none select-none z-[2]"
+                    style={{ objectFit: "fill" }}
+                    draggable={false}
+                  />
                   {template.style && (
-                    <div className="absolute top-4 left-4 bg-white/80 backdrop-blur-sm text-[#8C7B6B] text-xs font-medium px-3 py-1.5 rounded-full border border-white/60">
+                    <div className="absolute top-4 left-4 z-10 bg-white/80 backdrop-blur-sm text-[#8C7B6B] text-xs font-medium px-3 py-1.5 rounded-full border border-white/60">
                       {template.style}
                     </div>
                   )}
-                  <div className="absolute bottom-0 inset-x-0 bg-gradient-to-t from-black/50 to-transparent px-5 pb-5 pt-10">
+                  <div className="absolute bottom-0 inset-x-0 z-10 bg-gradient-to-t from-black/50 to-transparent px-5 pb-5 pt-10">
                     <p className="text-white/60 text-[10px] text-center tracking-wide">
                       Free watermarked preview · Unlock after purchase
                     </p>
@@ -470,15 +480,26 @@ export function TemplateDetailClient({
                         <div className="relative overflow-hidden" style={{ aspectRatio: "3/4" }}>
                           <TemplateImg imgUrl={rImgUrl} name={t.name} category={t.category} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" />
 
+                          {/* Portrait frame overlay */}
+                          {/* eslint-disable-next-line @next/next/no-img-element */}
+                          <img
+                            src="/mockups/frame-black-12x16.png"
+                            alt=""
+                            aria-hidden
+                            className="absolute inset-0 w-full h-full pointer-events-none select-none z-[2]"
+                            style={{ objectFit: "fill" }}
+                            draggable={false}
+                          />
+
                           {/* Style badge */}
                           {t.style && (
-                            <div className="absolute top-2.5 left-2.5 bg-white/85 backdrop-blur-sm text-[#8C7B6B] text-[10px] font-medium px-2 py-1 rounded-full">
+                            <div className="absolute top-2.5 left-2.5 z-10 bg-white/85 backdrop-blur-sm text-[#8C7B6B] text-[10px] font-medium px-2 py-1 rounded-full">
                               {t.style}
                             </div>
                           )}
 
                           {/* Hover overlay CTA */}
-                          <div className="absolute inset-0 bg-gradient-to-t from-[#1A1714]/70 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex items-end justify-center pb-5">
+                          <div className="absolute inset-0 z-10 bg-gradient-to-t from-[#1A1714]/70 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex items-end justify-center pb-5">
                             <span className="bg-[#C4622D] text-white text-xs font-semibold px-5 py-2 rounded-full shadow-lg">
                               Try this style →
                             </span>

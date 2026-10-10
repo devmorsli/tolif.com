@@ -69,6 +69,17 @@ function TemplateCard({ template, index }: { template: PublicTemplate; index: nu
             </div>
           )}
 
+          {/* Portrait frame overlay */}
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            src="/mockups/frame-black-12x16.png"
+            alt=""
+            aria-hidden
+            className="absolute inset-0 w-full h-full pointer-events-none select-none z-[2]"
+            style={{ objectFit: "fill" }}
+            draggable={false}
+          />
+
           {/* Style badge */}
           <div className="absolute top-3 left-3 z-10">
             <span className="bg-black/45 backdrop-blur-md text-white/90 text-[10px] font-medium tracking-wide px-2.5 py-1 rounded-full border border-white/10">

@@ -221,15 +221,72 @@ export interface OrdersPage {
   total: number;
   page: number;
   pageSize: number;
+  revenue: number;
 }
 
-export async function getOrders(page = 1, pageSize = 20, status = "", search = "") {
-  const q = new URLSearchParams({ page: String(page), pageSize: String(pageSize), status, search });
+export async function getOrders(
+  page = 1, pageSize = 20, status = "", search = "",
+  from?: string, to?: string
+) {
+  const q = new URLSearchParams({ page: String(page), pageSize: String(pageSize) });
+  if (status) q.set("status", status);
+  if (search) q.set("search", search);
+  if (from) q.set("from", from);
+  if (to) q.set("to", to);
   return apiFetch<OrdersPage>(`/api/admin/orders?${q}`);
 }
 
 export async function getOrder(id: string) {
   return apiFetch<OrderDetail>(`/api/admin/orders/${id}`);
+}
+
+export interface OrderStats {
+  todayOrders: number;
+  todayRevenue: number;
+  weekRevenue: number;
+  monthRevenue: number;
+  abandonedCount: number;
+}
+
+export interface AbandonedCartItem {
+  id: string;
+  orderNumber: string;
+  customerEmail: string;
+  customerName?: string;
+  totalAmount: number;
+  currency: string;
+  createdAt: string;
+  hasPreview: boolean;
+  sessionId?: string;
+}
+
+export interface AbandonedCartsPage {
+  items: AbandonedCartItem[];
+  total: number;
+  page: number;
+  pageSize: number;
+}
+
+export async function getOrderStats() {
+  return apiFetch<OrderStats>("/api/admin/orders/stats");
+}
+
+export async function getAbandonedCarts(page = 1, pageSize = 50) {
+  const q = new URLSearchParams({ page: String(page), pageSize: String(pageSize) });
+  return apiFetch<AbandonedCartsPage>(`/api/admin/orders/abandoned?${q}`);
+}
+
+export async function sendAbandonmentEmail(id: string) {
+  return apiFetch<{ success: boolean }>(`/api/admin/orders/${id}/send-abandonment-email`, {
+    method: "POST",
+  });
+}
+
+export async function sendAbandonmentCampaign() {
+  return apiFetch<{ sent: number; failed: number; total: number }>(
+    "/api/admin/orders/abandonment-campaign",
+    { method: "POST" }
+  );
 }
 
 // ── Settings ──────────────────────────────────────────────────────────────────
