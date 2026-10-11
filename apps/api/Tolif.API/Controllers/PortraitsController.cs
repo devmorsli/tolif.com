@@ -244,8 +244,10 @@ public class PortraitsController(
     }
 
     // ── GET /api/portraits/{sessionId}/preview ────────────────────────────────
+    // HEAD is used by the frontend poller to check readiness without downloading bytes.
     /// <summary>Streams the watermarked preview image for the given session.</summary>
     [HttpGet("{sessionId}/preview")]
+    [HttpHead("{sessionId}/preview")]
     public async Task<IActionResult> Preview(Guid sessionId, CancellationToken ct)
     {
         var session = await db.PortraitSessions
@@ -254,6 +256,14 @@ public class PortraitsController(
 
         if (session is null || string.IsNullOrEmpty(session.WatermarkedPreviewKey))
             return NotFound(new { message = "Preview not found." });
+
+        // HEAD: just confirm the resource exists — skip the download
+        if (HttpContext.Request.Method == HttpMethods.Head)
+        {
+            Response.Headers.ContentType   = "image/jpeg";
+            Response.Headers.CacheControl  = "private, max-age=3600";
+            return Ok();
+        }
 
         try
         {

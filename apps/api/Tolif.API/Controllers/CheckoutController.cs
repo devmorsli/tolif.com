@@ -106,6 +106,21 @@ public class CheckoutController(
             amountInCents = (long)Math.Round(unitPrice * req.Quantity * 100);
         }
 
+        // ── Stripe minimum charge guard ────────────────────────────────────
+        // Stripe requires ≥50 cents for most currencies (≥30p for GBP).
+        // Validate before inserting the Order row to avoid orphan records.
+        var stripeMinCents = currency == "gbp" ? 30L : 50L;
+        if (amountInCents < stripeMinCents)
+        {
+            var minFormatted = (stripeMinCents / 100m).ToString("0.00");
+            return BadRequest(new
+            {
+                message = $"Order total is below Stripe's minimum charge " +
+                          $"({currency.ToUpperInvariant()} {minFormatted}). " +
+                          $"Please update the product price in the admin panel."
+            });
+        }
+
         // ── Create Order in DB (Pending) ───────────────────────────────────
         var order = new Domain.Entities.Order
         {
