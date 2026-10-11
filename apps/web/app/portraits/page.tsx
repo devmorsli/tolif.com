@@ -51,14 +51,17 @@ function TemplateCard({ template, index }: { template: PublicTemplate; index: nu
     >
       <Link href={`/portraits/${template.slug}`} className="group block">
 
-        {/* ── Frame area — no card bg, no rounded clip, frame defines the shape ── */}
+        {/* ── Frame ── */}
         <div className="relative" style={{ aspectRatio: "3/4" }}>
 
-          {/* Portrait image — full-bleed behind the frame.
-              The frame's opaque border/mat covers the edges; the transparent
-              centre reveals the portrait. overflow-hidden is intentionally
-              absent so the frame PNG can render without being clipped. */}
-          <div className="absolute inset-0">
+          {/* Template image — clipped to the glass opening of the frame PNG.
+              The frame PNG has a white glass area (not transparent), so we must
+              position the image precisely inside it. Measured from the actual PNG:
+              ~13% border+padding each side horizontally, ~10% vertically. */}
+          <div
+            className="absolute overflow-hidden"
+            style={{ top: "10%", left: "13%", width: "74%", height: "80%", zIndex: 0 }}
+          >
             {imgUrl && !imgError ? (
               // eslint-disable-next-line @next/next/no-img-element
               <img
@@ -68,17 +71,13 @@ function TemplateCard({ template, index }: { template: PublicTemplate; index: nu
                 className="w-full h-full object-cover transition-transform duration-700 ease-out group-hover:scale-105"
               />
             ) : (
-              <div
-                className={`w-full h-full bg-gradient-to-br ${categoryGradient(template.category)} flex items-center justify-center`}
-              >
-                <ImageIcon size={36} className="text-[#C4622D]/40" />
+              <div className={`w-full h-full bg-gradient-to-br ${categoryGradient(template.category)} flex items-center justify-center`}>
+                <ImageIcon size={28} className="text-[#C4622D]/40" />
               </div>
             )}
           </div>
 
-          {/* Frame overlay — stretched to fill exactly 100×100% of the card.
-              Because the card aspect-ratio matches the frame PNG (3:4 = 12×16),
-              object-fit:fill produces no distortion and covers every pixel. */}
+          {/* Frame PNG — fills the entire card slot */}
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img
             src="/mockups/frame-black-12x16.png"

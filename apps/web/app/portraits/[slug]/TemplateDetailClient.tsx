@@ -254,15 +254,15 @@ export function TemplateDetailClient({
                 transition={{ duration: 0.6, ease: "easeOut" }}
                 className="lg:sticky lg:top-28"
               >
-                {/* Full-bleed portrait behind frame — no clip container so the
-                    frame PNG fills 100% without being cut by rounded-3xl.
-                    A drop-shadow on the wrapper gives the "hanging frame" look. */}
                 <div className="relative aspect-[3/4]" style={{ filter: "drop-shadow(0 20px 40px rgba(26,23,20,0.22))" }}>
-                  {/* Portrait image — full bleed, frame covers borders */}
-                  <div className="absolute inset-0">
+                  {/* Template image clipped to the frame's glass opening */}
+                  <div
+                    className="absolute overflow-hidden"
+                    style={{ top: "10%", left: "13%", width: "74%", height: "80%", zIndex: 0 }}
+                  >
                     <TemplateImg imgUrl={imgUrl} name={template.name} category={template.category} />
                   </div>
-                  {/* Portrait frame overlay */}
+                  {/* Frame PNG overlay */}
                   {/* eslint-disable-next-line @next/next/no-img-element */}
                   <img
                     src="/mockups/frame-black-12x16.png"
@@ -489,9 +489,12 @@ export function TemplateDetailClient({
                     >
                       <Link href={`/portraits/${t.slug}`} className="group block">
 
-                        {/* Frame — full-bleed image behind, frame overlay on top */}
                         <div className="relative" style={{ aspectRatio: "3/4" }}>
-                          <div className="absolute inset-0">
+                          {/* Image clipped to frame glass opening */}
+                          <div
+                            className="absolute overflow-hidden"
+                            style={{ top: "10%", left: "13%", width: "74%", height: "80%", zIndex: 0 }}
+                          >
                             <TemplateImg imgUrl={rImgUrl} name={t.name} category={t.category} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" />
                           </div>
                           {/* eslint-disable-next-line @next/next/no-img-element */}
