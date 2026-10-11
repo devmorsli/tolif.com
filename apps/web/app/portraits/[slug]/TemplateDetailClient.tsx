@@ -257,8 +257,8 @@ export function TemplateDetailClient({
                 <div className="relative aspect-[3/4] overflow-hidden" style={{ filter: "drop-shadow(0 20px 40px rgba(26,23,20,0.22))" }}>
                   {/* Template image clipped to the frame's glass opening */}
                   <div
-                    className="absolute overflow-hidden"
-                    style={{ top: "5%", left: "5%", width: "90%", height: "90%", zIndex: 0 }}
+                    className="absolute inset-0"
+                    style={{ clipPath: "inset(8% 8% 8% 8%)", zIndex: 0 }}
                   >
                     <TemplateImg imgUrl={imgUrl} name={template.name} category={template.category} />
                   </div>
@@ -492,8 +492,8 @@ export function TemplateDetailClient({
                         <div className="relative overflow-hidden" style={{ aspectRatio: "3/4" }}>
                           {/* Image clipped to frame glass opening */}
                           <div
-                            className="absolute overflow-hidden"
-                            style={{ top: "5%", left: "5%", width: "90%", height: "90%", zIndex: 0 }}
+                            className="absolute inset-0"
+                            style={{ clipPath: "inset(8% 8% 8% 8%)", zIndex: 0 }}
                           >
                             <TemplateImg imgUrl={rImgUrl} name={t.name} category={t.category} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" />
                           </div>

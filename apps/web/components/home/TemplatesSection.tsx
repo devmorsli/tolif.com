@@ -36,29 +36,24 @@ function TemplateCard({
       <Link href={`/portraits/${template.slug}`} className="group block">
         <div className="relative overflow-hidden" style={{ aspectRatio: "3/4" }}>
           {/* Template image clipped to the oak frame's glass opening */}
-          {imgUrl && !imgError ? (
-            <div
-              className="absolute overflow-hidden"
-              style={{ top: "5%", left: "5%", width: "90%", height: "90%", zIndex: 0 }}
-            >
-              {/* eslint-disable-next-line @next/next/no-img-element */}
+          <div
+            className="absolute inset-0"
+            style={{ clipPath: "inset(8% 8% 8% 8%)", zIndex: 0 }}
+          >
+            {imgUrl && !imgError ? (
+              // eslint-disable-next-line @next/next/no-img-element
               <img
                 src={imgUrl}
                 alt={template.name}
                 onError={() => setImgError(true)}
                 className="w-full h-full object-cover transition-transform duration-700 ease-out group-hover:scale-105"
               />
-            </div>
-          ) : (
-            <div
-              className="absolute overflow-hidden"
-              style={{ top: "5%", left: "5%", width: "90%", height: "90%", zIndex: 0 }}
-            >
+            ) : (
               <div className={`w-full h-full bg-gradient-to-br ${categoryGradient(template.category)} flex items-center justify-center`}>
                 <ImageIcon size={32} className="text-[#C4622D]/40" />
               </div>
-            </div>
-          )}
+            )}
+          </div>
 
           {/* Oak frame overlay */}
           {/* eslint-disable-next-line @next/next/no-img-element */}
