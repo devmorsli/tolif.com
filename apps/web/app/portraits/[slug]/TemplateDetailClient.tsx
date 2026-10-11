@@ -207,7 +207,16 @@ export function TemplateDetailClient({
   const handleGenerate = () => {
     if (!canGenerate) return;
     setLaunching(true);
-    goTo(2);
+    // Clear any stale cart / session state so we always land on the
+    // generation screen (step 2), even if the user had an item in cart.
+    useWizardStore.setState({
+      step: 2,
+      sessionId: null,
+      previewUrl: null,
+      generationStatus: "idle",
+      selectedVariant: null,
+      selectedShipping: null,
+    });
     router.push("/create");
   };
 
@@ -245,12 +254,12 @@ export function TemplateDetailClient({
                 transition={{ duration: 0.6, ease: "easeOut" }}
                 className="lg:sticky lg:top-28"
               >
-                <div className="relative rounded-3xl overflow-hidden aspect-[3/4] shadow-xl shadow-[#1A1714]/10">
-                  {/* Portrait inside frame window */}
-                  <div
-                    className="absolute overflow-hidden"
-                    style={{ top: "11.67%", left: "21.67%", width: "57.5%", height: "77.5%", zIndex: 0 }}
-                  >
+                {/* Full-bleed portrait behind frame — no clip container so the
+                    frame PNG fills 100% without being cut by rounded-3xl.
+                    A drop-shadow on the wrapper gives the "hanging frame" look. */}
+                <div className="relative aspect-[3/4]" style={{ filter: "drop-shadow(0 20px 40px rgba(26,23,20,0.22))" }}>
+                  {/* Portrait image — full bleed, frame covers borders */}
+                  <div className="absolute inset-0">
                     <TemplateImg imgUrl={imgUrl} name={template.name} category={template.category} />
                   </div>
                   {/* Portrait frame overlay */}
@@ -467,7 +476,7 @@ export function TemplateDetailClient({
                 </Link>
               </motion.div>
 
-              <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4">
+              <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-5">
                 {related.map((t, i) => {
                   const rImgUrl = templateImageUrl(t.templateImageKey);
                   const slotCount = parseUploadSlots(t.uploadSlotsJson).length;
@@ -478,21 +487,13 @@ export function TemplateDetailClient({
                       animate={relatedInView ? { opacity: 1, y: 0 } : {}}
                       transition={{ delay: i * 0.08, duration: 0.5 }}
                     >
-                      <Link
-                        href={`/portraits/${t.slug}`}
-                        className="group block rounded-2xl overflow-hidden border border-[#E4D8CC] hover:border-[#C4622D]/50 hover:shadow-xl hover:shadow-[#C4622D]/10 hover:-translate-y-1.5 transition-all duration-300"
-                      >
-                        {/* Portrait-ratio image */}
-                        <div className="relative overflow-hidden" style={{ aspectRatio: "3/4" }}>
-                          {/* Portrait inside frame window */}
-                          <div
-                            className="absolute overflow-hidden"
-                            style={{ top: "11.67%", left: "21.67%", width: "57.5%", height: "77.5%", zIndex: 0 }}
-                          >
+                      <Link href={`/portraits/${t.slug}`} className="group block">
+
+                        {/* Frame — full-bleed image behind, frame overlay on top */}
+                        <div className="relative" style={{ aspectRatio: "3/4" }}>
+                          <div className="absolute inset-0">
                             <TemplateImg imgUrl={rImgUrl} name={t.name} category={t.category} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" />
                           </div>
-
-                          {/* Portrait frame overlay */}
                           {/* eslint-disable-next-line @next/next/no-img-element */}
                           <img
                             src="/mockups/frame-black-12x16.png"
@@ -502,29 +503,22 @@ export function TemplateDetailClient({
                             style={{ objectFit: "fill" }}
                             draggable={false}
                           />
-
-                          {/* Style badge */}
-                          {t.style && (
-                            <div className="absolute top-2.5 left-2.5 z-20 bg-white/85 backdrop-blur-sm text-[#8C7B6B] text-[10px] font-medium px-2 py-1 rounded-full">
-                              {t.style}
-                            </div>
-                          )}
-
                           {/* Hover overlay CTA */}
-                          <div className="absolute inset-0 z-20 bg-gradient-to-t from-[#1A1714]/70 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex items-end justify-center pb-5">
-                            <span className="bg-[#C4622D] text-white text-xs font-semibold px-5 py-2 rounded-full shadow-lg">
+                          <div className="absolute inset-0 z-20 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity duration-300">
+                            <span className="bg-[#C4622D] text-white text-xs font-semibold px-5 py-2 rounded-full shadow-lg translate-y-2 group-hover:translate-y-0 transition-transform duration-300">
                               Try this style →
                             </span>
                           </div>
                         </div>
 
-                        {/* Card footer */}
-                        <div className="bg-white px-3.5 py-3">
-                          <p className="font-semibold text-[#1A1714] text-sm truncate">{t.name}</p>
+                        {/* Info below frame */}
+                        <div className="mt-2.5 px-0.5">
+                          <p className="font-semibold text-[#1A1714] text-sm truncate group-hover:text-[#C4622D] transition-colors duration-200">{t.name}</p>
                           <p className="text-[11px] text-[#8C7B6B] mt-0.5">
                             {slotCount} photo{slotCount !== 1 ? "s" : ""} · Free preview
                           </p>
                         </div>
+
                       </Link>
                     </motion.div>
                   );
@@ -538,7 +532,8 @@ export function TemplateDetailClient({
                 >
                   <Link
                     href="/portraits"
-                    className="group flex flex-col items-center justify-center rounded-2xl border-2 border-dashed border-[#E4D8CC] hover:border-[#C4622D]/50 bg-[#FAF6F0] hover:bg-[#F5EEE6] transition-all duration-300 h-full min-h-[200px]"
+                    className="group flex flex-col items-center justify-center border-2 border-dashed border-[#E4D8CC] hover:border-[#C4622D]/50 bg-[#FAF6F0] hover:bg-[#F5EEE6] transition-all duration-300 h-full min-h-[200px]"
+                    style={{ aspectRatio: "3/4" }}
                   >
                     <div className="w-12 h-12 rounded-full bg-[#C4622D]/10 flex items-center justify-center mb-3 group-hover:bg-[#C4622D]/20 transition-colors">
                       <ArrowRight size={20} className="text-[#C4622D] group-hover:translate-x-0.5 transition-transform" />

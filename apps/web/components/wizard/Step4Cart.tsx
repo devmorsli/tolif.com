@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   ArrowLeft,
@@ -16,6 +17,7 @@ import {
   Trash2,
   Clock,
   AlertCircle,
+  Plus,
 } from "lucide-react";
 import Link from "next/link";
 import { useWizardStore } from "@/store/wizardStore";
@@ -185,6 +187,7 @@ function LineItem({
 
 // ── Main ───────────────────────────────────────────────────────────────────────
 export function Step4Cart() {
+  const router = useRouter();
   const {
     previewUrl,
     sessionId,
@@ -358,6 +361,15 @@ export function Step4Cart() {
             </div>
           </div>
         </div>
+
+        {/* ── Add another portrait ──────────────────────────────────────────── */}
+        <button
+          onClick={() => router.push("/portraits")}
+          className="w-full flex items-center justify-center gap-2 rounded-2xl border-2 border-dashed border-[#E4D8CC] hover:border-[#C4622D]/50 bg-white hover:bg-[#FFF9F6] py-4 text-sm font-medium text-[#8C7B6B] hover:text-[#C4622D] transition-all duration-200"
+        >
+          <Plus size={15} />
+          Add another portrait
+        </button>
 
         {/* ── Shipping OR Digital delivery ─────────────────────────────────── */}
         <AnimatePresence mode="wait">

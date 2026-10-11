@@ -132,6 +132,18 @@ export const useWizardStore = create<WizardState>()(
         gdprConsent:      state.gdprConsent,
         generationStatus: state.generationStatus,
       }),
+      // After rehydration, restore uploadSlots from selectedTemplate
+      // (they were excluded because File objects aren't JSON-serialisable,
+      //  but the slot definitions themselves are safe to restore).
+      onRehydrateStorage: () => (state) => {
+        if (state?.selectedTemplate) {
+          state.uploadSlots = state.selectedTemplate.uploadSlots.map((slot) => ({
+            ...slot,
+            file: undefined,
+            previewUrl: undefined,
+          }));
+        }
+      },
     }
   )
 );

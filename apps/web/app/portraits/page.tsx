@@ -50,31 +50,35 @@ function TemplateCard({ template, index }: { template: PublicTemplate; index: nu
       layout
     >
       <Link href={`/portraits/${template.slug}`} className="group block">
-        <div className="relative overflow-hidden rounded-2xl bg-[#1A1714]" style={{ aspectRatio: "3/4" }}>
 
-          {/* Portrait inside frame window */}
-          {imgUrl && !imgError ? (
-            <div
-              className="absolute overflow-hidden"
-              style={{ top: "11.67%", left: "21.67%", width: "57.5%", height: "77.5%", zIndex: 0 }}
-            >
-              {/* eslint-disable-next-line @next/next/no-img-element */}
+        {/* ── Frame area — no card bg, no rounded clip, frame defines the shape ── */}
+        <div className="relative" style={{ aspectRatio: "3/4" }}>
+
+          {/* Portrait image — full-bleed behind the frame.
+              The frame's opaque border/mat covers the edges; the transparent
+              centre reveals the portrait. overflow-hidden is intentionally
+              absent so the frame PNG can render without being clipped. */}
+          <div className="absolute inset-0">
+            {imgUrl && !imgError ? (
+              // eslint-disable-next-line @next/next/no-img-element
               <img
                 src={imgUrl}
                 alt={template.name}
                 onError={() => setImgError(true)}
                 className="w-full h-full object-cover transition-transform duration-700 ease-out group-hover:scale-105"
               />
-            </div>
-          ) : (
-            <div
-              className={`absolute inset-0 bg-gradient-to-br ${categoryGradient(template.category)} flex items-center justify-center`}
-            >
-              <ImageIcon size={36} className="text-[#C4622D]/40" />
-            </div>
-          )}
+            ) : (
+              <div
+                className={`w-full h-full bg-gradient-to-br ${categoryGradient(template.category)} flex items-center justify-center`}
+              >
+                <ImageIcon size={36} className="text-[#C4622D]/40" />
+              </div>
+            )}
+          </div>
 
-          {/* Portrait frame overlay */}
+          {/* Frame overlay — stretched to fill exactly 100×100% of the card.
+              Because the card aspect-ratio matches the frame PNG (3:4 = 12×16),
+              object-fit:fill produces no distortion and covers every pixel. */}
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img
             src="/mockups/frame-black-12x16.png"
@@ -85,30 +89,24 @@ function TemplateCard({ template, index }: { template: PublicTemplate; index: nu
             draggable={false}
           />
 
-          {/* Style badge */}
-          <div className="absolute top-3 left-3 z-20">
-            <span className="bg-black/45 backdrop-blur-md text-white/90 text-[10px] font-medium tracking-wide px-2.5 py-1 rounded-full border border-white/10">
-              {template.style}
-            </span>
-          </div>
-
-          {/* Bottom gradient + info */}
-          <div className="absolute inset-x-0 bottom-0 z-20 bg-gradient-to-t from-black/85 via-black/35 to-transparent pt-16 pb-4 px-4">
-            <p className="text-[9px] font-semibold tracking-[3px] uppercase text-white/45 mb-1">
-              {template.category}
-            </p>
-            <h3 className="text-white font-semibold text-sm leading-snug">
-              {template.name}
-            </h3>
-          </div>
-
           {/* Hover CTA */}
-          <div className="absolute inset-0 z-30 flex items-center justify-center bg-black/0 group-hover:bg-black/20 transition-colors duration-300">
-            <span className="flex items-center gap-1.5 bg-[#C4622D] text-white text-xs font-bold tracking-wide px-5 py-2.5 rounded-full opacity-0 group-hover:opacity-100 translate-y-3 group-hover:translate-y-0 transition-all duration-300 shadow-xl shadow-black/40">
+          <div className="absolute inset-0 z-20 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity duration-300">
+            <span className="flex items-center gap-1.5 bg-[#C4622D] text-white text-xs font-bold tracking-wide px-5 py-2.5 rounded-full shadow-xl shadow-black/40 translate-y-2 group-hover:translate-y-0 transition-transform duration-300">
               Create yours <ArrowRight size={12} />
             </span>
           </div>
         </div>
+
+        {/* ── Info below the frame ────────────────────────────────────────────── */}
+        <div className="mt-2.5 px-0.5">
+          <h3 className="font-semibold text-[#1A1714] text-sm leading-snug truncate group-hover:text-[#C4622D] transition-colors duration-200">
+            {template.name}
+          </h3>
+          <p className="text-[11px] text-[#8C7B6B] mt-0.5">
+            {template.category}{template.style ? ` · ${template.style}` : ""}
+          </p>
+        </div>
+
       </Link>
     </motion.div>
   );
@@ -142,13 +140,15 @@ function EmptyState({ query }: { query: string }) {
 
 function SkeletonGrid() {
   return (
-    <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4">
+    <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-5">
       {Array.from({ length: 8 }).map((_, i) => (
-        <div
-          key={i}
-          className="rounded-2xl bg-[#F0E8DC] animate-pulse"
-          style={{ aspectRatio: "3/4" }}
-        />
+        <div key={i}>
+          <div className="bg-[#E8DDD4] animate-pulse" style={{ aspectRatio: "3/4" }} />
+          <div className="mt-2.5 space-y-1.5">
+            <div className="h-3.5 bg-[#E8DDD4] animate-pulse rounded w-3/4" />
+            <div className="h-3 bg-[#E8DDD4] animate-pulse rounded w-1/2" />
+          </div>
+        </div>
       ))}
     </div>
   );
@@ -420,7 +420,7 @@ export default function PortraitsPage() {
           {loading ? (
             <SkeletonGrid />
           ) : (
-            <motion.div layout className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4">
+            <motion.div layout className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-5">
               <AnimatePresence mode="popLayout">
                 {filtered.length === 0 ? (
                   <EmptyState key="empty" query={search} />
