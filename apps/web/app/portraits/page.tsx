@@ -56,7 +56,7 @@ function TemplateCard({ template, index }: { template: PublicTemplate; index: nu
 
           <div
             className="absolute overflow-hidden"
-            style={{ top: "3%", left: "6%", width: "88%", height: "94%", zIndex: 0 }}
+            style={{ top: "5%", left: "5%", width: "90%", height: "90%", zIndex: 0 }}
           >
             {imgUrl && !imgError ? (
               // eslint-disable-next-line @next/next/no-img-element
@@ -79,7 +79,7 @@ function TemplateCard({ template, index }: { template: PublicTemplate; index: nu
             alt=""
             aria-hidden
             className="absolute inset-0 w-full h-full pointer-events-none select-none z-10"
-            style={{ objectFit: "fill", transform: "scale(1.13)", transformOrigin: "center center" }}
+            style={{ objectFit: "fill", transform: "scale(1.3)", transformOrigin: "center center" }}
             draggable={false}
           />
 

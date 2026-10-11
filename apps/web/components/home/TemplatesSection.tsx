@@ -39,7 +39,7 @@ function TemplateCard({
           {imgUrl && !imgError ? (
             <div
               className="absolute overflow-hidden"
-              style={{ top: "3%", left: "6%", width: "88%", height: "94%", zIndex: 0 }}
+              style={{ top: "5%", left: "5%", width: "90%", height: "90%", zIndex: 0 }}
             >
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img
@@ -52,7 +52,7 @@ function TemplateCard({
           ) : (
             <div
               className="absolute overflow-hidden"
-              style={{ top: "3%", left: "6%", width: "88%", height: "94%", zIndex: 0 }}
+              style={{ top: "5%", left: "5%", width: "90%", height: "90%", zIndex: 0 }}
             >
               <div className={`w-full h-full bg-gradient-to-br ${categoryGradient(template.category)} flex items-center justify-center`}>
                 <ImageIcon size={32} className="text-[#C4622D]/40" />
@@ -67,7 +67,7 @@ function TemplateCard({
             alt=""
             aria-hidden
             className="absolute inset-0 w-full h-full pointer-events-none select-none z-10"
-            style={{ objectFit: "fill", transform: "scale(1.13)", transformOrigin: "center center" }}
+            style={{ objectFit: "fill", transform: "scale(1.3)", transformOrigin: "center center" }}
             draggable={false}
           />
 
