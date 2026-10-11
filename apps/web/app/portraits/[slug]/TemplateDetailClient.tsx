@@ -258,14 +258,14 @@ export function TemplateDetailClient({
                   {/* Template image clipped to the frame's glass opening */}
                   <div
                     className="absolute overflow-hidden"
-                    style={{ top: "10%", left: "13%", width: "74%", height: "80%", zIndex: 0 }}
+                    style={{ top: "8%", left: "9%", width: "82%", height: "84%", zIndex: 0 }}
                   >
                     <TemplateImg imgUrl={imgUrl} name={template.name} category={template.category} />
                   </div>
                   {/* Frame PNG overlay */}
                   {/* eslint-disable-next-line @next/next/no-img-element */}
                   <img
-                    src="/mockups/frame-black-12x16.png"
+                    src="/mockups/frame-redoak-12x16.png"
                     alt=""
                     aria-hidden
                     className="absolute inset-0 w-full h-full pointer-events-none select-none z-10"
@@ -493,13 +493,13 @@ export function TemplateDetailClient({
                           {/* Image clipped to frame glass opening */}
                           <div
                             className="absolute overflow-hidden"
-                            style={{ top: "10%", left: "13%", width: "74%", height: "80%", zIndex: 0 }}
+                            style={{ top: "8%", left: "9%", width: "82%", height: "84%", zIndex: 0 }}
                           >
                             <TemplateImg imgUrl={rImgUrl} name={t.name} category={t.category} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" />
                           </div>
                           {/* eslint-disable-next-line @next/next/no-img-element */}
                           <img
-                            src="/mockups/frame-black-12x16.png"
+                            src="/mockups/frame-redoak-12x16.png"
                             alt=""
                             aria-hidden
                             className="absolute inset-0 w-full h-full pointer-events-none select-none z-10"

@@ -54,13 +54,9 @@ function TemplateCard({ template, index }: { template: PublicTemplate; index: nu
         {/* ── Frame ── */}
         <div className="relative" style={{ aspectRatio: "3/4" }}>
 
-          {/* Template image — clipped to the glass opening of the frame PNG.
-              The frame PNG has a white glass area (not transparent), so we must
-              position the image precisely inside it. Measured from the actual PNG:
-              ~13% border+padding each side horizontally, ~10% vertically. */}
           <div
             className="absolute overflow-hidden"
-            style={{ top: "10%", left: "13%", width: "74%", height: "80%", zIndex: 0 }}
+            style={{ top: "8%", left: "9%", width: "82%", height: "84%", zIndex: 0 }}
           >
             {imgUrl && !imgError ? (
               // eslint-disable-next-line @next/next/no-img-element
@@ -77,10 +73,9 @@ function TemplateCard({ template, index }: { template: PublicTemplate; index: nu
             )}
           </div>
 
-          {/* Frame PNG — fills the entire card slot */}
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img
-            src="/mockups/frame-black-12x16.png"
+            src="/mockups/frame-redoak-12x16.png"
             alt=""
             aria-hidden
             className="absolute inset-0 w-full h-full pointer-events-none select-none z-10"

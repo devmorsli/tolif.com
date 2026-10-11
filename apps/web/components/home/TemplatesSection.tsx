@@ -34,16 +34,14 @@ function TemplateCard({
       layout
     >
       <Link href={`/portraits/${template.slug}`} className="group block">
-        <div
-          className="relative overflow-hidden rounded-xl bg-[#1A1714]"
-          style={{ aspectRatio: "3/4" }}
-        >
-          {/* Portrait inside frame window */}
+        <div className="relative" style={{ aspectRatio: "3/4" }}>
+          {/* Template image clipped to the oak frame's glass opening */}
           {imgUrl && !imgError ? (
             <div
               className="absolute overflow-hidden"
-              style={{ top: "11.67%", left: "21.67%", width: "57.5%", height: "77.5%", zIndex: 0 }}
+              style={{ top: "8%", left: "9%", width: "82%", height: "84%", zIndex: 0 }}
             >
+              {/* eslint-disable-next-line @next/next/no-img-element */}
               <img
                 src={imgUrl}
                 alt={template.name}
@@ -53,16 +51,19 @@ function TemplateCard({
             </div>
           ) : (
             <div
-              className={`absolute inset-0 bg-gradient-to-br ${categoryGradient(template.category)} flex items-center justify-center`}
+              className="absolute overflow-hidden"
+              style={{ top: "8%", left: "9%", width: "82%", height: "84%", zIndex: 0 }}
             >
-              <ImageIcon size={32} className="text-[#C4622D]/40" />
+              <div className={`w-full h-full bg-gradient-to-br ${categoryGradient(template.category)} flex items-center justify-center`}>
+                <ImageIcon size={32} className="text-[#C4622D]/40" />
+              </div>
             </div>
           )}
 
-          {/* Portrait frame overlay */}
+          {/* Oak frame overlay */}
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img
-            src="/mockups/frame-black-12x16.png"
+            src="/mockups/frame-redoak-12x16.png"
             alt=""
             aria-hidden
             className="absolute inset-0 w-full h-full pointer-events-none select-none z-10"
@@ -70,27 +71,17 @@ function TemplateCard({
             draggable={false}
           />
 
-          {/* Style badge */}
-          <div className="absolute top-3 left-3 z-20">
-            <span className="bg-black/40 backdrop-blur-md text-white/90 text-[10px] font-medium tracking-wide px-2.5 py-1 rounded-full border border-white/10">
-              {template.style}
-            </span>
-          </div>
-
-          {/* Bottom gradient + name */}
-          <div className="absolute inset-x-0 bottom-0 z-20 bg-gradient-to-t from-black/75 via-black/25 to-transparent pt-12 pb-3.5 px-3.5">
-            <p className="text-[9px] font-semibold tracking-widest uppercase text-white/50 mb-0.5">
-              {template.category}
-            </p>
-            <h3 className="text-white font-medium text-[13px] leading-snug">{template.name}</h3>
-          </div>
-
           {/* Hover CTA */}
-          <div className="absolute inset-0 z-30 flex items-center justify-center bg-black/0 group-hover:bg-black/20 transition-colors duration-300">
-            <span className="flex items-center gap-1.5 bg-[#C4622D] text-white text-xs font-semibold px-4 py-2 rounded-full opacity-0 group-hover:opacity-100 translate-y-3 group-hover:translate-y-0 transition-all duration-300 shadow-lg shadow-black/30">
+          <div className="absolute inset-0 z-20 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity duration-300">
+            <span className="flex items-center gap-1.5 bg-[#C4622D] text-white text-xs font-semibold px-4 py-2 rounded-full translate-y-2 group-hover:translate-y-0 transition-transform duration-300 shadow-lg">
               Choose style <ArrowRight size={11} />
             </span>
           </div>
+        </div>
+        {/* Name below frame */}
+        <div className="mt-2 px-0.5">
+          <p className="font-semibold text-[#1A1714] text-sm truncate group-hover:text-[#C4622D] transition-colors duration-200">{template.name}</p>
+          <p className="text-[11px] text-[#8C7B6B] mt-0.5">{template.category}{template.style ? ` · ${template.style}` : ""}</p>
         </div>
       </Link>
     </motion.div>
