@@ -35,10 +35,10 @@ function TemplateCard({
     >
       <Link href={`/portraits/${template.slug}`} className="group block">
         <div className="relative overflow-hidden" style={{ aspectRatio: "3/4" }}>
-          {/* Template image clipped to the oak frame's glass opening */}
+          {/* Template image inset to the oak frame's glass opening */}
           <div
-            className="absolute inset-0"
-            style={{ clipPath: "inset(8% 8% 8% 8%)", zIndex: 0 }}
+            className="absolute overflow-hidden"
+            style={{ top: "8%", left: "8%", right: "8%", bottom: "8%", zIndex: 0 }}
           >
             {imgUrl && !imgError ? (
               // eslint-disable-next-line @next/next/no-img-element
