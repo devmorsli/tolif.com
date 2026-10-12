@@ -35,10 +35,21 @@ function TemplateCard({
     >
       <Link href={`/portraits/${template.slug}`} className="group block">
         <div className="relative overflow-hidden" style={{ aspectRatio: "3/4" }}>
-          {/* Template image inset to the oak frame's glass opening */}
+          {/* Oak frame — behind the portrait, scaled to crop white outer padding */}
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            src="/mockups/frame-redoak-12x16.png"
+            alt=""
+            aria-hidden
+            className="absolute inset-0 w-full h-full pointer-events-none select-none z-0"
+            style={{ objectFit: "fill", transform: "scale(1.3)", transformOrigin: "center center" }}
+            draggable={false}
+          />
+
+          {/* Template image sits inside the glass opening, on top of the frame */}
           <div
-            className="absolute overflow-hidden"
-            style={{ top: "8%", left: "8%", right: "8%", bottom: "8%", zIndex: 0 }}
+            className="absolute overflow-hidden z-10"
+            style={{ top: "11%", left: "9%", right: "9%", bottom: "11%" }}
           >
             {imgUrl && !imgError ? (
               // eslint-disable-next-line @next/next/no-img-element
@@ -54,17 +65,6 @@ function TemplateCard({
               </div>
             )}
           </div>
-
-          {/* Oak frame overlay */}
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img
-            src="/mockups/frame-redoak-12x16.png"
-            alt=""
-            aria-hidden
-            className="absolute inset-0 w-full h-full pointer-events-none select-none z-10"
-            style={{ objectFit: "fill", transform: "scale(1.3)", transformOrigin: "center center" }}
-            draggable={false}
-          />
 
           {/* Hover CTA */}
           <div className="absolute inset-0 z-20 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity duration-300">
