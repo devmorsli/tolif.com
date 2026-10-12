@@ -34,30 +34,18 @@ function TemplateCard({
       layout
     >
       <Link href={`/portraits/${template.slug}`} className="group block">
-        <div className="relative overflow-hidden" style={{ aspectRatio: "3/4" }}>
-          {/* Oak frame — behind the portrait, scaled to crop white outer padding */}
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img
-            src="/mockups/frame-redoak-12x16.png"
-            alt=""
-            aria-hidden
-            className="absolute inset-0 w-full h-full pointer-events-none select-none z-0"
-            style={{ objectFit: "fill", transform: "scale(1.3)", transformOrigin: "center center" }}
-            draggable={false}
-          />
-
-          {/* Template image sits inside the glass opening, on top of the frame */}
-          <div
-            className="absolute overflow-hidden z-10"
-            style={{ top: "11%", left: "9%", right: "9%", bottom: "11%" }}
-          >
+        {/* Card: fixed aspect ratio with hard overflow clip */}
+        <div style={{ position: "relative", aspectRatio: "3/4", overflow: "hidden" }}>
+          {/* Portrait image fills the full card behind the frame */}
+          <div style={{ position: "absolute", inset: 0, zIndex: 0 }}>
             {imgUrl && !imgError ? (
               // eslint-disable-next-line @next/next/no-img-element
               <img
                 src={imgUrl}
                 alt={template.name}
                 onError={() => setImgError(true)}
-                className="w-full h-full object-cover transition-transform duration-700 ease-out group-hover:scale-105"
+                style={{ width: "100%", height: "100%", objectFit: "cover" }}
+                className="transition-transform duration-700 ease-out group-hover:scale-105"
               />
             ) : (
               <div className={`w-full h-full bg-gradient-to-br ${categoryGradient(template.category)} flex items-center justify-center`}>
@@ -66,8 +54,26 @@ function TemplateCard({
             )}
           </div>
 
+          {/* Oak frame on top — RGBA PNG with transparent glass center shows image through */}
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            src="/mockups/frame-redoak-12x16.png"
+            alt=""
+            aria-hidden
+            style={{
+              position: "absolute", inset: 0,
+              width: "100%", height: "100%",
+              objectFit: "fill",
+              transform: "scale(1.3)",
+              transformOrigin: "center center",
+              zIndex: 10,
+              pointerEvents: "none",
+            }}
+            draggable={false}
+          />
+
           {/* Hover CTA */}
-          <div className="absolute inset-0 z-20 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity duration-300">
+          <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity duration-300" style={{ zIndex: 20 }}>
             <span className="flex items-center gap-1.5 bg-[#C4622D] text-white text-xs font-semibold px-4 py-2 rounded-full translate-y-2 group-hover:translate-y-0 transition-transform duration-300 shadow-lg">
               Choose style <ArrowRight size={11} />
             </span>
