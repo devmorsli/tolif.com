@@ -254,24 +254,30 @@ export function TemplateDetailClient({
                 transition={{ duration: 0.6, ease: "easeOut" }}
                 className="lg:sticky lg:top-28"
               >
-                <div className="relative aspect-[3/4] overflow-hidden" style={{ filter: "drop-shadow(0 20px 40px rgba(26,23,20,0.22))" }}>
-                  {/* Template image clipped to the frame's glass opening */}
-                  <div
-                    className="absolute inset-0"
-                    style={{ clipPath: "inset(8% 8% 8% 8%)", zIndex: 0 }}
-                  >
-                    <TemplateImg imgUrl={imgUrl} name={template.name} category={template.category} />
+                <div className="relative aspect-[3/4]" style={{ filter: "drop-shadow(0 20px 40px rgba(26,23,20,0.22))" }}>
+                  {/* Frame container — overflow hidden clips the frame's white padding */}
+                  <div className="absolute inset-0 overflow-hidden">
+                    {/* Image — same height as frame */}
+                    <div className="absolute inset-0">
+                      <TemplateImg imgUrl={imgUrl} name={template.name} category={template.category} />
+                    </div>
+                    {/* Frame — slightly larger so white padding overflows and gets clipped */}
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img
+                      src="/mockups/frame-redoak-12x16.png"
+                      alt=""
+                      aria-hidden
+                      className="pointer-events-none select-none"
+                      style={{
+                        position: "absolute",
+                        top: "-10%", left: "-10%",
+                        width: "120%", height: "120%",
+                        objectFit: "fill",
+                        zIndex: 10,
+                      }}
+                      draggable={false}
+                    />
                   </div>
-                  {/* Frame PNG overlay */}
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img
-                    src="/mockups/frame-redoak-12x16.png"
-                    alt=""
-                    aria-hidden
-                    className="absolute inset-0 w-full h-full pointer-events-none select-none z-10"
-                    style={{ objectFit: "fill", transform: "scale(1.3)", transformOrigin: "center center" }}
-                    draggable={false}
-                  />
                   {template.style && (
                     <div className="absolute top-4 left-4 z-20 bg-white/80 backdrop-blur-sm text-[#8C7B6B] text-xs font-medium px-3 py-1.5 rounded-full border border-white/60">
                       {template.style}
@@ -489,23 +495,28 @@ export function TemplateDetailClient({
                     >
                       <Link href={`/portraits/${t.slug}`} className="group block">
 
-                        <div className="relative overflow-hidden" style={{ aspectRatio: "3/4" }}>
-                          {/* Image clipped to frame glass opening */}
-                          <div
-                            className="absolute inset-0"
-                            style={{ clipPath: "inset(8% 8% 8% 8%)", zIndex: 0 }}
-                          >
+                        <div className="relative" style={{ aspectRatio: "3/4" }}>
+                          {/* Frame container — overflow hidden clips the frame's white padding */}
+                          <div className="absolute inset-0 overflow-hidden">
+                            {/* Image — same height as frame */}
                             <TemplateImg imgUrl={rImgUrl} name={t.name} category={t.category} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" />
+                            {/* Frame — slightly larger so white padding overflows and gets clipped */}
+                            {/* eslint-disable-next-line @next/next/no-img-element */}
+                            <img
+                              src="/mockups/frame-redoak-12x16.png"
+                              alt=""
+                              aria-hidden
+                              className="pointer-events-none select-none"
+                              style={{
+                                position: "absolute",
+                                top: "-10%", left: "-10%",
+                                width: "120%", height: "120%",
+                                objectFit: "fill",
+                                zIndex: 10,
+                              }}
+                              draggable={false}
+                            />
                           </div>
-                          {/* eslint-disable-next-line @next/next/no-img-element */}
-                          <img
-                            src="/mockups/frame-redoak-12x16.png"
-                            alt=""
-                            aria-hidden
-                            className="absolute inset-0 w-full h-full pointer-events-none select-none z-10"
-                            style={{ objectFit: "fill", transform: "scale(1.3)", transformOrigin: "center center" }}
-                            draggable={false}
-                          />
                           {/* Hover overlay CTA */}
                           <div className="absolute inset-0 z-20 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity duration-300">
                             <span className="bg-[#C4622D] text-white text-xs font-semibold px-5 py-2 rounded-full shadow-lg translate-y-2 group-hover:translate-y-0 transition-transform duration-300">

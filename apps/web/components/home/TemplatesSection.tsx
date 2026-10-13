@@ -34,10 +34,11 @@ function TemplateCard({
       layout
     >
       <Link href={`/portraits/${template.slug}`} className="group block">
-        {/* Card: fixed aspect ratio with hard overflow clip */}
-        <div style={{ position: "relative", aspectRatio: "3/4", overflow: "hidden" }}>
-          {/* Portrait image fills the full card behind the frame */}
-          <div style={{ position: "absolute", inset: 0, zIndex: 0 }}>
+        {/* Card: fixed aspect ratio */}
+        <div style={{ position: "relative", aspectRatio: "3/4" }}>
+          {/* Frame container — same dimensions as the frame, overflow hidden clips white padding */}
+          <div style={{ position: "absolute", inset: 0, overflow: "hidden" }}>
+            {/* Portrait image — same height as frame */}
             {imgUrl && !imgError ? (
               // eslint-disable-next-line @next/next/no-img-element
               <img
@@ -52,25 +53,24 @@ function TemplateCard({
                 <ImageIcon size={32} className="text-[#C4622D]/40" />
               </div>
             )}
-          </div>
 
-          {/* Oak frame on top — RGBA PNG with transparent glass center shows image through */}
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img
-            src="/mockups/frame-redoak-12x16.png"
-            alt=""
-            aria-hidden
-            style={{
-              position: "absolute", inset: 0,
-              width: "100%", height: "100%",
-              objectFit: "fill",
-              transform: "scale(1.3)",
-              transformOrigin: "center center",
-              zIndex: 10,
-              pointerEvents: "none",
-            }}
-            draggable={false}
-          />
+            {/* Oak frame — slightly larger so the white padding overflows and gets clipped */}
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src="/mockups/frame-redoak-12x16.png"
+              alt=""
+              aria-hidden
+              style={{
+                position: "absolute",
+                top: "-10%", left: "-10%",
+                width: "120%", height: "120%",
+                objectFit: "fill",
+                zIndex: 10,
+                pointerEvents: "none",
+              }}
+              draggable={false}
+            />
+          </div>
 
           {/* Hover CTA */}
           <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity duration-300" style={{ zIndex: 20 }}>
