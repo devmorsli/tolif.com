@@ -254,29 +254,27 @@ export function TemplateDetailClient({
                 transition={{ duration: 0.6, ease: "easeOut" }}
                 className="lg:sticky lg:top-28"
               >
-                <div className="relative aspect-[3/4]" style={{ filter: "drop-shadow(0 20px 40px rgba(26,23,20,0.22))" }}>
-                  {/* Frame container — overflow hidden clips the frame's white padding */}
-                  <div className="absolute inset-0 overflow-hidden">
-                    {/* Image — same height as frame */}
-                    <div className="absolute inset-0">
+                {/* CSS picture frame */}
+                <div style={{
+                  position: "relative",
+                  aspectRatio: "3/4",
+                  background: "linear-gradient(160deg, #D8BC96 0%, #C4A47C 30%, #B08858 55%, #CAA87A 80%, #D4B488 100%)",
+                  padding: "10px",
+                  boxShadow: "0 20px 48px rgba(26,23,20,0.28), inset 0 1px 0 rgba(255,255,255,0.28), inset 0 -1px 0 rgba(0,0,0,0.18)",
+                }}>
+                  {/* Mat board */}
+                  <div style={{
+                    width: "100%",
+                    height: "100%",
+                    background: "#F7F2EA",
+                    padding: "14px",
+                    boxShadow: "inset 0 2px 8px rgba(0,0,0,0.10)",
+                    display: "flex",
+                  }}>
+                    {/* Portrait image */}
+                    <div style={{ flex: 1, overflow: "hidden", position: "relative" }}>
                       <TemplateImg imgUrl={imgUrl} name={template.name} category={template.category} />
                     </div>
-                    {/* Frame — slightly larger so white padding overflows and gets clipped */}
-                    {/* eslint-disable-next-line @next/next/no-img-element */}
-                    <img
-                      src="/mockups/frame-redoak-12x16.png"
-                      alt=""
-                      aria-hidden
-                      className="pointer-events-none select-none"
-                      style={{
-                        position: "absolute",
-                        top: "-10%", left: "-10%",
-                        width: "120%", height: "120%",
-                        objectFit: "fill",
-                        zIndex: 10,
-                      }}
-                      draggable={false}
-                    />
                   </div>
                   {template.style && (
                     <div className="absolute top-4 left-4 z-20 bg-white/80 backdrop-blur-sm text-[#8C7B6B] text-xs font-medium px-3 py-1.5 rounded-full border border-white/60">
@@ -495,27 +493,27 @@ export function TemplateDetailClient({
                     >
                       <Link href={`/portraits/${t.slug}`} className="group block">
 
-                        <div className="relative" style={{ aspectRatio: "3/4" }}>
-                          {/* Frame container — overflow hidden clips the frame's white padding */}
-                          <div className="absolute inset-0 overflow-hidden">
-                            {/* Image — same height as frame */}
-                            <TemplateImg imgUrl={rImgUrl} name={t.name} category={t.category} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" />
-                            {/* Frame — slightly larger so white padding overflows and gets clipped */}
-                            {/* eslint-disable-next-line @next/next/no-img-element */}
-                            <img
-                              src="/mockups/frame-redoak-12x16.png"
-                              alt=""
-                              aria-hidden
-                              className="pointer-events-none select-none"
-                              style={{
-                                position: "absolute",
-                                top: "-10%", left: "-10%",
-                                width: "120%", height: "120%",
-                                objectFit: "fill",
-                                zIndex: 10,
-                              }}
-                              draggable={false}
-                            />
+                        {/* CSS picture frame */}
+                        <div style={{
+                          position: "relative",
+                          aspectRatio: "3/4",
+                          background: "linear-gradient(160deg, #D8BC96 0%, #C4A47C 30%, #B08858 55%, #CAA87A 80%, #D4B488 100%)",
+                          padding: "8px",
+                          boxShadow: "0 8px 24px rgba(0,0,0,0.22), inset 0 1px 0 rgba(255,255,255,0.28), inset 0 -1px 0 rgba(0,0,0,0.18)",
+                        }}>
+                          {/* Mat board */}
+                          <div style={{
+                            width: "100%",
+                            height: "100%",
+                            background: "#F7F2EA",
+                            padding: "10px",
+                            boxShadow: "inset 0 2px 8px rgba(0,0,0,0.10)",
+                            display: "flex",
+                          }}>
+                            {/* Portrait image */}
+                            <div style={{ flex: 1, overflow: "hidden" }}>
+                              <TemplateImg imgUrl={rImgUrl} name={t.name} category={t.category} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" />
+                            </div>
                           </div>
                           {/* Hover overlay CTA */}
                           <div className="absolute inset-0 z-20 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity duration-300">

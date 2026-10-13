@@ -34,42 +34,40 @@ function TemplateCard({
       layout
     >
       <Link href={`/portraits/${template.slug}`} className="group block">
-        {/* Card: fixed aspect ratio */}
-        <div style={{ position: "relative", aspectRatio: "3/4" }}>
-          {/* Frame container — same dimensions as the frame, overflow hidden clips white padding */}
-          <div style={{ position: "absolute", inset: 0, overflow: "hidden" }}>
-            {/* Portrait image — same height as frame */}
-            {imgUrl && !imgError ? (
-              // eslint-disable-next-line @next/next/no-img-element
-              <img
-                src={imgUrl}
-                alt={template.name}
-                onError={() => setImgError(true)}
-                style={{ width: "100%", height: "100%", objectFit: "cover" }}
-                className="transition-transform duration-700 ease-out group-hover:scale-105"
-              />
-            ) : (
-              <div className={`w-full h-full bg-gradient-to-br ${categoryGradient(template.category)} flex items-center justify-center`}>
-                <ImageIcon size={32} className="text-[#C4622D]/40" />
-              </div>
-            )}
-
-            {/* Oak frame — slightly larger so the white padding overflows and gets clipped */}
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img
-              src="/mockups/frame-redoak-12x16.png"
-              alt=""
-              aria-hidden
-              style={{
-                position: "absolute",
-                top: "-10%", left: "-10%",
-                width: "120%", height: "120%",
-                objectFit: "fill",
-                zIndex: 10,
-                pointerEvents: "none",
-              }}
-              draggable={false}
-            />
+        {/* CSS picture frame */}
+        <div style={{
+          position: "relative",
+          aspectRatio: "3/4",
+          background: "linear-gradient(160deg, #D8BC96 0%, #C4A47C 30%, #B08858 55%, #CAA87A 80%, #D4B488 100%)",
+          padding: "8px",
+          boxShadow: "0 8px 24px rgba(0,0,0,0.22), inset 0 1px 0 rgba(255,255,255,0.28), inset 0 -1px 0 rgba(0,0,0,0.18)",
+        }}>
+          {/* Mat board */}
+          <div style={{
+            width: "100%",
+            height: "100%",
+            background: "#F7F2EA",
+            padding: "12px",
+            boxShadow: "inset 0 2px 8px rgba(0,0,0,0.10)",
+            display: "flex",
+          }}>
+            {/* Portrait image — fills the mat opening, overflow hidden for hover scale */}
+            <div style={{ flex: 1, overflow: "hidden" }}>
+              {imgUrl && !imgError ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img
+                  src={imgUrl}
+                  alt={template.name}
+                  onError={() => setImgError(true)}
+                  style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }}
+                  className="transition-transform duration-700 ease-out group-hover:scale-105"
+                />
+              ) : (
+                <div className={`w-full h-full bg-gradient-to-br ${categoryGradient(template.category)} flex items-center justify-center`}>
+                  <ImageIcon size={28} className="text-[#C4622D]/40" />
+                </div>
+              )}
+            </div>
           </div>
 
           {/* Hover CTA */}
