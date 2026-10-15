@@ -356,6 +356,10 @@ export async function syncPrintfulCatalog() {
   });
 }
 
+export async function getPrintfulProductVariants(productId: number) {
+  return apiFetch<PrintfulVariant[]>(`/api/admin/printful/catalog/${productId}/variants`);
+}
+
 export async function getPrintfulMappings() {
   return apiFetch<PrintfulMapping[]>("/api/admin/printful/mappings");
 }

@@ -11,7 +11,9 @@ import {
   savePrintfulMappings,
   getPrintfulWebhooks,
   registerPrintfulWebhooks,
+  getPrintfulProductVariants,
   type PrintfulProduct,
+  type PrintfulVariant,
   type PrintfulMapping,
   type PrintfulWebhook,
 } from "@/lib/admin-api";
@@ -78,13 +80,31 @@ function StatusPill({
 
 // ── Collapsible product card ───────────────────────────────────────────────────
 function ProductCard({ product }: { product: PrintfulProduct }) {
-  const [open, setOpen] = useState(false);
-  const variants = product.variants ?? [];
+  const [open, setOpen]         = useState(false);
+  const [variants, setVariants] = useState<PrintfulVariant[] | null>(null);
+  const [loading, setLoading]   = useState(false);
+
+  const handleToggle = async () => {
+    const next = !open;
+    setOpen(next);
+    if (next && variants === null && !loading) {
+      setLoading(true);
+      try {
+        const data = await getPrintfulProductVariants(product.productId);
+        setVariants(data ?? []);
+      } catch {
+        setVariants([]);
+      } finally {
+        setLoading(false);
+      }
+    }
+  };
+
   return (
     <div className="bg-white/5 border border-white/10 rounded-xl overflow-hidden">
       <button
         className="w-full flex items-center gap-3 px-4 py-3 text-left hover:bg-white/5 transition-colors"
-        onClick={() => setOpen((v) => !v)}
+        onClick={handleToggle}
       >
         {product.image && (
           // eslint-disable-next-line @next/next/no-img-element
@@ -92,7 +112,7 @@ function ProductCard({ product }: { product: PrintfulProduct }) {
         )}
         <div className="flex-1 min-w-0">
           <p className="text-sm font-medium text-white truncate">{product.name}</p>
-          <p className="text-xs text-white/40">{variants.length} variants · {product.type}</p>
+          <p className="text-xs text-white/40">{product.type}</p>
         </div>
         <span className="text-white/30">
           {open ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
@@ -100,28 +120,36 @@ function ProductCard({ product }: { product: PrintfulProduct }) {
       </button>
       {open && (
         <div className="border-t border-white/8 px-4 py-3">
-          <div className="overflow-x-auto">
-            <table className="w-full text-xs">
-              <thead>
-                <tr className="text-white/40">
-                  <th className="text-left pb-2 font-medium">Variant ID</th>
-                  <th className="text-left pb-2 font-medium">Name</th>
-                  <th className="text-left pb-2 font-medium">Size</th>
-                  <th className="text-left pb-2 font-medium">Price</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-white/5">
-                {variants.map((v) => (
-                  <tr key={v.variantId}>
-                    <td className="py-1.5 text-white/60 font-mono">{v.variantId}</td>
-                    <td className="py-1.5 text-white/80">{v.name}</td>
-                    <td className="py-1.5 text-white/50">{v.size ?? "—"}</td>
-                    <td className="py-1.5 text-white/60">${v.price} {v.currency}</td>
+          {loading ? (
+            <div className="flex items-center gap-2 py-3 text-white/40 text-xs">
+              <Loader2 size={12} className="animate-spin" /> Loading variants…
+            </div>
+          ) : (variants ?? []).length === 0 ? (
+            <p className="text-xs text-white/30 py-2">No variants found.</p>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="w-full text-xs">
+                <thead>
+                  <tr className="text-white/40">
+                    <th className="text-left pb-2 font-medium">Variant ID</th>
+                    <th className="text-left pb-2 font-medium">Name</th>
+                    <th className="text-left pb-2 font-medium">Size</th>
+                    <th className="text-left pb-2 font-medium">Price</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+                </thead>
+                <tbody className="divide-y divide-white/5">
+                  {(variants ?? []).map((v) => (
+                    <tr key={v.variantId}>
+                      <td className="py-1.5 text-white/60 font-mono">{v.variantId}</td>
+                      <td className="py-1.5 text-white/80">{v.name}</td>
+                      <td className="py-1.5 text-white/50">{v.size ?? "—"}</td>
+                      <td className="py-1.5 text-white/60">${v.price} {v.currency}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
         </div>
       )}
     </div>

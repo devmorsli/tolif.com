@@ -84,8 +84,11 @@ public interface IPrintfulService
     /// <summary>Verify the stored API key works. Returns null on success, error message on failure.</summary>
     Task<string?> TestConnectionAsync(CancellationToken ct = default);
 
-    /// <summary>Pull products + variants from Printful and return them.</summary>
+    /// <summary>Pull all products (without variants) from Printful and return them.</summary>
     Task<IReadOnlyList<PrintfulCatalogProduct>> SyncCatalogAsync(CancellationToken ct = default);
+
+    /// <summary>Fetch variants for a single catalog product by its Printful product ID.</summary>
+    Task<IReadOnlyList<PrintfulCatalogVariant>> GetProductVariantsAsync(long productId, CancellationToken ct = default);
 
     /// <summary>Upload a file (by public URL) to the Printful file library; returns the Printful file ID.</summary>
     Task<string> UploadFileAsync(string publicUrl, string fileName, CancellationToken ct = default);

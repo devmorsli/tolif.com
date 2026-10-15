@@ -82,18 +82,13 @@ public sealed class PrintfulService(ISettingsService settings, IHttpClientFactor
 
     // ── Catalog sync ───────────────────────────────────────────────────────────
 
-    // Keywords that identify wall art / print products we care about
-    private static readonly string[] PrintKeywords =
-        ["poster", "canvas", "frame", "print", "wall", "photo", "art", "matte", "luster", "acrylic", "metal"];
-
     public async Task<IReadOnlyList<PrintfulCatalogProduct>> SyncCatalogAsync(CancellationToken ct = default)
     {
         var client   = await CreateClientAsync(ct);
         var products = new List<PrintfulCatalogProduct>();
 
-        // Paginate through the full Printful catalog (wall art is not in the first 100 items).
-        // Only fetch variants for products matching print/wall-art keywords to avoid
-        // hundreds of extra API calls for clothing items we don't need.
+        // Paginate through the full Printful catalog.
+        // Variants are NOT fetched here — they are loaded on demand via GetProductVariantsAsync.
         int  offset  = 0;
         const int pageSize = 100;
 
@@ -112,43 +107,42 @@ public sealed class PrintfulService(ISettingsService settings, IHttpClientFactor
                 var type = p?["type"]?.GetValue<string>() ?? "";
                 var img  = p?["image"]?.GetValue<string>();
 
-                // Skip products that are not print/wall-art related
-                var combined = (name + " " + type).ToLowerInvariant();
-                if (!PrintKeywords.Any(k => combined.Contains(k)))
-                    continue;
-
-                // Fetch variants for this product
-                var vRes = await client.GetAsync($"/products/{pid}", ct);
-                if (!vRes.IsSuccessStatusCode) continue;
-
-                var vRoot    = JsonNode.Parse(await vRes.Content.ReadAsStringAsync(ct));
-                var varArray = vRoot?["result"]?["variants"]?.AsArray();
-                var variants = new List<PrintfulCatalogVariant>();
-
-                if (varArray is not null)
-                {
-                    foreach (var v in varArray)
-                    {
-                        variants.Add(new PrintfulCatalogVariant(
-                            VariantId: v?["id"]?.GetValue<long>() ?? 0,
-                            Name:      v?["name"]?.GetValue<string>() ?? "",
-                            Size:      v?["size"]?.GetValue<string>(),
-                            Color:     v?["color"]?.GetValue<string>(),
-                            Price:     decimal.TryParse(v?["price"]?.ToString(), out var pr) ? pr : 0m,
-                            Currency:  v?["currency"]?.GetValue<string>() ?? "USD"
-                        ));
-                    }
-                }
-
-                products.Add(new PrintfulCatalogProduct(pid, name, type, img, variants));
+                products.Add(new PrintfulCatalogProduct(pid, name, type, img, []));
             }
 
-            // Stop if we got fewer than a full page
             if (list.Count < pageSize) break;
             offset += list.Count;
         }
 
         return products;
+    }
+
+    // ── Product variants (on-demand) ───────────────────────────────────────────
+
+    public async Task<IReadOnlyList<PrintfulCatalogVariant>> GetProductVariantsAsync(
+        long productId, CancellationToken ct = default)
+    {
+        var client = await CreateClientAsync(ct);
+        var res    = await client.GetAsync($"/products/{productId}", ct);
+        await EnsureSuccessAsync(res, ct);
+
+        var root     = JsonNode.Parse(await res.Content.ReadAsStringAsync(ct));
+        var varArray = root?["result"]?["variants"]?.AsArray();
+        if (varArray is null) return [];
+
+        var variants = new List<PrintfulCatalogVariant>();
+        foreach (var v in varArray)
+        {
+            variants.Add(new PrintfulCatalogVariant(
+                VariantId: v?["id"]?.GetValue<long>() ?? 0,
+                Name:      v?["name"]?.GetValue<string>() ?? "",
+                Size:      v?["size"]?.GetValue<string>(),
+                Color:     v?["color"]?.GetValue<string>(),
+                Price:     decimal.TryParse(v?["price"]?.ToString(), out var pr) ? pr : 0m,
+                Currency:  v?["currency"]?.GetValue<string>() ?? "USD"
+            ));
+        }
+        return variants;
     }
 
     // ── File upload ────────────────────────────────────────────────────────────

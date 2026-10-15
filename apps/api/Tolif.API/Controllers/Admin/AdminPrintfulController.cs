@@ -67,6 +67,14 @@ public class AdminPrintfulController(
         return Ok(payload);
     }
 
+    /// <summary>Fetch variants for a single Printful catalog product (called lazily on expand).</summary>
+    [HttpGet("catalog/{productId:long}/variants")]
+    public async Task<IActionResult> GetProductVariants(long productId, CancellationToken ct)
+    {
+        var variants = await printful.GetProductVariantsAsync(productId, ct);
+        return Ok(variants);
+    }
+
     // ── Product mappings ───────────────────────────────────────────────────────
 
     /// <summary>
