@@ -28,6 +28,7 @@ try
 
     // ── Infrastructure (DB, Identity, S3, Hangfire) ───────────────────────
     builder.Services.AddInfrastructure(builder.Configuration);
+    builder.Services.AddMemoryCache();
     builder.Services.AddControllers();
     builder.Services.AddHttpClient();
     builder.Services.AddEndpointsApiExplorer();
