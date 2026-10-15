@@ -79,6 +79,7 @@ function StatusPill({
 // ── Collapsible product card ───────────────────────────────────────────────────
 function ProductCard({ product }: { product: PrintfulProduct }) {
   const [open, setOpen] = useState(false);
+  const variants = product.variants ?? [];
   return (
     <div className="bg-white/5 border border-white/10 rounded-xl overflow-hidden">
       <button
@@ -91,7 +92,7 @@ function ProductCard({ product }: { product: PrintfulProduct }) {
         )}
         <div className="flex-1 min-w-0">
           <p className="text-sm font-medium text-white truncate">{product.name}</p>
-          <p className="text-xs text-white/40">{product.variants.length} variants · {product.type}</p>
+          <p className="text-xs text-white/40">{variants.length} variants · {product.type}</p>
         </div>
         <span className="text-white/30">
           {open ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
@@ -110,7 +111,7 @@ function ProductCard({ product }: { product: PrintfulProduct }) {
                 </tr>
               </thead>
               <tbody className="divide-y divide-white/5">
-                {product.variants.map((v) => (
+                {variants.map((v) => (
                   <tr key={v.variantId}>
                     <td className="py-1.5 text-white/60 font-mono">{v.variantId}</td>
                     <td className="py-1.5 text-white/80">{v.name}</td>

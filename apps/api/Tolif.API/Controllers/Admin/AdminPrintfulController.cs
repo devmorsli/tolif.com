@@ -12,7 +12,11 @@ public class AdminPrintfulController(
     IPrintfulService printful,
     ISettingsService settings) : ControllerBase
 {
-    private static readonly JsonSerializerOptions JsonOpts = new() { WriteIndented = false };
+    private static readonly JsonSerializerOptions JsonOpts = new()
+    {
+        WriteIndented        = false,
+        PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
+    };
 
     // ── Test connection ────────────────────────────────────────────────────────
 
