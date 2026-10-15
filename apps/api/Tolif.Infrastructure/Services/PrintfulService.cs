@@ -116,9 +116,13 @@ public sealed class PrintfulService(ISettingsService settings, IHttpClientFactor
 
             offset += list.Count;
 
-            // If Printful told us the total, stop when we have everything
-            if (total.HasValue && products.Count >= total.Value) break;
-            // Otherwise stop only when a page comes back empty (handled above)
+            // If paging.total is present, use it; otherwise fall back to standard
+            // partial-page termination (fewer items than requested = last page).
+            if (total.HasValue ? products.Count >= total.Value : list.Count < pageSize)
+                break;
+
+            // Hard safety cap — never loop more than 30 pages (3 000 products)
+            if (offset >= 3000) break;
         }
 
         return products;
