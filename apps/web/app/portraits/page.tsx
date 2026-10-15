@@ -51,42 +51,46 @@ function TemplateCard({ template, index }: { template: PublicTemplate; index: nu
     >
       <Link href={`/portraits/${template.slug}`} className="group block">
 
-        {/* ── Frame ── */}
-        <div className="relative overflow-hidden" style={{ aspectRatio: "3/4" }}>
-
-          <div
-            className="absolute inset-0"
-            style={{ clipPath: "inset(8% 8% 8% 8%)", zIndex: 0 }}
-          >
-            {imgUrl && !imgError ? (
-              // eslint-disable-next-line @next/next/no-img-element
-              <img
-                src={imgUrl}
-                alt={template.name}
-                onError={() => setImgError(true)}
-                className="w-full h-full object-cover transition-transform duration-700 ease-out group-hover:scale-105"
-              />
-            ) : (
-              <div className={`w-full h-full bg-gradient-to-br ${categoryGradient(template.category)} flex items-center justify-center`}>
-                <ImageIcon size={28} className="text-[#C4622D]/40" />
-              </div>
-            )}
+        {/* CSS picture frame */}
+        <div style={{
+          position: "relative",
+          aspectRatio: "3/4",
+          background: "linear-gradient(160deg, #D8BC96 0%, #C4A47C 30%, #B08858 55%, #CAA87A 80%, #D4B488 100%)",
+          padding: "8px",
+          boxShadow: "0 8px 24px rgba(0,0,0,0.22), inset 0 1px 0 rgba(255,255,255,0.28), inset 0 -1px 0 rgba(0,0,0,0.18)",
+        }}>
+          {/* Mat board */}
+          <div style={{
+            width: "100%",
+            height: "100%",
+            background: "#F7F2EA",
+            padding: "12px",
+            boxShadow: "inset 0 2px 8px rgba(0,0,0,0.10)",
+            display: "flex",
+          }}>
+            {/* Portrait image — fills the mat opening, overflow hidden for hover scale */}
+            <div style={{ flex: 1, overflow: "hidden" }}>
+              {imgUrl && !imgError ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img
+                  src={imgUrl}
+                  alt={template.name}
+                  onError={() => setImgError(true)}
+                  style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }}
+                  className="transition-transform duration-700 ease-out group-hover:scale-105"
+                />
+              ) : (
+                <div className={`w-full h-full bg-gradient-to-br ${categoryGradient(template.category)} flex items-center justify-center`}>
+                  <ImageIcon size={28} className="text-[#C4622D]/40" />
+                </div>
+              )}
+            </div>
           </div>
 
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img
-            src="/mockups/frame-redoak-12x16.png"
-            alt=""
-            aria-hidden
-            className="absolute inset-0 w-full h-full pointer-events-none select-none z-10"
-            style={{ objectFit: "fill", transform: "scale(1.3)", transformOrigin: "center center" }}
-            draggable={false}
-          />
-
           {/* Hover CTA */}
-          <div className="absolute inset-0 z-20 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity duration-300">
-            <span className="flex items-center gap-1.5 bg-[#C4622D] text-white text-xs font-bold tracking-wide px-5 py-2.5 rounded-full shadow-xl shadow-black/40 translate-y-2 group-hover:translate-y-0 transition-transform duration-300">
-              Create yours <ArrowRight size={12} />
+          <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity duration-300" style={{ zIndex: 20 }}>
+            <span className="flex items-center gap-1.5 bg-[#C4622D] text-white text-xs font-semibold px-4 py-2 rounded-full translate-y-2 group-hover:translate-y-0 transition-transform duration-300 shadow-lg">
+              Choose style <ArrowRight size={11} />
             </span>
           </div>
         </div>
