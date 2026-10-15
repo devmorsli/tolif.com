@@ -77,9 +77,9 @@ const SETTING_GROUPS = [
     icon: "🖨️",
     settings: [
       { key: "print.defaultProvider", label: "Default Provider", type: "select", options: ["printful", "printify"] },
-      { key: "print.printful.apiKey", label: "Printful API Key", type: "password", placeholder: "••••••••", sensitive: true },
-      { key: "print.printify.apiKey", label: "Printify API Key", type: "password", placeholder: "••••••••", sensitive: true },
-      { key: "print.printify.shopId", label: "Printify Shop ID", type: "text", placeholder: "12345" },
+      { key: "printful.api_key", label: "Printful API Key", type: "password", placeholder: "••••••••", sensitive: true },
+      { key: "printify.api_key", label: "Printify API Key", type: "password", placeholder: "••••••••", sensitive: true },
+      { key: "printify.shop_id", label: "Printify Shop ID", type: "text", placeholder: "12345" },
     ],
   },
   {
