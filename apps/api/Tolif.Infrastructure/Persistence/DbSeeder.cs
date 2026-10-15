@@ -213,7 +213,9 @@ public static class DbSeeder
             SortOrder = order,
             SeoTitle = $"{name} AI Portrait | Tolif",
             SeoDescription = $"Turn your own photos into a beautiful {name.ToLower()} AI portrait. Upload your photos and get a stunning result in minutes.",
-            IsActive = true
+            IsActive = true,
+            ExtraPersonsAllowed = 10,
+            ExtraPetsAllowed = 10,
         };
 
     private static async Task UpsertSettingAsync(ApplicationDbContext db, string key, string value)

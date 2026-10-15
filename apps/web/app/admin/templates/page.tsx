@@ -22,7 +22,7 @@ const EMPTY: Partial<AdminTemplate> = {
   description: "", templateImageKey: "", uploadSlotsJson: "[]",
   aiProviderOverride: "", isActive: true, sortOrder: 0,
   seoTitle: "", seoDescription: "",
-  extraPersonsAllowed: 0, extraPetsAllowed: 0,
+  extraPersonsAllowed: 10, extraPetsAllowed: 10,
 };
 
 // ── Image Upload Widget ────────────────────────────────────────────────────────
