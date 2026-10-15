@@ -1,6 +1,7 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
+import { createPortal } from "react-dom";
 import { AdminGuard } from "@/components/admin/AdminGuard";
 import { AdminSidebar } from "@/components/admin/AdminSidebar";
 import {
@@ -80,6 +81,87 @@ function StatusPill({
   );
 }
 
+// ── Assign modal (portal — never clipped by overflow containers) ──────────────
+function AssignModal({
+  variant,
+  mappings,
+  onAssign,
+  onClose,
+}: {
+  variant: PrintfulVariant;
+  mappings: PrintfulMapping[];
+  onAssign: (ourProductId: string, variantId: number) => void;
+  onClose: () => void;
+}) {
+  const ref = useRef<HTMLDivElement>(null);
+
+  // Close on Escape
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => { if (e.key === "Escape") onClose(); };
+    document.addEventListener("keydown", handler);
+    return () => document.removeEventListener("keydown", handler);
+  }, [onClose]);
+
+  return createPortal(
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center p-4"
+      onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}
+    >
+      {/* backdrop */}
+      <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" />
+
+      {/* panel */}
+      <div
+        ref={ref}
+        className="relative w-full max-w-md bg-[#1A1714] border border-white/15 rounded-2xl shadow-2xl overflow-hidden"
+      >
+        {/* header */}
+        <div className="flex items-start justify-between px-5 py-4 border-b border-white/8">
+          <div>
+            <p className="text-sm font-semibold text-white">Assign variant</p>
+            <p className="text-xs text-white/40 mt-0.5 font-mono">ID {variant.variantId} · {variant.name}</p>
+          </div>
+          <button onClick={onClose} className="text-white/40 hover:text-white transition-colors ml-4 shrink-0">
+            <X size={16} />
+          </button>
+        </div>
+
+        {/* product list */}
+        <div className="overflow-y-auto max-h-[60vh] py-2">
+          {OUR_PRODUCTS.map((p) => {
+            const isSelected = mappings.find((m) => m.ourProductId === p.id)?.printfulVariantId === String(variant.variantId);
+            const hasOther   = !isSelected && !!mappings.find((m) => m.ourProductId === p.id)?.printfulVariantId;
+            return (
+              <button
+                key={p.id}
+                onClick={() => { onAssign(p.id, variant.variantId); onClose(); }}
+                className={`w-full text-left px-5 py-3 flex items-center justify-between gap-3 transition-colors ${
+                  isSelected
+                    ? "bg-emerald-500/10 text-emerald-400"
+                    : "text-white/70 hover:bg-white/6 hover:text-white"
+                }`}
+              >
+                <span className="text-sm">{p.label}</span>
+                <span className="shrink-0 flex items-center gap-1.5">
+                  {isSelected && (
+                    <span className="flex items-center gap-1 text-[10px] text-emerald-400 bg-emerald-500/15 border border-emerald-500/20 px-2 py-0.5 rounded-full">
+                      <CheckCircle size={9} /> assigned
+                    </span>
+                  )}
+                  {hasOther && (
+                    <span className="text-[10px] text-white/25">mapped</span>
+                  )}
+                </span>
+              </button>
+            );
+          })}
+        </div>
+      </div>
+    </div>,
+    document.body
+  );
+}
+
 // ── Collapsible product card ───────────────────────────────────────────────────
 function ProductCard({
   product,
@@ -90,15 +172,15 @@ function ProductCard({
   mappings: PrintfulMapping[];
   onAssign: (ourProductId: string, variantId: number) => void;
 }) {
-  const [open, setOpen]             = useState(false);
-  const [variants, setVariants]     = useState<PrintfulVariant[] | null>(null);
-  const [loading, setLoading]       = useState(false);
-  const [assignOpen, setAssignOpen] = useState<number | null>(null);
+  const [open, setOpen]                   = useState(false);
+  const [variants, setVariants]           = useState<PrintfulVariant[] | null>(null);
+  const [loading, setLoading]             = useState(false);
+  const [assignVariant, setAssignVariant] = useState<PrintfulVariant | null>(null);
 
   const handleToggle = async () => {
     const next = !open;
     setOpen(next);
-    if (!next) { setAssignOpen(null); return; }
+    if (!next) return;
     if (variants === null && !loading) {
       setLoading(true);
       try {
@@ -119,99 +201,86 @@ function ProductCard({
   };
 
   return (
-    <div className="bg-white/5 border border-white/10 rounded-xl overflow-hidden">
-      <button
-        className="w-full flex items-center gap-3 px-4 py-3 text-left hover:bg-white/5 transition-colors"
-        onClick={handleToggle}
-      >
-        {product.image && (
-          // eslint-disable-next-line @next/next/no-img-element
-          <img src={product.image} alt={product.name} className="w-10 h-10 object-cover rounded-lg shrink-0" />
-        )}
-        <div className="flex-1 min-w-0">
-          <p className="text-sm font-medium text-white truncate">{product.name}</p>
-          <p className="text-xs text-white/40">{product.type}</p>
-        </div>
-        <span className="text-white/30">
-          {open ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
-        </span>
-      </button>
-      {open && (
-        <div className="border-t border-white/8 px-4 py-3">
-          {loading ? (
-            <div className="flex items-center gap-2 py-3 text-white/40 text-xs">
-              <Loader2 size={12} className="animate-spin" /> Loading variants…
-            </div>
-          ) : (variants ?? []).length === 0 ? (
-            <p className="text-xs text-white/30 py-2">No variants found.</p>
-          ) : (
-            <div className="overflow-x-auto">
-              <table className="w-full text-xs">
-                <thead>
-                  <tr className="text-white/40">
-                    <th className="text-left pb-2 font-medium">Variant ID</th>
-                    <th className="text-left pb-2 font-medium">Name</th>
-                    <th className="text-left pb-2 font-medium">Size</th>
-                    <th className="text-left pb-2 font-medium">Price</th>
-                    <th className="text-left pb-2 font-medium">Assign to</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-white/5">
-                  {(variants ?? []).map((v) => {
-                    const label = assignedLabel(v.variantId);
-                    return (
-                      <tr key={v.variantId}>
-                        <td className="py-1.5 text-white/60 font-mono">{v.variantId}</td>
-                        <td className="py-1.5 text-white/80">{v.name}</td>
-                        <td className="py-1.5 text-white/50">{v.size ?? "—"}</td>
-                        <td className="py-1.5 text-white/60">${v.price} {v.currency}</td>
-                        <td className="py-1.5 relative">
-                          <button
-                            onClick={() => setAssignOpen(assignOpen === v.variantId ? null : v.variantId)}
-                            className={`flex items-center gap-1.5 text-[10px] font-medium px-2.5 py-1 rounded-lg transition-colors whitespace-nowrap ${
-                              label
-                                ? "bg-emerald-500/15 text-emerald-400 border border-emerald-500/20 hover:bg-emerald-500/25"
-                                : "bg-[#C4622D]/15 text-[#C4622D] border border-[#C4622D]/20 hover:bg-[#C4622D]/25"
-                            }`}
-                          >
-                            <Link2 size={10} />
-                            {label ?? "Assign"}
-                          </button>
-                          {assignOpen === v.variantId && (
-                            <div className="absolute left-0 top-8 z-30 w-64 bg-[#1A1714] border border-white/15 rounded-xl shadow-2xl py-1 max-h-64 overflow-y-auto">
-                              <p className="px-3 py-1.5 text-[10px] text-white/30 font-medium uppercase tracking-wider border-b border-white/8">
-                                Assign variant {v.variantId} to…
-                              </p>
-                              {OUR_PRODUCTS.map((p) => {
-                                const isSelected = mappings.find((m) => m.ourProductId === p.id)?.printfulVariantId === String(v.variantId);
-                                return (
-                                  <button
-                                    key={p.id}
-                                    onClick={() => { onAssign(p.id, v.variantId); setAssignOpen(null); }}
-                                    className={`w-full text-left px-3 py-2 text-xs transition-colors flex items-center justify-between gap-2 ${
-                                      isSelected
-                                        ? "text-emerald-400 bg-emerald-500/10"
-                                        : "text-white/70 hover:bg-white/8 hover:text-white"
-                                    }`}
-                                  >
-                                    <span>{p.label}</span>
-                                    {isSelected && <CheckCircle size={11} />}
-                                  </button>
-                                );
-                              })}
-                            </div>
-                          )}
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-            </div>
+    <>
+      <div className="bg-white/5 border border-white/10 rounded-xl overflow-hidden">
+        <button
+          className="w-full flex items-center gap-3 px-4 py-3 text-left hover:bg-white/5 transition-colors"
+          onClick={handleToggle}
+        >
+          {product.image && (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img src={product.image} alt={product.name} className="w-10 h-10 object-cover rounded-lg shrink-0" />
           )}
-        </div>
+          <div className="flex-1 min-w-0">
+            <p className="text-sm font-medium text-white truncate">{product.name}</p>
+            <p className="text-xs text-white/40">{product.type}</p>
+          </div>
+          <span className="text-white/30">
+            {open ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
+          </span>
+        </button>
+        {open && (
+          <div className="border-t border-white/8 px-4 py-3">
+            {loading ? (
+              <div className="flex items-center gap-2 py-3 text-white/40 text-xs">
+                <Loader2 size={12} className="animate-spin" /> Loading variants…
+              </div>
+            ) : (variants ?? []).length === 0 ? (
+              <p className="text-xs text-white/30 py-2">No variants found.</p>
+            ) : (
+              <div className="overflow-x-auto">
+                <table className="w-full text-xs">
+                  <thead>
+                    <tr className="text-white/40">
+                      <th className="text-left pb-2 font-medium">Variant ID</th>
+                      <th className="text-left pb-2 font-medium">Name</th>
+                      <th className="text-left pb-2 font-medium">Size</th>
+                      <th className="text-left pb-2 font-medium">Price</th>
+                      <th className="text-left pb-2 font-medium">Assign to</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-white/5">
+                    {(variants ?? []).map((v) => {
+                      const label = assignedLabel(v.variantId);
+                      return (
+                        <tr key={v.variantId}>
+                          <td className="py-1.5 text-white/60 font-mono">{v.variantId}</td>
+                          <td className="py-1.5 text-white/80">{v.name}</td>
+                          <td className="py-1.5 text-white/50">{v.size ?? "—"}</td>
+                          <td className="py-1.5 text-white/60">${v.price} {v.currency}</td>
+                          <td className="py-1.5">
+                            <button
+                              onClick={() => setAssignVariant(v)}
+                              className={`flex items-center gap-1.5 text-[10px] font-medium px-2.5 py-1 rounded-lg transition-colors whitespace-nowrap ${
+                                label
+                                  ? "bg-emerald-500/15 text-emerald-400 border border-emerald-500/20 hover:bg-emerald-500/25"
+                                  : "bg-[#C4622D]/15 text-[#C4622D] border border-[#C4622D]/20 hover:bg-[#C4622D]/25"
+                              }`}
+                            >
+                              <Link2 size={10} />
+                              {label ?? "Assign"}
+                            </button>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
+        )}
+      </div>
+
+      {assignVariant && (
+        <AssignModal
+          variant={assignVariant}
+          mappings={mappings}
+          onAssign={onAssign}
+          onClose={() => setAssignVariant(null)}
+        />
       )}
-    </div>
+    </>
   );
 }
 
