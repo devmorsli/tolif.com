@@ -70,27 +70,31 @@ public class GeminiImageGenerationProvider(
             var subjectSummary = subjectParts.Count > 0 ? string.Join(" and ", subjectParts) : $"{totalSubjects} subject(s)";
 
             var instruction = $"""
-                You are an AI portrait artist. I will give you:
-                1. A TEMPLATE IMAGE — this defines the art style, composition, colour palette, lighting, and mood. Study it carefully.
-                2. {totalSubjects} CUSTOMER PHOTO(S) — showing the exact subjects that must appear in the final portrait.
+                You are an AI portrait artist. You will receive two types of images:
 
-                CRITICAL — subject count: The customer has provided {totalSubjects} subject(s) ({subjectSummary}).
-                Your portrait MUST include ALL {totalSubjects} of them, even if the template image shows a different number.
-                - If the template shows FEWER subjects than provided: expand the composition naturally to include everyone.
-                - If the template shows MORE subjects than provided: reduce the composition to only the subjects provided.
-                - Never add imaginary people or pets that were not in the customer photos.
-                - Never omit any subject that was provided.
+                IMAGE 1 — STYLE REFERENCE ONLY (the template image):
+                This image defines ONLY the art style, medium, colour palette, lighting, composition layout, and mood.
+                The people/pets visible in this image are anonymous PLACEHOLDERS. Their faces and identities must be
+                completely discarded. Do NOT copy, blend, or carry over any face, likeness, or identity from this image
+                into the final portrait under any circumstances.
 
-                Your task: create a new portrait that:
-                - Preserves the EXACT art style, medium, colour palette, lighting, and mood of the template image.
-                - Replaces the subjects in the template with the {totalSubjects} subject(s) from the customer photos, maintaining their exact likeness.
-                - Adjusts the composition naturally to fit exactly {totalSubjects} subject(s) while keeping the overall scene feel.
-                - Produces a high-quality, seamless result that looks professionally made in that art style.
+                IMAGES 2 to {totalSubjects + 1} — THE ACTUAL SUBJECTS (customer photos):
+                These are the real people/pets that must appear in the portrait.
+                The customer has provided exactly {totalSubjects} subject(s): {subjectSummary}.
 
-                Additional context from the template:
+                ══ STRICT RULES ══
+                1. SUBJECT COUNT IS EXACTLY {totalSubjects}. Paint ONLY the {totalSubjects} subject(s) from the customer photos.
+                   - If the style-reference image shows MORE people/pets: remove the extras entirely — do not fill the gap with anyone from the template.
+                   - If the style-reference image shows FEWER people/pets: add the extra subjects naturally to the composition.
+                2. Every subject's face and likeness must come EXCLUSIVELY from the customer photos provided. Never invent or borrow faces.
+                3. Preserve the art style, medium, colour palette, lighting, and composition feel of the style reference exactly.
+                4. Adjust the composition layout naturally so that exactly {totalSubjects} subject(s) fill the scene — no empty chairs, no cropped-out ghosts, no phantom silhouettes.
+                5. Produce a seamless, high-quality result that looks professionally made in that art style.
+
+                Additional template context:
                 {request.Prompt}
 
-                Generate the final portrait image now.
+                Generate the final portrait now.
                 """;
 
             // ── Assemble the Gemini request ──────────────────────────────────
