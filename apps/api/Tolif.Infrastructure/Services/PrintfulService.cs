@@ -80,66 +80,89 @@ public sealed class PrintfulService(ISettingsService settings, IHttpClientFactor
         }
     }
 
-    // ── Catalog sync ───────────────────────────────────────────────────────────
+    // ── Catalog sync (v2 API — includes wall art / posters) ───────────────────
 
     public async Task<IReadOnlyList<PrintfulCatalogProduct>> SyncCatalogAsync(CancellationToken ct = default)
     {
         var client   = await CreateClientAsync(ct);
         var products = new List<PrintfulCatalogProduct>();
 
-        // Paginate through the full Printful catalog.
-        // Variants are NOT fetched here — they are loaded on demand via GetProductVariantsAsync.
-        int  offset  = 0;
+        // v2 catalog has the full product range including posters/canvas/frames.
+        // Variants are loaded on demand via GetProductVariantsAsync.
+        int  offset   = 0;
+        int? total    = null;
         const int pageSize = 100;
 
         while (true)
         {
-            var res = await client.GetAsync($"/products?limit={pageSize}&offset={offset}", ct);
+            var res = await client.GetAsync($"/v2/catalog/products?limit={pageSize}&offset={offset}", ct);
             await EnsureSuccessAsync(res, ct);
             var root = JsonNode.Parse(await res.Content.ReadAsStringAsync(ct));
-            var list = root?["result"]?.AsArray();
+
+            var list = root?["data"]?.AsArray();
             if (list is null || list.Count == 0) break;
+
+            total ??= root?["paging"]?["total"]?.GetValue<int>();
 
             foreach (var p in list)
             {
                 var pid  = p?["id"]?.GetValue<long>() ?? 0;
-                var name = p?["title"]?.GetValue<string>() ?? "";
+                var name = p?["title"]?.GetValue<string>()
+                           ?? p?["name"]?.GetValue<string>() ?? "";
                 var type = p?["type"]?.GetValue<string>() ?? "";
-                var img  = p?["image"]?.GetValue<string>();
+                var img  = p?["thumbnail_url"]?.GetValue<string>()
+                           ?? p?["image"]?.GetValue<string>();
 
                 products.Add(new PrintfulCatalogProduct(pid, name, type, img, []));
             }
 
-            if (list.Count < pageSize) break;
             offset += list.Count;
+            if (total.HasValue && products.Count >= total.Value) break;
+            if (list.Count < pageSize) break;
         }
 
         return products;
     }
 
-    // ── Product variants (on-demand) ───────────────────────────────────────────
+    // ── Product variants (on-demand, v2) ──────────────────────────────────────
 
     public async Task<IReadOnlyList<PrintfulCatalogVariant>> GetProductVariantsAsync(
         long productId, CancellationToken ct = default)
     {
         var client = await CreateClientAsync(ct);
-        var res    = await client.GetAsync($"/products/{productId}", ct);
+        var res    = await client.GetAsync($"/v2/catalog/products/{productId}", ct);
         await EnsureSuccessAsync(res, ct);
 
         var root     = JsonNode.Parse(await res.Content.ReadAsStringAsync(ct));
-        var varArray = root?["result"]?["variants"]?.AsArray();
+        var varArray = root?["data"]?["variants"]?.AsArray();
         if (varArray is null) return [];
 
         var variants = new List<PrintfulCatalogVariant>();
         foreach (var v in varArray)
         {
+            // v2 price: { "amount": "9.95", "currency": "USD" }  OR flat decimal in v1
+            decimal price    = 0m;
+            string  currency = "USD";
+            var     priceNode = v?["price"];
+            if (priceNode is JsonObject priceObj)
+            {
+                decimal.TryParse(priceObj["amount"]?.ToString(), out price);
+                currency = priceObj["currency"]?.GetValue<string>() ?? "USD";
+            }
+            else
+            {
+                decimal.TryParse(priceNode?.ToString(), out price);
+                currency = v?["currency"]?.GetValue<string>() ?? "USD";
+            }
+
             variants.Add(new PrintfulCatalogVariant(
                 VariantId: v?["id"]?.GetValue<long>() ?? 0,
-                Name:      v?["name"]?.GetValue<string>() ?? "",
+                Name:      v?["title"]?.GetValue<string>()
+                           ?? v?["name"]?.GetValue<string>() ?? "",
                 Size:      v?["size"]?.GetValue<string>(),
                 Color:     v?["color"]?.GetValue<string>(),
-                Price:     decimal.TryParse(v?["price"]?.ToString(), out var pr) ? pr : 0m,
-                Currency:  v?["currency"]?.GetValue<string>() ?? "USD"
+                Price:     price,
+                Currency:  currency
             ));
         }
         return variants;
