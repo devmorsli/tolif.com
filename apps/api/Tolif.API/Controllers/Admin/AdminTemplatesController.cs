@@ -42,19 +42,21 @@ public class AdminTemplatesController(IApplicationDbContext db) : ControllerBase
     {
         var template = new Template
         {
-            Slug             = req.Slug,
-            Name             = req.Name,
-            Category         = req.Category,
-            Style            = req.Style,
-            TemplateImageKey = req.TemplateImageKey,
-            Prompt           = req.Prompt,
-            UploadSlotsJson  = req.UploadSlotsJson ?? "[]",
-            AiProviderOverride = ParseProvider(req.AiProviderOverride),
-            IsActive         = req.IsActive,
-            SortOrder        = req.SortOrder,
-            SeoTitle         = req.SeoTitle,
-            SeoDescription   = req.SeoDescription,
-            Description      = req.Description
+            Slug                 = req.Slug,
+            Name                 = req.Name,
+            Category             = req.Category,
+            Style                = req.Style,
+            TemplateImageKey     = req.TemplateImageKey,
+            Prompt               = req.Prompt,
+            UploadSlotsJson      = req.UploadSlotsJson ?? "[]",
+            AiProviderOverride   = ParseProvider(req.AiProviderOverride),
+            IsActive             = req.IsActive,
+            SortOrder            = req.SortOrder,
+            SeoTitle             = req.SeoTitle,
+            SeoDescription       = req.SeoDescription,
+            Description          = req.Description,
+            ExtraPersonsAllowed  = req.ExtraPersonsAllowed,
+            ExtraPetsAllowed     = req.ExtraPetsAllowed,
         };
 
         var slugExists = await db.Templates.AnyAsync(t => t.Slug == req.Slug, ct);
@@ -82,20 +84,22 @@ public class AdminTemplatesController(IApplicationDbContext db) : ControllerBase
                 return Conflict(new { error = $"A template with slug '{req.Slug}' already exists. Use a different slug." });
         }
 
-        template.Slug              = req.Slug;
-        template.Name              = req.Name;
-        template.Category          = req.Category;
-        template.Style             = req.Style;
-        template.TemplateImageKey  = req.TemplateImageKey;
-        template.Prompt            = req.Prompt;
-        template.UploadSlotsJson   = req.UploadSlotsJson ?? "[]";
-        template.AiProviderOverride = ParseProvider(req.AiProviderOverride);
-        template.IsActive          = req.IsActive;
-        template.SortOrder         = req.SortOrder;
-        template.SeoTitle          = req.SeoTitle;
-        template.SeoDescription    = req.SeoDescription;
-        template.Description       = req.Description;
-        template.UpdatedAt         = DateTime.UtcNow;
+        template.Slug                = req.Slug;
+        template.Name                = req.Name;
+        template.Category            = req.Category;
+        template.Style               = req.Style;
+        template.TemplateImageKey    = req.TemplateImageKey;
+        template.Prompt              = req.Prompt;
+        template.UploadSlotsJson     = req.UploadSlotsJson ?? "[]";
+        template.AiProviderOverride  = ParseProvider(req.AiProviderOverride);
+        template.IsActive            = req.IsActive;
+        template.SortOrder           = req.SortOrder;
+        template.SeoTitle            = req.SeoTitle;
+        template.SeoDescription      = req.SeoDescription;
+        template.Description         = req.Description;
+        template.ExtraPersonsAllowed = req.ExtraPersonsAllowed;
+        template.ExtraPetsAllowed    = req.ExtraPetsAllowed;
+        template.UpdatedAt           = DateTime.UtcNow;
 
         await db.SaveChangesAsync(ct);
         return Ok(MapToDto(template));
@@ -145,6 +149,8 @@ public class AdminTemplatesController(IApplicationDbContext db) : ControllerBase
         t.SeoTitle,
         t.SeoDescription,
         t.Description,
+        t.ExtraPersonsAllowed,
+        t.ExtraPetsAllowed,
         t.CreatedAt,
         t.UpdatedAt
     );
@@ -173,7 +179,9 @@ public record TemplateDto(
     int SortOrder,
     string? SeoTitle,
     string? SeoDescription,
-    string? Description
+    string? Description,
+    int ExtraPersonsAllowed = 0,
+    int ExtraPetsAllowed = 0
 );
 
 public record TemplateResponseDto(
@@ -191,6 +199,8 @@ public record TemplateResponseDto(
     string? SeoTitle,
     string? SeoDescription,
     string? Description,
+    int ExtraPersonsAllowed,
+    int ExtraPetsAllowed,
     DateTime CreatedAt,
     DateTime UpdatedAt
 );

@@ -96,6 +96,8 @@ export interface AdminTemplate {
   sortOrder: number;
   seoTitle: string;
   seoDescription: string;
+  extraPersonsAllowed: number;
+  extraPetsAllowed: number;
 }
 
 export interface GeneratedMetadata {

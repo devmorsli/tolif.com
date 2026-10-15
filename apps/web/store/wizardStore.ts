@@ -19,6 +19,8 @@ export interface Template {
   category: string;
   style: string;
   uploadSlots: UploadSlot[];
+  extraPersonsAllowed: number;
+  extraPetsAllowed: number;
 }
 
 export interface ProductVariant {
@@ -78,6 +80,8 @@ interface WizardState {
   setShipping: (option: ShippingOption) => void;
   addCartItem: (item: CartItem) => void;
   removeCartItem: (id: string) => void;
+  addExtraSlot: (type: "person" | "pet") => void;
+  removeExtraSlot: (slotName: string) => void;
   clearCart: () => void;
   reset: () => void;
 }
@@ -126,6 +130,23 @@ export const useWizardStore = create<WizardState>()(
       setShipping: (option) => set({ selectedShipping: option }),
       addCartItem: (item) => set((s) => ({ cartItems: [...s.cartItems, item] })),
       removeCartItem: (id) => set((s) => ({ cartItems: s.cartItems.filter((i) => i.id !== id) })),
+      addExtraSlot: (type) =>
+        set((s) => {
+          const existing = s.uploadSlots.filter((sl) => sl.type === type);
+          const index    = existing.length + 1;
+          const label    = type === "person" ? `Person ${index}` : `Pet ${index}`;
+          const newSlot: UploadSlot = {
+            name:     `extra_${type}_${Date.now()}`,
+            label,
+            type,
+            required: false,
+          };
+          return { uploadSlots: [...s.uploadSlots, newSlot] };
+        }),
+      removeExtraSlot: (slotName) =>
+        set((s) => ({
+          uploadSlots: s.uploadSlots.filter((sl) => sl.name !== slotName),
+        })),
       clearCart: () => set({ selectedVariant: null, selectedShipping: null }),
       reset: () => set(initialState),
     }),

@@ -22,6 +22,7 @@ const EMPTY: Partial<AdminTemplate> = {
   description: "", templateImageKey: "", uploadSlotsJson: "[]",
   aiProviderOverride: "", isActive: true, sortOrder: 0,
   seoTitle: "", seoDescription: "",
+  extraPersonsAllowed: 0, extraPetsAllowed: 0,
 };
 
 // ── Image Upload Widget ────────────────────────────────────────────────────────
@@ -434,6 +435,37 @@ function TemplateModal({
                     >
                       {AI_PROVIDERS.map((p) => <option key={p} value={p}>{p || "— use default —"}</option>)}
                     </select>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="text-xs font-medium text-[#8C7B6B] uppercase tracking-wider block mb-1.5">
+                      Extra persons allowed
+                    </label>
+                    <input
+                      type="number"
+                      min={0}
+                      max={20}
+                      value={form.extraPersonsAllowed ?? 0}
+                      onChange={(e) => set("extraPersonsAllowed", Number(e.target.value))}
+                      className="w-full bg-[#FAF6F0] border border-[#E4D8CC] rounded-xl px-4 py-2.5 text-sm text-[#1A1714] focus:outline-none focus:ring-2 focus:ring-[#C4622D]/30 focus:border-[#C4622D] transition-colors"
+                    />
+                    <p className="text-[10px] text-[#B0A090] mt-1">How many extra people the customer can add (0 = fixed)</p>
+                  </div>
+                  <div>
+                    <label className="text-xs font-medium text-[#8C7B6B] uppercase tracking-wider block mb-1.5">
+                      Extra pets allowed
+                    </label>
+                    <input
+                      type="number"
+                      min={0}
+                      max={20}
+                      value={form.extraPetsAllowed ?? 0}
+                      onChange={(e) => set("extraPetsAllowed", Number(e.target.value))}
+                      className="w-full bg-[#FAF6F0] border border-[#E4D8CC] rounded-xl px-4 py-2.5 text-sm text-[#1A1714] focus:outline-none focus:ring-2 focus:ring-[#C4622D]/30 focus:border-[#C4622D] transition-colors"
+                    />
+                    <p className="text-[10px] text-[#B0A090] mt-1">How many extra pets the customer can add (0 = fixed)</p>
                   </div>
                 </div>
 

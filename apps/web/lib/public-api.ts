@@ -20,6 +20,8 @@ export interface PublicTemplate {
   uploadSlotsJson: string;
   seoTitle: string;
   seoDescription: string;
+  extraPersonsAllowed: number;
+  extraPetsAllowed: number;
 }
 
 export interface UploadSlot {

@@ -2,7 +2,7 @@
 
 import { useRef, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Upload, X, User, PawPrint, ChevronLeft, ChevronRight } from "lucide-react";
+import { Upload, X, User, PawPrint, ChevronLeft, ChevronRight, Plus } from "lucide-react";
 import { useWizardStore } from "@/store/wizardStore";
 
 const tips = [
@@ -13,12 +13,30 @@ const tips = [
 ];
 
 export function Step2Upload() {
-  const { selectedTemplate, uploadSlots, setUploadSlot, gdprConsent, setGdprConsent, next, back } =
-    useWizardStore();
+  const {
+    selectedTemplate,
+    uploadSlots,
+    setUploadSlot,
+    addExtraSlot,
+    removeExtraSlot,
+    gdprConsent,
+    setGdprConsent,
+    next,
+    back,
+  } = useWizardStore();
   const [dragOver, setDragOver] = useState<string | null>(null);
   const inputRefs = useRef<Record<string, HTMLInputElement | null>>({});
 
   const allUploaded = uploadSlots.filter((s) => s.required).every((s) => !!s.file);
+
+  // Count current extra slots per type
+  const extraPersonsAdded = uploadSlots.filter((s) => s.name.startsWith("extra_person")).length;
+  const extraPetsAdded    = uploadSlots.filter((s) => s.name.startsWith("extra_pet")).length;
+  const extraPersonsMax   = selectedTemplate?.extraPersonsAllowed ?? 0;
+  const extraPetsMax      = selectedTemplate?.extraPetsAllowed ?? 0;
+  const canAddPerson      = extraPersonsAdded < extraPersonsMax;
+  const canAddPet         = extraPetsAdded < extraPetsMax;
+  const showAddButtons    = extraPersonsMax > 0 || extraPetsMax > 0;
 
   const handleFile = (slotName: string, file: File) => {
     if (!file.type.startsWith("image/")) return;
@@ -55,6 +73,7 @@ export function Step2Upload() {
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: i * 0.1 }}
           >
+            <div className="relative">
             <p className="text-sm font-medium text-[#1A1714] mb-2 flex items-center gap-2">
               {slot.type === "person" ? (
                 <User size={14} className="text-[#C4622D]" />
@@ -64,6 +83,17 @@ export function Step2Upload() {
               {slot.label}
               {slot.required && <span className="text-[#C4622D]">*</span>}
             </p>
+
+            {/* Remove button for extra (optional) slots */}
+            {!slot.required && (
+              <button
+                onClick={() => removeExtraSlot(slot.name)}
+                className="absolute top-0 right-0 text-[10px] text-[#8C7B6B] hover:text-red-500 transition-colors flex items-center gap-0.5"
+                style={{ transform: "translateY(-1px)" }}
+              >
+                <X size={10} /> remove
+              </button>
+            )}
 
             <div
               className={`relative rounded-2xl border-2 border-dashed transition-all duration-200 overflow-hidden cursor-pointer ${
@@ -139,9 +169,42 @@ export function Step2Upload() {
                 )}
               </AnimatePresence>
             </div>
+            </div>
           </motion.div>
         ))}
       </div>
+
+      {/* Add extra person / pet buttons */}
+      {showAddButtons && (
+        <div className="flex flex-wrap gap-3 mb-6">
+          {extraPersonsMax > 0 && (
+            <button
+              onClick={() => addExtraSlot("person")}
+              disabled={!canAddPerson}
+              className="flex items-center gap-2 border-2 border-dashed border-[#E4D8CC] hover:border-[#C4622D]/50 disabled:border-[#E4D8CC] disabled:opacity-40 disabled:cursor-not-allowed bg-white hover:bg-[#FFF9F6] px-4 py-2.5 rounded-xl text-sm font-medium text-[#8C7B6B] hover:text-[#C4622D] transition-all duration-200"
+            >
+              <Plus size={14} />
+              Add another person
+              <span className="text-[10px] text-[#C0B5A8]">
+                ({extraPersonsAdded}/{extraPersonsMax})
+              </span>
+            </button>
+          )}
+          {extraPetsMax > 0 && (
+            <button
+              onClick={() => addExtraSlot("pet")}
+              disabled={!canAddPet}
+              className="flex items-center gap-2 border-2 border-dashed border-[#E4D8CC] hover:border-[#C4622D]/50 disabled:border-[#E4D8CC] disabled:opacity-40 disabled:cursor-not-allowed bg-white hover:bg-[#FFF9F6] px-4 py-2.5 rounded-xl text-sm font-medium text-[#8C7B6B] hover:text-[#C4622D] transition-all duration-200"
+            >
+              <Plus size={14} />
+              Add another pet
+              <span className="text-[10px] text-[#C0B5A8]">
+                ({extraPetsAdded}/{extraPetsMax})
+              </span>
+            </button>
+          )}
+        </div>
+      )}
 
       {/* Tips */}
       <div className="bg-[#F2EAE0] rounded-2xl p-5 mb-8">

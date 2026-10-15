@@ -50,15 +50,41 @@ public class GeminiImageGenerationProvider(
             }
 
             // ── Build the prompt ─────────────────────────────────────────────
+            // Compute subject summary from slot metadata when available
+            int personCount, petCount;
+            if (request.SubjectSlots is { Count: > 0 })
+            {
+                personCount = request.SubjectSlots.Count(s => s.SlotType == "person");
+                petCount    = request.SubjectSlots.Count(s => s.SlotType == "pet");
+            }
+            else
+            {
+                personCount = request.UploadedImageKeys.Count;
+                petCount    = 0;
+            }
+
+            int totalSubjects = personCount + petCount;
+            var subjectParts  = new List<string>();
+            if (personCount > 0) subjectParts.Add($"{personCount} {(personCount == 1 ? "person" : "people")}");
+            if (petCount    > 0) subjectParts.Add($"{petCount} {(petCount == 1 ? "pet" : "pets")}");
+            var subjectSummary = subjectParts.Count > 0 ? string.Join(" and ", subjectParts) : $"{totalSubjects} subject(s)";
+
             var instruction = $"""
                 You are an AI portrait artist. I will give you:
                 1. A TEMPLATE IMAGE — this defines the art style, composition, colour palette, lighting, and mood. Study it carefully.
-                2. One or more CUSTOMER PHOTOS — these show the real people/pets that must appear in the final portrait.
+                2. {totalSubjects} CUSTOMER PHOTO(S) — showing the exact subjects that must appear in the final portrait.
+
+                CRITICAL — subject count: The customer has provided {totalSubjects} subject(s) ({subjectSummary}).
+                Your portrait MUST include ALL {totalSubjects} of them, even if the template image shows a different number.
+                - If the template shows FEWER subjects than provided: expand the composition naturally to include everyone.
+                - If the template shows MORE subjects than provided: reduce the composition to only the subjects provided.
+                - Never add imaginary people or pets that were not in the customer photos.
+                - Never omit any subject that was provided.
 
                 Your task: create a new portrait that:
-                - Preserves the EXACT art style, medium, colour palette, composition, background, and mood of the template image.
-                - Replaces every person/animal in the template with the corresponding subject(s) from the customer photos, maintaining their likeness.
-                - Maintains the same framing, poses, and overall scene layout.
+                - Preserves the EXACT art style, medium, colour palette, lighting, and mood of the template image.
+                - Replaces the subjects in the template with the {totalSubjects} subject(s) from the customer photos, maintaining their exact likeness.
+                - Adjusts the composition naturally to fit exactly {totalSubjects} subject(s) while keeping the overall scene feel.
                 - Produces a high-quality, seamless result that looks professionally made in that art style.
 
                 Additional context from the template:

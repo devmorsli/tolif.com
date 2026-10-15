@@ -21,5 +21,10 @@ public class Template : BaseEntity
     public string? OgImageKey { get; set; }
     public string? Description { get; set; }
 
+    /// <summary>How many extra person photos the customer may add beyond the base slots (0 = no extras allowed).</summary>
+    public int ExtraPersonsAllowed { get; set; } = 0;
+    /// <summary>How many extra pet photos the customer may add beyond the base slots (0 = no extras allowed).</summary>
+    public int ExtraPetsAllowed { get; set; } = 0;
+
     public ICollection<PortraitSession> PortraitSessions { get; set; } = [];
 }

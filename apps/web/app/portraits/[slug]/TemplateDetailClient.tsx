@@ -189,6 +189,8 @@ export function TemplateDetailClient({
         id: template.id, slug: template.slug, name: template.name,
         category: template.category, style: template.style,
         uploadSlots: parseUploadSlots(template.uploadSlotsJson),
+        extraPersonsAllowed: template.extraPersonsAllowed ?? 0,
+        extraPetsAllowed: template.extraPetsAllowed ?? 0,
       });
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps

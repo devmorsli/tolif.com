@@ -694,6 +694,12 @@ namespace Tolif.Infrastructure.Persistence.Migrations
                     b.Property<string>("Description")
                         .HasColumnType("text");
 
+                    b.Property<int>("ExtraPersonsAllowed")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("ExtraPetsAllowed")
+                        .HasColumnType("integer");
+
                     b.Property<bool>("IsActive")
                         .HasColumnType("boolean");
 

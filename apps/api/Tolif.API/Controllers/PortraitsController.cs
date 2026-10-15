@@ -87,12 +87,32 @@ public class PortraitsController(
         session.UpdatedAt = DateTime.UtcNow;
         await db.SaveChangesAsync(ct);
 
+        // Build subject slot metadata for the AI prompt
+        // Base slots come from the template definition; extras are named extra_person_N / extra_pet_N
+        var baseSlotTypes = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+        try
+        {
+            var slotDefs = System.Text.Json.JsonSerializer
+                .Deserialize<List<SlotDefinition>>(template.UploadSlotsJson ?? "[]");
+            if (slotDefs is not null)
+                foreach (var sd in slotDefs) baseSlotTypes[sd.name] = sd.type;
+        }
+        catch { /* ignore parse errors — slots will fall back to "person" */ }
+
+        var subjectSlots = uploadedKeys.Keys.Select(slotName =>
+        {
+            if (baseSlotTypes.TryGetValue(slotName, out var t)) return new SubjectSlot(slotName, t);
+            if (slotName.StartsWith("extra_pet",    StringComparison.OrdinalIgnoreCase)) return new SubjectSlot(slotName, "pet");
+            return new SubjectSlot(slotName, "person");
+        }).ToList();
+
         // Run AI generation
         var genRequest = new GenerationRequest(
             SessionId:        session.Id,
             TemplateImageKey: template.TemplateImageKey,
             Prompt:           template.Prompt ?? template.Name,
-            UploadedImageKeys: uploadedKeysList);
+            UploadedImageKeys: uploadedKeysList,
+            SubjectSlots:     subjectSlots);
 
         var result = await imageGenerationProvider.GenerateAsync(genRequest, ct);
 
@@ -189,11 +209,29 @@ public class PortraitsController(
         await db.SaveChangesAsync(ct);
 
         // Re-run AI generation with the stored photos
+        var regenBaseSlots = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+        try
+        {
+            var slotDefs = System.Text.Json.JsonSerializer
+                .Deserialize<List<SlotDefinition>>(session.Template.UploadSlotsJson ?? "[]");
+            if (slotDefs is not null)
+                foreach (var sd in slotDefs) regenBaseSlots[sd.name] = sd.type;
+        }
+        catch { }
+
+        var regenSubjectSlots = uploadedKeys.Keys.Select(slotName =>
+        {
+            if (regenBaseSlots.TryGetValue(slotName, out var t)) return new SubjectSlot(slotName, t);
+            if (slotName.StartsWith("extra_pet", StringComparison.OrdinalIgnoreCase)) return new SubjectSlot(slotName, "pet");
+            return new SubjectSlot(slotName, "person");
+        }).ToList();
+
         var genRequest = new GenerationRequest(
             SessionId:        session.Id,
             TemplateImageKey: session.Template.TemplateImageKey,
             Prompt:           session.Template.Prompt ?? session.Template.Name,
-            UploadedImageKeys: [.. uploadedKeys.Values]);
+            UploadedImageKeys: [.. uploadedKeys.Values],
+            SubjectSlots:     regenSubjectSlots);
 
         var result = await imageGenerationProvider.GenerateAsync(genRequest, ct);
 
@@ -279,3 +317,6 @@ public class PortraitsController(
 }
 
 public record StartPortraitRequest(string TemplateId);
+
+// Used to parse template.UploadSlotsJson
+internal record SlotDefinition(string name, string label, string type, bool required);

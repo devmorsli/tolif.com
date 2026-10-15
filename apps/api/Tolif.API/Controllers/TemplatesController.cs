@@ -25,7 +25,9 @@ public class TemplatesController(IApplicationDbContext db) : ControllerBase
                 t.TemplateImageKey,
                 t.UploadSlotsJson,
                 t.SeoTitle ?? "",
-                t.SeoDescription ?? ""))
+                t.SeoDescription ?? "",
+                t.ExtraPersonsAllowed,
+                t.ExtraPetsAllowed))
             .ToListAsync(ct);
 
         return Ok(templates);
@@ -51,7 +53,9 @@ public class TemplatesController(IApplicationDbContext db) : ControllerBase
             t.TemplateImageKey,
             t.UploadSlotsJson,
             t.SeoTitle ?? "",
-            t.SeoDescription ?? ""));
+            t.SeoDescription ?? "",
+            t.ExtraPersonsAllowed,
+            t.ExtraPetsAllowed));
     }
 }
 
@@ -65,5 +69,7 @@ public record PublicTemplateDto(
     string TemplateImageKey,
     string UploadSlotsJson,
     string SeoTitle,
-    string SeoDescription
+    string SeoDescription,
+    int ExtraPersonsAllowed,
+    int ExtraPetsAllowed
 );
