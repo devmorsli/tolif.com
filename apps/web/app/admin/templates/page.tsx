@@ -1,10 +1,11 @@
 "use client";
 
-import { useEffect, useState, useRef } from "react";
+import { useEffect, useState, useRef, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   Plus, Pencil, Trash2, ToggleLeft, ToggleRight, X, Save,
   Loader2, Sparkles, Upload, ImageIcon, RefreshCw, ChevronDown, ChevronUp,
+  Layers, CheckCircle2, AlertCircle, StopCircle, Play,
 } from "lucide-react";
 import { AdminGuard } from "@/components/admin/AdminGuard";
 import { AdminSidebar } from "@/components/admin/AdminSidebar";
@@ -523,6 +524,262 @@ function TemplateModal({
   );
 }
 
+// ── Bulk Generate Modal ────────────────────────────────────────────────────────
+
+type BulkItem = {
+  prompt: string;
+  status: "pending" | "running" | "done" | "error";
+  name?: string;
+  imageKey?: string;
+  error?: string;
+};
+
+function BulkGenerateModal({ onClose, onDone }: { onClose: () => void; onDone: () => void }) {
+  const API_BASE = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:5000";
+  const [raw, setRaw] = useState("");
+  const [items, setItems] = useState<BulkItem[]>([]);
+  const [running, setRunning] = useState(false);
+  const [started, setStarted] = useState(false);
+  const stopRef = useRef(false);
+
+  const updateItem = useCallback((idx: number, patch: Partial<BulkItem>) =>
+    setItems((prev) => prev.map((it, i) => i === idx ? { ...it, ...patch } : it)), []);
+
+  const handleStart = async () => {
+    const prompts = raw.split("\n").map((p) => p.trim()).filter(Boolean);
+    if (!prompts.length) return;
+    const initial: BulkItem[] = prompts.map((p) => ({ prompt: p, status: "pending" }));
+    setItems(initial);
+    setStarted(true);
+    setRunning(true);
+    stopRef.current = false;
+
+    for (let i = 0; i < prompts.length; i++) {
+      if (stopRef.current) break;
+      setItems((prev) => prev.map((it, idx) => idx === i ? { ...it, status: "running" } : it));
+
+      try {
+        const [metaResult, imgResult] = await Promise.allSettled([
+          aiGenerateMetadata(prompts[i]),
+          aiGenerateImage(prompts[i]),
+        ]);
+
+        const meta = metaResult.status === "fulfilled" ? metaResult.value : null;
+        const img  = imgResult.status  === "fulfilled" ? imgResult.value  : null;
+
+        if (!meta) throw new Error(
+          metaResult.status === "rejected" && metaResult.reason instanceof Error
+            ? metaResult.reason.message : "Metadata generation failed"
+        );
+
+        await createTemplate({
+          slug:                meta.slug        ?? `template-${Date.now()}-${i}`,
+          name:                meta.name        ?? prompts[i].slice(0, 60),
+          category:            meta.category    ?? "Families",
+          style:               meta.style       ?? "",
+          description:         meta.description ?? "",
+          seoTitle:            meta.seoTitle    ?? "",
+          seoDescription:      meta.seoDescription ?? "",
+          uploadSlotsJson:     meta.uploadSlotsJson ?? "[]",
+          extraPersonsAllowed: meta.extraPersonsAllowed ?? 10,
+          extraPetsAllowed:    meta.extraPetsAllowed    ?? 10,
+          prompt:              prompts[i],
+          templateImageKey:    img?.key ?? "",
+          isActive:            true,
+          sortOrder:           0,
+          aiProviderOverride:  "",
+        });
+
+        setItems((prev) => prev.map((it, idx) =>
+          idx === i ? { ...it, status: "done", name: meta.name, imageKey: img?.key } : it));
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : "Unknown error";
+        setItems((prev) => prev.map((it, idx) =>
+          idx === i ? { ...it, status: "error", error: msg } : it));
+      }
+    }
+
+    setRunning(false);
+    onDone();
+  };
+
+  const done  = items.filter((it) => it.status === "done").length;
+  const total = items.length;
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-start justify-center pt-4 px-4 pb-4 overflow-y-auto">
+      <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={!running ? onClose : undefined} />
+      <motion.div
+        initial={{ opacity: 0, scale: 0.97, y: 12 }}
+        animate={{ opacity: 1, scale: 1, y: 0 }}
+        exit={{ opacity: 0, scale: 0.97 }}
+        className="relative bg-white rounded-2xl shadow-2xl w-full max-w-2xl overflow-hidden"
+      >
+        {/* Header */}
+        <div className="flex items-center justify-between px-6 py-5 border-b border-[#E4D8CC] bg-[#FAF6F0]">
+          <div>
+            <h2 className="text-lg font-semibold text-[#1A1714] flex items-center gap-2">
+              <Layers size={18} className="text-[#C4622D]" /> Bulk Add Templates
+            </h2>
+            <p className="text-xs text-[#8C7B6B] mt-0.5">
+              Paste one prompt per line — AI generates metadata + image for each automatically
+            </p>
+          </div>
+          {!running && (
+            <button onClick={onClose} className="text-[#8C7B6B] hover:text-[#1A1714] transition-colors">
+              <X size={20} />
+            </button>
+          )}
+        </div>
+
+        <div className="px-6 py-5 space-y-5">
+          {/* Prompt input (only before start) */}
+          {!started && (
+            <div>
+              <label className="text-xs font-medium text-[#8C7B6B] uppercase tracking-wider block mb-2">
+                Prompts — one per line
+              </label>
+              <textarea
+                rows={10}
+                value={raw}
+                onChange={(e) => setRaw(e.target.value)}
+                placeholder={
+                  "A warm oil painting portrait of a family in a cosy living room, soft candlelight…\n" +
+                  "A romantic watercolour portrait of a couple on a Parisian balcony at sunset…\n" +
+                  "A vibrant impressionist portrait of a dog owner with their golden retriever…"
+                }
+                className="w-full bg-[#FAF6F0] border border-[#E4D8CC] rounded-xl px-4 py-3 text-sm text-[#1A1714] placeholder:text-[#C8BAB0] focus:outline-none focus:ring-2 focus:ring-[#C4622D]/30 focus:border-[#C4622D] resize-none transition-colors font-mono"
+              />
+              <p className="text-xs text-[#8C7B6B] mt-1.5">
+                {raw.split("\n").filter((l) => l.trim()).length} prompt{raw.split("\n").filter((l) => l.trim()).length !== 1 ? "s" : ""} detected
+              </p>
+            </div>
+          )}
+
+          {/* Progress list */}
+          {started && (
+            <div className="space-y-3">
+              {/* Progress bar */}
+              <div>
+                <div className="flex items-center justify-between text-xs text-[#8C7B6B] mb-1.5">
+                  <span>{done} of {total} completed</span>
+                  {running && <span className="flex items-center gap-1"><Loader2 size={11} className="animate-spin" /> Processing…</span>}
+                  {!running && done === total && <span className="text-green-600 font-medium">All done!</span>}
+                  {!running && done < total && stopRef.current && <span className="text-amber-600 font-medium">Stopped</span>}
+                </div>
+                <div className="h-2 bg-[#F2EAE0] rounded-full overflow-hidden">
+                  <motion.div
+                    className="h-full bg-[#C4622D] rounded-full"
+                    animate={{ width: total > 0 ? `${(done / total) * 100}%` : "0%" }}
+                    transition={{ duration: 0.4 }}
+                  />
+                </div>
+              </div>
+
+              {/* Per-template rows */}
+              <div className="space-y-2 max-h-96 overflow-y-auto pr-1">
+                {items.map((item, i) => (
+                  <div
+                    key={i}
+                    className={`flex items-start gap-3 p-3 rounded-xl border transition-colors ${
+                      item.status === "done"    ? "bg-green-50 border-green-200" :
+                      item.status === "error"   ? "bg-red-50 border-red-200" :
+                      item.status === "running" ? "bg-[#FFF9F6] border-[#C4622D]/30" :
+                                                  "bg-[#FAF6F0] border-[#E4D8CC]"
+                    }`}
+                  >
+                    {/* Status icon */}
+                    <div className="shrink-0 mt-0.5">
+                      {item.status === "pending" && <div className="w-4 h-4 rounded-full border-2 border-[#E4D8CC]" />}
+                      {item.status === "running" && <Loader2 size={16} className="animate-spin text-[#C4622D]" />}
+                      {item.status === "done"    && <CheckCircle2 size={16} className="text-green-600" />}
+                      {item.status === "error"   && <AlertCircle  size={16} className="text-red-500" />}
+                    </div>
+
+                    {/* Thumbnail (done only) */}
+                    {item.status === "done" && item.imageKey && (
+                      <div className="shrink-0 w-10 h-10 rounded-lg overflow-hidden bg-[#F2EAE0]">
+                        <img
+                          src={`${API_BASE}/api/storage/preview?key=${encodeURIComponent(item.imageKey)}`}
+                          alt={item.name}
+                          className="w-full h-full object-cover"
+                          onError={(e) => { (e.target as HTMLImageElement).style.display = "none"; }}
+                        />
+                      </div>
+                    )}
+
+                    {/* Text */}
+                    <div className="flex-1 min-w-0">
+                      {item.name && (
+                        <p className="text-sm font-medium text-[#1A1714] truncate">{item.name}</p>
+                      )}
+                      <p className="text-xs text-[#8C7B6B] truncate mt-0.5">{item.prompt}</p>
+                      {item.error && (
+                        <p className="text-xs text-red-600 mt-1">{item.error}</p>
+                      )}
+                    </div>
+
+                    {/* Status label */}
+                    <span className={`text-[10px] font-semibold uppercase shrink-0 ${
+                      item.status === "done"    ? "text-green-600" :
+                      item.status === "error"   ? "text-red-500" :
+                      item.status === "running" ? "text-[#C4622D]" :
+                                                  "text-[#C8BAB0]"
+                    }`}>
+                      {item.status}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* Footer */}
+        <div className="px-6 py-4 bg-[#FAF6F0] border-t border-[#E4D8CC] flex gap-3">
+          {!started ? (
+            <>
+              <button
+                type="button"
+                onClick={onClose}
+                className="flex-1 border border-[#E4D8CC] text-[#8C7B6B] font-medium py-3 rounded-xl hover:bg-white transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={handleStart}
+                disabled={!raw.trim()}
+                className="flex-1 flex items-center justify-center gap-2 bg-[#C4622D] hover:bg-[#9E4A1E] disabled:opacity-50 text-white font-medium py-3 rounded-xl transition-colors"
+              >
+                <Play size={15} />
+                Start generating ({raw.split("\n").filter((l) => l.trim()).length})
+              </button>
+            </>
+          ) : running ? (
+            <button
+              type="button"
+              onClick={() => { stopRef.current = true; }}
+              className="flex-1 flex items-center justify-center gap-2 border border-red-200 text-red-500 hover:bg-red-50 font-medium py-3 rounded-xl transition-colors"
+            >
+              <StopCircle size={15} />
+              Stop after current
+            </button>
+          ) : (
+            <button
+              type="button"
+              onClick={onClose}
+              className="flex-1 bg-[#C4622D] hover:bg-[#9E4A1E] text-white font-medium py-3 rounded-xl transition-colors"
+            >
+              Close
+            </button>
+          )}
+        </div>
+      </motion.div>
+    </div>
+  );
+}
+
 // ── Main Page ──────────────────────────────────────────────────────────────────
 
 function TemplatesContent() {
@@ -530,6 +787,7 @@ function TemplatesContent() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [modal, setModal] = useState<Partial<AdminTemplate> | null>(null);
+  const [bulkOpen, setBulkOpen] = useState(false);
 
   const load = () =>
     getAdminTemplates()
@@ -567,13 +825,22 @@ function TemplatesContent() {
                 Add a prompt — AI generates the title, SEO, and slots for you.
               </p>
             </div>
-            <button
-              onClick={() => setModal(EMPTY)}
-              className="flex items-center gap-2 bg-[#C4622D] hover:bg-[#9E4A1E] text-white font-medium px-5 py-2.5 rounded-xl transition-colors"
-            >
-              <Plus size={16} />
-              New template
-            </button>
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => setBulkOpen(true)}
+                className="flex items-center gap-2 border border-[#C4622D]/40 bg-[#C4622D]/5 hover:bg-[#C4622D]/10 text-[#C4622D] font-medium px-5 py-2.5 rounded-xl transition-colors"
+              >
+                <Layers size={16} />
+                Bulk add
+              </button>
+              <button
+                onClick={() => setModal(EMPTY)}
+                className="flex items-center gap-2 bg-[#C4622D] hover:bg-[#9E4A1E] text-white font-medium px-5 py-2.5 rounded-xl transition-colors"
+              >
+                <Plus size={16} />
+                New template
+              </button>
+            </div>
           </div>
 
           {loading && (
@@ -670,6 +937,12 @@ function TemplatesContent() {
             initial={modal}
             onSave={handleSave}
             onClose={() => setModal(null)}
+          />
+        )}
+        {bulkOpen && (
+          <BulkGenerateModal
+            onClose={() => setBulkOpen(false)}
+            onDone={() => { load(); }}
           />
         )}
       </AnimatePresence>
