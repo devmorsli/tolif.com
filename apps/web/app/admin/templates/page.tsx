@@ -400,15 +400,55 @@ function TemplateModal({
           </div>
 
           {/* ── Section 5: Upload Slots ───────────────────────────────────── */}
-          <div className="px-6 py-5 space-y-3">
-            <p className="text-xs font-semibold text-[#8C7B6B] uppercase tracking-wider">Upload Slots (JSON)</p>
-            <p className="text-xs text-[#8C7B6B]">Defines which photos the customer must upload. Generated automatically — edit if needed.</p>
-            <Field
-              label=""
-              name="uploadSlotsJson"
-              rows={3}
-              placeholder='[{"name":"person","label":"Your photo","type":"person","required":true}]'
-            />
+          <div className="px-6 py-5 space-y-4">
+            <div>
+              <p className="text-xs font-semibold text-[#8C7B6B] uppercase tracking-wider mb-1">Upload Slots (JSON)</p>
+              <p className="text-xs text-[#8C7B6B] mb-3">Defines which photos the customer must upload. Generated automatically — edit if needed.</p>
+              <Field
+                label=""
+                name="uploadSlotsJson"
+                rows={3}
+                placeholder='[{"name":"person","label":"Your photo","type":"person","required":true}]'
+              />
+            </div>
+
+            {/* Extra subjects */}
+            <div className="bg-[#FAF6F0] border border-[#E4D8CC] rounded-xl p-4 space-y-3">
+              <div>
+                <p className="text-xs font-semibold text-[#1A1714]">Customer can add extra subjects</p>
+                <p className="text-xs text-[#8C7B6B] mt-0.5">
+                  Lets customers include more people or pets beyond the fixed slots above. Set to 0 to lock the template.
+                </p>
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="text-xs font-medium text-[#8C7B6B] uppercase tracking-wider block mb-1.5">
+                    Max extra persons
+                  </label>
+                  <input
+                    type="number"
+                    min={0}
+                    max={20}
+                    value={form.extraPersonsAllowed ?? 0}
+                    onChange={(e) => set("extraPersonsAllowed", Number(e.target.value))}
+                    className="w-full bg-white border border-[#E4D8CC] rounded-xl px-4 py-2.5 text-sm text-[#1A1714] focus:outline-none focus:ring-2 focus:ring-[#C4622D]/30 focus:border-[#C4622D] transition-colors"
+                  />
+                </div>
+                <div>
+                  <label className="text-xs font-medium text-[#8C7B6B] uppercase tracking-wider block mb-1.5">
+                    Max extra pets
+                  </label>
+                  <input
+                    type="number"
+                    min={0}
+                    max={20}
+                    value={form.extraPetsAllowed ?? 0}
+                    onChange={(e) => set("extraPetsAllowed", Number(e.target.value))}
+                    className="w-full bg-white border border-[#E4D8CC] rounded-xl px-4 py-2.5 text-sm text-[#1A1714] focus:outline-none focus:ring-2 focus:ring-[#C4622D]/30 focus:border-[#C4622D] transition-colors"
+                  />
+                </div>
+              </div>
+            </div>
           </div>
 
           {/* ── Section 6: Advanced (collapsed) ──────────────────────────── */}
@@ -435,37 +475,6 @@ function TemplateModal({
                     >
                       {AI_PROVIDERS.map((p) => <option key={p} value={p}>{p || "— use default —"}</option>)}
                     </select>
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <label className="text-xs font-medium text-[#8C7B6B] uppercase tracking-wider block mb-1.5">
-                      Extra persons allowed
-                    </label>
-                    <input
-                      type="number"
-                      min={0}
-                      max={20}
-                      value={form.extraPersonsAllowed ?? 0}
-                      onChange={(e) => set("extraPersonsAllowed", Number(e.target.value))}
-                      className="w-full bg-[#FAF6F0] border border-[#E4D8CC] rounded-xl px-4 py-2.5 text-sm text-[#1A1714] focus:outline-none focus:ring-2 focus:ring-[#C4622D]/30 focus:border-[#C4622D] transition-colors"
-                    />
-                    <p className="text-[10px] text-[#B0A090] mt-1">How many extra people the customer can add (0 = fixed)</p>
-                  </div>
-                  <div>
-                    <label className="text-xs font-medium text-[#8C7B6B] uppercase tracking-wider block mb-1.5">
-                      Extra pets allowed
-                    </label>
-                    <input
-                      type="number"
-                      min={0}
-                      max={20}
-                      value={form.extraPetsAllowed ?? 0}
-                      onChange={(e) => set("extraPetsAllowed", Number(e.target.value))}
-                      className="w-full bg-[#FAF6F0] border border-[#E4D8CC] rounded-xl px-4 py-2.5 text-sm text-[#1A1714] focus:outline-none focus:ring-2 focus:ring-[#C4622D]/30 focus:border-[#C4622D] transition-colors"
-                    />
-                    <p className="text-[10px] text-[#B0A090] mt-1">How many extra pets the customer can add (0 = fixed)</p>
                   </div>
                 </div>
 
