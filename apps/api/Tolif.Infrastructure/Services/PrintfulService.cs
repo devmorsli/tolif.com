@@ -82,49 +82,70 @@ public sealed class PrintfulService(ISettingsService settings, IHttpClientFactor
 
     // ── Catalog sync ───────────────────────────────────────────────────────────
 
+    // Keywords that identify wall art / print products we care about
+    private static readonly string[] PrintKeywords =
+        ["poster", "canvas", "frame", "print", "wall", "photo", "art", "matte", "luster", "acrylic", "metal"];
+
     public async Task<IReadOnlyList<PrintfulCatalogProduct>> SyncCatalogAsync(CancellationToken ct = default)
     {
         var client   = await CreateClientAsync(ct);
         var products = new List<PrintfulCatalogProduct>();
 
-        // v1 endpoint — v2 catalog listing is still in preview / rate-limited
-        var res  = await client.GetAsync("/products?limit=100", ct);
-        await EnsureSuccessAsync(res, ct);
-        var root = JsonNode.Parse(await res.Content.ReadAsStringAsync(ct));
-        var list = root?["result"]?.AsArray();
-        if (list is null) return products;
+        // Paginate through the full Printful catalog (wall art is not in the first 100 items).
+        // Only fetch variants for products matching print/wall-art keywords to avoid
+        // hundreds of extra API calls for clothing items we don't need.
+        int  offset  = 0;
+        const int pageSize = 100;
 
-        foreach (var p in list)
+        while (true)
         {
-            var pid  = p?["id"]?.GetValue<long>() ?? 0;
-            var name = p?["title"]?.GetValue<string>() ?? "";
-            var type = p?["type"]?.GetValue<string>() ?? "";
-            var img  = p?["image"]?.GetValue<string>();
+            var res = await client.GetAsync($"/products?limit={pageSize}&offset={offset}", ct);
+            await EnsureSuccessAsync(res, ct);
+            var root = JsonNode.Parse(await res.Content.ReadAsStringAsync(ct));
+            var list = root?["result"]?.AsArray();
+            if (list is null || list.Count == 0) break;
 
-            // fetch variants for this product
-            var vRes = await client.GetAsync($"/products/{pid}", ct);
-            if (!vRes.IsSuccessStatusCode) continue;
-
-            var vRoot     = JsonNode.Parse(await vRes.Content.ReadAsStringAsync(ct));
-            var varArray  = vRoot?["result"]?["variants"]?.AsArray();
-            var variants  = new List<PrintfulCatalogVariant>();
-
-            if (varArray is not null)
+            foreach (var p in list)
             {
-                foreach (var v in varArray)
+                var pid  = p?["id"]?.GetValue<long>() ?? 0;
+                var name = p?["title"]?.GetValue<string>() ?? "";
+                var type = p?["type"]?.GetValue<string>() ?? "";
+                var img  = p?["image"]?.GetValue<string>();
+
+                // Skip products that are not print/wall-art related
+                var combined = (name + " " + type).ToLowerInvariant();
+                if (!PrintKeywords.Any(k => combined.Contains(k)))
+                    continue;
+
+                // Fetch variants for this product
+                var vRes = await client.GetAsync($"/products/{pid}", ct);
+                if (!vRes.IsSuccessStatusCode) continue;
+
+                var vRoot    = JsonNode.Parse(await vRes.Content.ReadAsStringAsync(ct));
+                var varArray = vRoot?["result"]?["variants"]?.AsArray();
+                var variants = new List<PrintfulCatalogVariant>();
+
+                if (varArray is not null)
                 {
-                    variants.Add(new PrintfulCatalogVariant(
-                        VariantId: v?["id"]?.GetValue<long>() ?? 0,
-                        Name:      v?["name"]?.GetValue<string>() ?? "",
-                        Size:      v?["size"]?.GetValue<string>(),
-                        Color:     v?["color"]?.GetValue<string>(),
-                        Price:     decimal.TryParse(v?["price"]?.ToString(), out var pr) ? pr : 0m,
-                        Currency:  v?["currency"]?.GetValue<string>() ?? "USD"
-                    ));
+                    foreach (var v in varArray)
+                    {
+                        variants.Add(new PrintfulCatalogVariant(
+                            VariantId: v?["id"]?.GetValue<long>() ?? 0,
+                            Name:      v?["name"]?.GetValue<string>() ?? "",
+                            Size:      v?["size"]?.GetValue<string>(),
+                            Color:     v?["color"]?.GetValue<string>(),
+                            Price:     decimal.TryParse(v?["price"]?.ToString(), out var pr) ? pr : 0m,
+                            Currency:  v?["currency"]?.GetValue<string>() ?? "USD"
+                        ));
+                    }
                 }
+
+                products.Add(new PrintfulCatalogProduct(pid, name, type, img, variants));
             }
 
-            products.Add(new PrintfulCatalogProduct(pid, name, type, img, variants));
+            // Stop if we got fewer than a full page
+            if (list.Count < pageSize) break;
+            offset += list.Count;
         }
 
         return products;
@@ -262,35 +283,44 @@ public sealed class PrintfulService(ISettingsService settings, IHttpClientFactor
     {
         var client = await CreateClientAsync(ct);
         var res    = await client.GetAsync("/v2/webhooks", ct);
-        await EnsureSuccessAsync(res, ct);
-        var root   = JsonNode.Parse(await res.Content.ReadAsStringAsync(ct));
-        var arr    = root?["data"]?.AsArray() ?? [];
 
-        return arr.Select(w => new PrintfulWebhook(
-            Id:    w?["id"]?.GetValue<long>() ?? 0,
-            Url:   w?["url"]?.GetValue<string>() ?? "",
-            Types: w?["types"]?.AsArray().Select(t => t?.GetValue<string>() ?? "").ToList()
-                   ?? (IReadOnlyList<string>)[]
-        )).ToList();
+        // 404 = no webhook configured yet — not an error
+        if (res.StatusCode == System.Net.HttpStatusCode.NotFound)
+            return [];
+
+        await EnsureSuccessAsync(res, ct);
+        var root = JsonNode.Parse(await res.Content.ReadAsStringAsync(ct));
+        var data = root?["data"];
+
+        if (data is null) return [];
+
+        // Printful v2 returns a single webhook object, not an array
+        if (data is not JsonObject obj) return [];
+
+        var url = obj["url"]?.GetValue<string>() ?? "";
+        if (string.IsNullOrEmpty(url)) return [];
+
+        var id    = obj["id"]?.GetValue<long>() ?? 0;
+        var types = obj["types"]?.AsArray()
+                        .Select(t => t?.GetValue<string>() ?? "")
+                        .ToList()
+                    ?? (IReadOnlyList<string>)[];
+
+        return [new PrintfulWebhook(id, url, types)];
     }
 
     public async Task RegisterWebhooksAsync(string baseUrl, CancellationToken ct = default)
     {
-        var client      = await CreateClientAsync(ct);
-        var webhookUrl  = $"{baseUrl.TrimEnd('/')}/api/webhooks/printful";
+        var client     = await CreateClientAsync(ct);
+        var webhookUrl = $"{baseUrl.TrimEnd('/')}/api/webhooks/printful";
 
-        // Delete existing webhooks first to avoid duplicates
-        var existing = await GetWebhooksAsync(ct);
-        foreach (var wh in existing)
-        {
-            await client.DeleteAsync($"/v2/webhooks/{wh.Id}", ct);
-        }
+        // In Printful v2, DELETE /v2/webhooks removes the current config (no ID needed)
+        await client.DeleteAsync("/v2/webhooks", ct);
 
-        // Register our webhook
         var body = new
         {
-            url    = webhookUrl,
-            types  = RequiredWebhookTypes,
+            url   = webhookUrl,
+            types = RequiredWebhookTypes,
         };
         var res = await client.PostAsync("/v2/webhooks", JsonBody(body), ct);
         await EnsureSuccessAsync(res, ct);
