@@ -1,6 +1,9 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Caching.Memory;
+using SixLabors.ImageSharp;
+using SixLabors.ImageSharp.Formats.Webp;
+using SixLabors.ImageSharp.Processing;
 using Tolif.Application.Interfaces;
 
 namespace Tolif.API.Controllers.Admin;
@@ -10,13 +13,18 @@ namespace Tolif.API.Controllers.Admin;
 [Authorize(Roles = "Admin")]
 public class StorageController(IStorageService storageService, IMemoryCache cache) : ControllerBase
 {
+    // Max display width for any template image across the whole site (hero on detail page).
+    // Images wider than this are resized down; smaller images are not upscaled.
+    private const int MaxWidth = 900;
+
     // ── GET /api/storage/preview?key=... ──────────────────────────────────────
     /// <summary>
-    /// Streams the file bytes directly from MinIO/S3 to the browser.
-    /// Results are cached in server memory for 30 minutes so repeated page
-    /// loads serve template images from RAM instead of downloading from storage
-    /// on every request. Avoids redirecting to the internal Docker hostname
-    /// (minio:9000) which is not reachable from the user's browser.
+    /// Serves template images optimised for the browser:
+    ///   1. Downloads the raw file from MinIO/S3 once.
+    ///   2. Resizes to at most 900 px wide and re-encodes as WebP (quality 82).
+    ///   3. Caches the compressed result in server memory for 30 minutes.
+    /// After the first request every subsequent hit is served from RAM as a
+    /// small WebP — no storage round-trip, no large JPEG transfer.
     /// </summary>
     [AllowAnonymous]
     [HttpGet("preview")]
@@ -25,23 +33,15 @@ public class StorageController(IStorageService storageService, IMemoryCache cach
         if (string.IsNullOrWhiteSpace(key))
             return BadRequest(new { message = "key is required." });
 
-        var cacheKey = $"storage:preview:{key}";
+        var cacheKey = $"storage:preview:v2:{key}";
 
-        if (!cache.TryGetValue(cacheKey, out (byte[] Bytes, string ContentType) cached))
+        if (!cache.TryGetValue(cacheKey, out byte[]? webpBytes))
         {
             try
             {
-                var bytes = await storageService.DownloadAsync(key, ct);
-                var ext = Path.GetExtension(key).ToLowerInvariant();
-                var contentType = ext switch
-                {
-                    ".png"  => "image/png",
-                    ".webp" => "image/webp",
-                    ".gif"  => "image/gif",
-                    _       => "image/jpeg"
-                };
-                cached = (bytes, contentType);
-                cache.Set(cacheKey, cached, TimeSpan.FromMinutes(30));
+                var raw = await storageService.DownloadAsync(key, ct);
+                webpBytes = Compress(raw);
+                cache.Set(cacheKey, webpBytes, TimeSpan.FromMinutes(30));
             }
             catch
             {
@@ -50,6 +50,18 @@ public class StorageController(IStorageService storageService, IMemoryCache cach
         }
 
         Response.Headers.CacheControl = "public, max-age=3600";
-        return File(cached.Bytes, cached.ContentType);
+        return File(webpBytes!, "image/webp");
+    }
+
+    private static byte[] Compress(byte[] raw)
+    {
+        using var image = Image.Load(raw);
+
+        if (image.Width > MaxWidth)
+            image.Mutate(x => x.Resize(MaxWidth, 0)); // 0 = auto height
+
+        using var ms = new MemoryStream();
+        image.SaveAsWebp(ms, new WebpEncoder { Quality = 82 });
+        return ms.ToArray();
     }
 }
