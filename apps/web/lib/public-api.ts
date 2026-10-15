@@ -63,6 +63,8 @@ function staticFallback(): PublicTemplate[] {
     uploadSlotsJson: JSON.stringify(t.uploadSlots),
     seoTitle: t.seoTitle,
     seoDescription: t.seoDescription,
+    extraPersonsAllowed: 0,
+    extraPetsAllowed: 0,
   }));
 }
 

@@ -40,6 +40,8 @@ function TemplateAutoSelect() {
         category: t.category,
         style: t.style,
         uploadSlots: parseUploadSlots(t.uploadSlotsJson),
+        extraPersonsAllowed: t.extraPersonsAllowed ?? 0,
+        extraPetsAllowed: t.extraPetsAllowed ?? 0,
       });
     });
   // eslint-disable-next-line react-hooks/exhaustive-deps

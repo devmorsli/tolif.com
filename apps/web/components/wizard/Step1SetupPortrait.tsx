@@ -281,6 +281,8 @@ export function Step1SetupPortrait() {
       category: t.category,
       style: t.style,
       uploadSlots: parseUploadSlots(t.uploadSlotsJson),
+      extraPersonsAllowed: t.extraPersonsAllowed ?? 0,
+      extraPetsAllowed: t.extraPetsAllowed ?? 0,
     });
   };
 
