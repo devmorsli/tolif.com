@@ -19,10 +19,10 @@ import { useWizardStore } from "@/store/wizardStore";
 
 // ── Small component to handle image load errors gracefully ────────────────────
 // eslint-disable-next-line @next/next/no-img-element
-function TemplateImg({ imgUrl, name, category, className }: { imgUrl: string; name: string; category: string; className?: string; iconSize?: number }) {
+function TemplateImg({ imgUrl, name, category, className, loading = "lazy", fetchPriority }: { imgUrl: string; name: string; category: string; className?: string; iconSize?: number; loading?: "lazy" | "eager"; fetchPriority?: "high" | "low" | "auto" }) {
   const [err, setErr] = useState(false);
   if (imgUrl && !err)
-    return <img src={imgUrl} alt={name} onError={() => setErr(true)} className={className ?? "w-full h-full object-cover"} />;
+    return <img src={imgUrl} alt={name} loading={loading} decoding="async" fetchPriority={fetchPriority} onError={() => setErr(true)} className={className ?? "w-full h-full object-cover"} />;
   return (
     <div className={`w-full h-full bg-gradient-to-br ${categoryGradient(category)} flex items-center justify-center`}>
       <ImageIcon size={40} className="text-[#C4622D]/20" />
@@ -280,7 +280,7 @@ export function TemplateDetailClient({
                   }}>
                     {/* Portrait image */}
                     <div style={{ flex: 1, overflow: "hidden", position: "relative" }}>
-                      <TemplateImg imgUrl={imgUrl} name={template.name} category={template.category} />
+                      <TemplateImg imgUrl={imgUrl} name={template.name} category={template.category} loading="eager" fetchPriority="high" />
                     </div>
                   </div>
                   {template.style && (
@@ -392,7 +392,7 @@ export function TemplateDetailClient({
                             <X size={9} />
                           </button>
                         )}
-                        <input ref={(el) => { inputRefs.current[slot.name] = el; }} type="file" accept="image/*" capture="user" className="hidden"
+                        <input ref={(el) => { inputRefs.current[slot.name] = el; }} type="file" accept="image/*" className="hidden"
                           onChange={(e) => { const f = e.target.files?.[0]; if (f) handleFile(slot.name, f); }} />
                         <SlotCard slot={slot} dragOver={dragOver === slot.name}
                           onDragOver={() => setDragOver(slot.name)} onDragLeave={() => setDragOver(null)}
@@ -586,16 +586,17 @@ export function TemplateDetailClient({
                   animate={relatedInView ? { opacity: 1, y: 0 } : {}}
                   transition={{ delay: related.length * 0.08, duration: 0.5 }}
                 >
-                  <Link
-                    href="/portraits"
-                    className="group flex flex-col items-center justify-center border-2 border-dashed border-[#E4D8CC] hover:border-[#C4622D]/50 bg-[#FAF6F0] hover:bg-[#F5EEE6] transition-all duration-300 h-full min-h-[200px]"
-                    style={{ aspectRatio: "3/4" }}
-                  >
-                    <div className="w-12 h-12 rounded-full bg-[#C4622D]/10 flex items-center justify-center mb-3 group-hover:bg-[#C4622D]/20 transition-colors">
-                      <ArrowRight size={20} className="text-[#C4622D] group-hover:translate-x-0.5 transition-transform" />
+                  <Link href="/portraits" className="group block">
+                    <div
+                      style={{ aspectRatio: "3/4" }}
+                      className="flex flex-col items-center justify-center border-2 border-dashed border-[#E4D8CC] hover:border-[#C4622D]/50 bg-[#FAF6F0] hover:bg-[#F5EEE6] transition-all duration-300"
+                    >
+                      <div className="w-12 h-12 rounded-full bg-[#C4622D]/10 flex items-center justify-center mb-3 group-hover:bg-[#C4622D]/20 transition-colors">
+                        <ArrowRight size={20} className="text-[#C4622D] group-hover:translate-x-0.5 transition-transform" />
+                      </div>
+                      <p className="text-sm font-semibold text-[#1A1714]">View all styles</p>
+                      <p className="text-xs text-[#8C7B6B] mt-1">Browse every template</p>
                     </div>
-                    <p className="text-sm font-semibold text-[#1A1714]">View all styles</p>
-                    <p className="text-xs text-[#8C7B6B] mt-1">Browse every template</p>
                   </Link>
                 </motion.div>
               </div>

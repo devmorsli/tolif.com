@@ -219,7 +219,6 @@ function PhotoUploader() {
                 ref={(el) => { inputRefs.current[slot.name] = el; }}
                 type="file"
                 accept="image/*"
-                capture="user"
                 className="hidden"
                 onChange={(e) => { const f = e.target.files?.[0]; if (f) handleFile(slot.name, f); }}
               />

@@ -16,7 +16,7 @@ import { Check, ImageIcon, Search, X, SlidersHorizontal } from "lucide-react";
 function TemplateThumb({ imgUrl, name, category }: { imgUrl: string; name: string; category: string }) {
   const [err, setErr] = useState(false);
   if (imgUrl && !err)
-    return <img src={imgUrl} alt={name} onError={() => setErr(true)} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" />;
+    return <img src={imgUrl} alt={name} loading="lazy" decoding="async" onError={() => setErr(true)} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" />;
   return (
     <div className={`w-full h-full bg-gradient-to-br ${categoryGradient(category)} flex items-center justify-center`}>
       <ImageIcon size={32} className="text-[#C4622D]/30" />
