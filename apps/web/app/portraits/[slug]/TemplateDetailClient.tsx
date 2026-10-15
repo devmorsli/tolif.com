@@ -156,7 +156,12 @@ export function TemplateDetailClient({
   related: PublicTemplate[];
 }) {
   const router = useRouter();
-  const { selectTemplate, uploadSlots, setUploadSlot, gdprConsent, setGdprConsent, goTo } = useWizardStore();
+  const { selectTemplate, uploadSlots, setUploadSlot, addExtraSlot, removeExtraSlot, gdprConsent, setGdprConsent, goTo } = useWizardStore();
+
+  const extraPersonsAdded = uploadSlots.filter((s) => s.name.startsWith("extra_person")).length;
+  const extraPetsAdded    = uploadSlots.filter((s) => s.name.startsWith("extra_pet")).length;
+  const extraPersonsMax   = template.extraPersonsAllowed ?? 0;
+  const extraPetsMax      = template.extraPetsAllowed ?? 0;
   const inputRefs = useRef<Record<string, HTMLInputElement | null>>({});
   const [dragOver, setDragOver] = useState<string | null>(null);
   const [tipsOpen, setTipsOpen] = useState(false);
@@ -377,7 +382,16 @@ export function TemplateDetailClient({
 
                   <div className={`grid gap-3 ${uploadSlots.length <= 2 ? "grid-cols-2" : "grid-cols-2 sm:grid-cols-3"}`}>
                     {uploadSlots.map((slot) => (
-                      <div key={slot.name}>
+                      <div key={slot.name} className="relative">
+                        {/* Remove button for extra slots */}
+                        {slot.name.startsWith("extra_") && (
+                          <button
+                            onClick={() => removeExtraSlot(slot.name)}
+                            className="absolute top-0 right-0 z-10 w-5 h-5 rounded-full bg-[#E4D8CC] hover:bg-red-100 hover:text-red-500 text-[#8C7B6B] flex items-center justify-center transition-colors"
+                          >
+                            <X size={9} />
+                          </button>
+                        )}
                         <input ref={(el) => { inputRefs.current[slot.name] = el; }} type="file" accept="image/*" capture="user" className="hidden"
                           onChange={(e) => { const f = e.target.files?.[0]; if (f) handleFile(slot.name, f); }} />
                         <SlotCard slot={slot} dragOver={dragOver === slot.name}
@@ -388,6 +402,34 @@ export function TemplateDetailClient({
                       </div>
                     ))}
                   </div>
+
+                  {/* Add extra person / pet */}
+                  {(extraPersonsMax > 0 || extraPetsMax > 0) && (
+                    <div className="flex flex-wrap gap-2 mt-3">
+                      {extraPersonsMax > 0 && (
+                        <button
+                          onClick={() => addExtraSlot("person")}
+                          disabled={extraPersonsAdded >= extraPersonsMax}
+                          className="flex items-center gap-1.5 border border-dashed border-[#C4622D]/40 hover:border-[#C4622D] disabled:border-[#E4D8CC] disabled:opacity-40 disabled:cursor-not-allowed bg-white hover:bg-[#FFF9F6] px-3 py-1.5 rounded-lg text-xs font-medium text-[#C4622D] transition-all duration-200"
+                        >
+                          <Plus size={11} />
+                          Add person
+                          <span className="text-[10px] text-[#C0B5A8]">({extraPersonsAdded}/{extraPersonsMax})</span>
+                        </button>
+                      )}
+                      {extraPetsMax > 0 && (
+                        <button
+                          onClick={() => addExtraSlot("pet")}
+                          disabled={extraPetsAdded >= extraPetsMax}
+                          className="flex items-center gap-1.5 border border-dashed border-[#C4622D]/40 hover:border-[#C4622D] disabled:border-[#E4D8CC] disabled:opacity-40 disabled:cursor-not-allowed bg-white hover:bg-[#FFF9F6] px-3 py-1.5 rounded-lg text-xs font-medium text-[#C4622D] transition-all duration-200"
+                        >
+                          <Plus size={11} />
+                          Add pet
+                          <span className="text-[10px] text-[#C0B5A8]">({extraPetsAdded}/{extraPetsMax})</span>
+                        </button>
+                      )}
+                    </div>
+                  )}
                 </div>
 
                 {/* GDPR consent */}

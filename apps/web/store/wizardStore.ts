@@ -109,8 +109,21 @@ export const useWizardStore = create<WizardState>()(
       next: () => set((s) => ({ step: Math.min(4, s.step + 1) as WizardStep })),
       back: () => set((s) => ({ step: Math.max(1, s.step - 1) as WizardStep })),
 
-      selectTemplate: (template) =>
-        set({ selectedTemplate: template, uploadSlots: template.uploadSlots }),
+      selectTemplate: (template) => {
+        // Only the FIRST slot of each type (person/pet) is required.
+        // Subsequent same-type slots become optional so users with fewer
+        // family members / pets can still proceed.
+        const seenTypes = new Set<string>();
+        const uploadSlots = template.uploadSlots.map((slot) => {
+          if (slot.type !== "person" && slot.type !== "pet") return slot;
+          if (!seenTypes.has(slot.type)) {
+            seenTypes.add(slot.type);
+            return slot; // first of this type — keep original required flag
+          }
+          return { ...slot, required: false }; // subsequent — make optional
+        });
+        set({ selectedTemplate: template, uploadSlots });
+      },
 
       setUploadSlot: (slotName, file, previewUrl) =>
         set((s) => ({
@@ -172,11 +185,13 @@ export const useWizardStore = create<WizardState>()(
       //  but the slot definitions themselves are safe to restore).
       onRehydrateStorage: () => (state) => {
         if (state?.selectedTemplate) {
-          state.uploadSlots = state.selectedTemplate.uploadSlots.map((slot) => ({
-            ...slot,
-            file: undefined,
-            previewUrl: undefined,
-          }));
+          const seenTypes = new Set<string>();
+          state.uploadSlots = state.selectedTemplate.uploadSlots.map((slot) => {
+            const base = { ...slot, file: undefined, previewUrl: undefined };
+            if (slot.type !== "person" && slot.type !== "pet") return base;
+            if (!seenTypes.has(slot.type)) { seenTypes.add(slot.type); return base; }
+            return { ...base, required: false };
+          });
         }
       },
     }
