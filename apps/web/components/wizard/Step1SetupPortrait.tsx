@@ -19,6 +19,7 @@ import {
   PawPrint,
   ChevronRight,
   ChevronDown,
+  Plus,
 } from "lucide-react";
 
 // eslint-disable-next-line @next/next/no-img-element
@@ -149,9 +150,16 @@ function TemplatePicker({
 // ── Photo uploader ────────────────────────────────────────────────────────────
 
 function PhotoUploader() {
-  const { uploadSlots, setUploadSlot } = useWizardStore();
+  const { selectedTemplate, uploadSlots, setUploadSlot, addExtraSlot, removeExtraSlot } = useWizardStore();
   const inputRefs = useRef<Record<string, HTMLInputElement | null>>({});
   const [dragOver, setDragOver] = useState<string | null>(null);
+
+  const extraPersonsAdded = uploadSlots.filter((s) => s.name.startsWith("extra_person")).length;
+  const extraPetsAdded    = uploadSlots.filter((s) => s.name.startsWith("extra_pet")).length;
+  const extraPersonsMax   = selectedTemplate?.extraPersonsAllowed ?? 0;
+  const extraPetsMax      = selectedTemplate?.extraPetsAllowed ?? 0;
+  const canAddPerson      = extraPersonsAdded < extraPersonsMax;
+  const canAddPet         = extraPetsAdded < extraPetsMax;
 
   const handleFile = (slotName: string, file: File) => {
     if (!file.type.startsWith("image/")) return;
@@ -172,81 +180,119 @@ function PhotoUploader() {
   }
 
   return (
-    <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-      {uploadSlots.map((slot) => (
-        <div key={slot.name}>
-          <p className="text-xs font-medium text-[#1A1714] mb-1.5 flex items-center gap-1.5">
-            {slot.type === "person" ? (
-              <User size={11} className="text-[#C4622D]" />
-            ) : (
-              <PawPrint size={11} className="text-[#C4622D]" />
-            )}
-            {slot.label}
-            {slot.required && <span className="text-[#C4622D]">*</span>}
-          </p>
-          <div
-            className={`relative rounded-xl border-2 border-dashed transition-all duration-200 overflow-hidden cursor-pointer ${
-              dragOver === slot.name
-                ? "border-[#C4622D] bg-[#C4622D]/5"
-                : slot.previewUrl
-                ? "border-[#2D4A3E]"
-                : "border-[#E4D8CC] hover:border-[#C4622D]/50 hover:bg-[#FAF6F0]"
-            }`}
-            style={{ height: 130 }}
-            onDragOver={(e) => { e.preventDefault(); setDragOver(slot.name); }}
-            onDragLeave={() => setDragOver(null)}
-            onDrop={(e) => { e.preventDefault(); setDragOver(null); const f = e.dataTransfer.files[0]; if (f) handleFile(slot.name, f); }}
-            onClick={() => inputRefs.current[slot.name]?.click()}
-          >
-            <input
-              ref={(el) => { inputRefs.current[slot.name] = el; }}
-              type="file"
-              accept="image/*"
-              capture="user"
-              className="hidden"
-              onChange={(e) => { const f = e.target.files?.[0]; if (f) handleFile(slot.name, f); }}
-            />
-            <AnimatePresence mode="wait">
-              {slot.previewUrl ? (
-                <motion.div
-                  key="preview"
-                  initial={{ opacity: 0 }}
-                  animate={{ opacity: 1 }}
-                  exit={{ opacity: 0 }}
-                  className="absolute inset-0"
-                >
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img src={slot.previewUrl} alt={slot.label} className="w-full h-full object-cover" />
-                  <button
-                    onClick={(e) => { e.stopPropagation(); setUploadSlot(slot.name, null as unknown as File, ""); }}
-                    className="absolute top-1.5 right-1.5 w-6 h-6 bg-white/90 rounded-full flex items-center justify-center shadow"
-                  >
-                    <X size={10} className="text-[#1A1714]" />
-                  </button>
-                  <div className="absolute bottom-0 inset-x-0 bg-gradient-to-t from-black/30 to-transparent p-1.5">
-                    <p className="text-white text-[10px] font-medium text-center">✓ Ready</p>
-                  </div>
-                </motion.div>
+    <div>
+      <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+        {uploadSlots.map((slot) => (
+          <div key={slot.name} className="relative">
+            <p className="text-xs font-medium text-[#1A1714] mb-1.5 flex items-center gap-1.5">
+              {slot.type === "person" ? (
+                <User size={11} className="text-[#C4622D]" />
               ) : (
-                <motion.div
-                  key="empty"
-                  initial={{ opacity: 0 }}
-                  animate={{ opacity: 1 }}
-                  exit={{ opacity: 0 }}
-                  className="absolute inset-0 flex flex-col items-center justify-center gap-2 p-3 text-center"
-                >
-                  <div className="w-9 h-9 rounded-xl bg-[#F2EAE0] flex items-center justify-center">
-                    <Upload size={16} className="text-[#C4622D]" />
-                  </div>
-                  <p className="text-[11px] text-[#8C7B6B] leading-tight">
-                    Tap to upload<br />or drag & drop
-                  </p>
-                </motion.div>
+                <PawPrint size={11} className="text-[#C4622D]" />
               )}
-            </AnimatePresence>
+              {slot.label}
+              {slot.required && <span className="text-[#C4622D]">*</span>}
+              {!slot.required && (
+                <button
+                  onClick={() => removeExtraSlot(slot.name)}
+                  className="ml-auto text-[#C0B5A8] hover:text-red-400 transition-colors"
+                >
+                  <X size={10} />
+                </button>
+              )}
+            </p>
+            <div
+              className={`relative rounded-xl border-2 border-dashed transition-all duration-200 overflow-hidden cursor-pointer ${
+                dragOver === slot.name
+                  ? "border-[#C4622D] bg-[#C4622D]/5"
+                  : slot.previewUrl
+                  ? "border-[#2D4A3E]"
+                  : "border-[#E4D8CC] hover:border-[#C4622D]/50 hover:bg-[#FAF6F0]"
+              }`}
+              style={{ height: 130 }}
+              onDragOver={(e) => { e.preventDefault(); setDragOver(slot.name); }}
+              onDragLeave={() => setDragOver(null)}
+              onDrop={(e) => { e.preventDefault(); setDragOver(null); const f = e.dataTransfer.files[0]; if (f) handleFile(slot.name, f); }}
+              onClick={() => inputRefs.current[slot.name]?.click()}
+            >
+              <input
+                ref={(el) => { inputRefs.current[slot.name] = el; }}
+                type="file"
+                accept="image/*"
+                capture="user"
+                className="hidden"
+                onChange={(e) => { const f = e.target.files?.[0]; if (f) handleFile(slot.name, f); }}
+              />
+              <AnimatePresence mode="wait">
+                {slot.previewUrl ? (
+                  <motion.div
+                    key="preview"
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                    exit={{ opacity: 0 }}
+                    className="absolute inset-0"
+                  >
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img src={slot.previewUrl} alt={slot.label} className="w-full h-full object-cover" />
+                    <button
+                      onClick={(e) => { e.stopPropagation(); setUploadSlot(slot.name, null as unknown as File, ""); }}
+                      className="absolute top-1.5 right-1.5 w-6 h-6 bg-white/90 rounded-full flex items-center justify-center shadow"
+                    >
+                      <X size={10} className="text-[#1A1714]" />
+                    </button>
+                    <div className="absolute bottom-0 inset-x-0 bg-gradient-to-t from-black/30 to-transparent p-1.5">
+                      <p className="text-white text-[10px] font-medium text-center">✓ Ready</p>
+                    </div>
+                  </motion.div>
+                ) : (
+                  <motion.div
+                    key="empty"
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                    exit={{ opacity: 0 }}
+                    className="absolute inset-0 flex flex-col items-center justify-center gap-2 p-3 text-center"
+                  >
+                    <div className="w-9 h-9 rounded-xl bg-[#F2EAE0] flex items-center justify-center">
+                      <Upload size={16} className="text-[#C4622D]" />
+                    </div>
+                    <p className="text-[11px] text-[#8C7B6B] leading-tight">
+                      Tap to upload<br />or drag & drop
+                    </p>
+                  </motion.div>
+                )}
+              </AnimatePresence>
+            </div>
           </div>
+        ))}
+      </div>
+
+      {/* Add extra person / pet */}
+      {(extraPersonsMax > 0 || extraPetsMax > 0) && (
+        <div className="flex flex-wrap gap-2 mt-3">
+          {extraPersonsMax > 0 && (
+            <button
+              onClick={() => addExtraSlot("person")}
+              disabled={!canAddPerson}
+              className="flex items-center gap-1.5 border border-dashed border-[#C4622D]/40 hover:border-[#C4622D] disabled:border-[#E4D8CC] disabled:opacity-40 disabled:cursor-not-allowed bg-white hover:bg-[#FFF9F6] px-3 py-1.5 rounded-lg text-xs font-medium text-[#C4622D] transition-all duration-200"
+            >
+              <Plus size={11} />
+              Add person
+              <span className="text-[10px] text-[#C0B5A8]">({extraPersonsAdded}/{extraPersonsMax})</span>
+            </button>
+          )}
+          {extraPetsMax > 0 && (
+            <button
+              onClick={() => addExtraSlot("pet")}
+              disabled={!canAddPet}
+              className="flex items-center gap-1.5 border border-dashed border-[#C4622D]/40 hover:border-[#C4622D] disabled:border-[#E4D8CC] disabled:opacity-40 disabled:cursor-not-allowed bg-white hover:bg-[#FFF9F6] px-3 py-1.5 rounded-lg text-xs font-medium text-[#C4622D] transition-all duration-200"
+            >
+              <Plus size={11} />
+              Add pet
+              <span className="text-[10px] text-[#C0B5A8]">({extraPetsAdded}/{extraPetsMax})</span>
+            </button>
+          )}
         </div>
-      ))}
+      )}
     </div>
   );
 }
