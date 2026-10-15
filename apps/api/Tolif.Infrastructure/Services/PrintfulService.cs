@@ -80,6 +80,24 @@ public sealed class PrintfulService(ISettingsService settings, IHttpClientFactor
         }
     }
 
+    // ── Categories ─────────────────────────────────────────────────────────────
+
+    public async Task<IReadOnlyList<PrintfulCategory>> GetCategoriesAsync(CancellationToken ct = default)
+    {
+        var client = await CreateClientAsync(ct);
+        var res    = await client.GetAsync("/categories", ct);
+        await EnsureSuccessAsync(res, ct);
+
+        var root = JsonNode.Parse(await res.Content.ReadAsStringAsync(ct));
+        var list = root?["result"]?.AsArray() ?? [];
+
+        return list.Select(c => new PrintfulCategory(
+            Id:       c?["id"]?.GetValue<long>()    ?? 0,
+            Title:    c?["title"]?.GetValue<string>() ?? "",
+            ImageUrl: c?["image_url"]?.GetValue<string>()
+        )).OrderBy(c => c.Title).ToList();
+    }
+
     // ── Catalog sync (v1 API — full catalog including wall art) ───────────────
 
     public async Task<IReadOnlyList<PrintfulCatalogProduct>> SyncCatalogAsync(CancellationToken ct = default)
@@ -122,6 +140,47 @@ public sealed class PrintfulService(ISettingsService settings, IHttpClientFactor
                 break;
 
             // Hard safety cap — never loop more than 30 pages (3 000 products)
+            if (offset >= 3000) break;
+        }
+
+        return products;
+    }
+
+    // ── Sync by category ───────────────────────────────────────────────────────
+
+    public async Task<IReadOnlyList<PrintfulCatalogProduct>> SyncCategoryAsync(
+        long categoryId, CancellationToken ct = default)
+    {
+        var client   = await CreateClientAsync(ct);
+        var products = new List<PrintfulCatalogProduct>();
+        int  offset  = 0;
+        int? total   = null;
+        const int pageSize = 100;
+
+        while (true)
+        {
+            var res = await client.GetAsync(
+                $"/products?category_id={categoryId}&limit={pageSize}&offset={offset}", ct);
+            await EnsureSuccessAsync(res, ct);
+            var root = JsonNode.Parse(await res.Content.ReadAsStringAsync(ct));
+
+            var list = root?["result"]?.AsArray();
+            if (list is null || list.Count == 0) break;
+
+            total ??= root?["paging"]?["total"]?.GetValue<int>();
+
+            foreach (var p in list)
+            {
+                var pid  = p?["id"]?.GetValue<long>() ?? 0;
+                var name = p?["title"]?.GetValue<string>() ?? "";
+                var type = p?["type"]?.GetValue<string>() ?? "";
+                var img  = p?["image"]?.GetValue<string>();
+                products.Add(new PrintfulCatalogProduct(pid, name, type, img, []));
+            }
+
+            offset += list.Count;
+            if (total.HasValue ? products.Count >= total.Value : list.Count < pageSize)
+                break;
             if (offset >= 3000) break;
         }
 

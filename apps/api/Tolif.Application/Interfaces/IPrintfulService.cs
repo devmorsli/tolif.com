@@ -1,5 +1,9 @@
 namespace Tolif.Application.Interfaces;
 
+// ── Categories ─────────────────────────────────────────────────────────────────
+
+public record PrintfulCategory(long Id, string Title, string? ImageUrl);
+
 // ── Catalog ────────────────────────────────────────────────────────────────────
 
 public record PrintfulCatalogProduct(
@@ -84,8 +88,14 @@ public interface IPrintfulService
     /// <summary>Verify the stored API key works. Returns null on success, error message on failure.</summary>
     Task<string?> TestConnectionAsync(CancellationToken ct = default);
 
+    /// <summary>List all Printful product categories.</summary>
+    Task<IReadOnlyList<PrintfulCategory>> GetCategoriesAsync(CancellationToken ct = default);
+
     /// <summary>Pull all products (without variants) from Printful and return them.</summary>
     Task<IReadOnlyList<PrintfulCatalogProduct>> SyncCatalogAsync(CancellationToken ct = default);
+
+    /// <summary>Pull products from a specific Printful category.</summary>
+    Task<IReadOnlyList<PrintfulCatalogProduct>> SyncCategoryAsync(long categoryId, CancellationToken ct = default);
 
     /// <summary>Fetch variants for a single catalog product by its Printful product ID.</summary>
     Task<IReadOnlyList<PrintfulCatalogVariant>> GetProductVariantsAsync(long productId, CancellationToken ct = default);

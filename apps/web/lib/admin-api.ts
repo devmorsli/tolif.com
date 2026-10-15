@@ -342,6 +342,23 @@ export interface PrintfulWebhook {
   types: string[];
 }
 
+export interface PrintfulCategory {
+  id: number;
+  title: string;
+  imageUrl?: string;
+}
+
+export async function getPrintfulCategories() {
+  return apiFetch<PrintfulCategory[]>("/api/admin/printful/categories");
+}
+
+export async function syncPrintfulCategory(categoryId: number) {
+  return apiFetch<{ added: number; total: number; syncedAt: string }>(
+    `/api/admin/printful/catalog/sync/category/${categoryId}`,
+    { method: "POST" }
+  );
+}
+
 export async function getPrintfulConnection() {
   return apiFetch<{ connected: boolean; error?: string }>("/api/admin/printful/connection");
 }

@@ -29,6 +29,14 @@ public class AdminPrintfulController(
 
     // ── Catalog ────────────────────────────────────────────────────────────────
 
+    /// <summary>List all Printful product categories.</summary>
+    [HttpGet("categories")]
+    public async Task<IActionResult> GetCategories(CancellationToken ct)
+    {
+        var categories = await printful.GetCategoriesAsync(ct);
+        return Ok(categories);
+    }
+
     /// <summary>Return the last-synced catalog (stored as JSON in Settings).</summary>
     [HttpGet("catalog")]
     public async Task<IActionResult> GetCatalog(CancellationToken ct)
@@ -65,6 +73,52 @@ public class AdminPrintfulController(
             ct: ct);
 
         return Ok(payload);
+    }
+
+    /// <summary>Sync products from a specific category and merge into the catalog cache.</summary>
+    [HttpPost("catalog/sync/category/{categoryId:long}")]
+    public async Task<IActionResult> SyncByCategory(long categoryId, CancellationToken ct)
+    {
+        var newProducts = await printful.SyncCategoryAsync(categoryId, ct);
+
+        // Merge into existing cache (replace by productId, keep everything else)
+        var existingJson = await settings.GetAsync("printful.catalog_cache", ct);
+        var existing = new List<object>();
+        string? syncedAt = null;
+
+        if (existingJson is not null)
+        {
+            try
+            {
+                var doc = JsonDocument.Parse(existingJson);
+                syncedAt = doc.RootElement.TryGetProperty("syncedAt", out var sat) ? sat.GetString() : null;
+                if (doc.RootElement.TryGetProperty("products", out var prods))
+                    existing = JsonSerializer.Deserialize<List<object>>(prods.GetRawText(), JsonOpts) ?? [];
+            }
+            catch { /* start fresh */ }
+        }
+
+        // Re-serialize existing products to get their IDs, then merge
+        var newIds = new HashSet<long>(newProducts.Select(p => p.ProductId));
+        var merged = existing
+            .Select(p => JsonSerializer.Deserialize<System.Text.Json.JsonElement>(
+                JsonSerializer.Serialize(p, JsonOpts), JsonOpts))
+            .Where(p => {
+                if (p.TryGetProperty("productId", out var id)) return !newIds.Contains(id.GetInt64());
+                return true;
+            })
+            .Cast<object>()
+            .Concat(newProducts.Cast<object>())
+            .ToList();
+
+        var payload = new { products = merged, syncedAt = DateTime.UtcNow.ToString("O") };
+        await settings.SetAsync(
+            "printful.catalog_cache",
+            JsonSerializer.Serialize(payload, JsonOpts),
+            isSensitive: false,
+            ct: ct);
+
+        return Ok(new { added = newProducts.Count, total = merged.Count, syncedAt = payload.syncedAt });
     }
 
     /// <summary>Fetch variants for a single Printful catalog product (called lazily on expand).</summary>

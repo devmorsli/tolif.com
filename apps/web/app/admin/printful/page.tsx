@@ -13,10 +13,13 @@ import {
   getPrintfulWebhooks,
   registerPrintfulWebhooks,
   getPrintfulProductVariants,
+  getPrintfulCategories,
+  syncPrintfulCategory,
   type PrintfulProduct,
   type PrintfulVariant,
   type PrintfulMapping,
   type PrintfulWebhook,
+  type PrintfulCategory,
 } from "@/lib/admin-api";
 import {
   RefreshCw,
@@ -284,9 +287,9 @@ function ProductCard({
   );
 }
 
-// ── Catalog tab (search + filter) ─────────────────────────────────────────────
+// ── Catalog tab (search + filter + category browser) ─────────────────────────
 function CatalogTab({
-  products, syncedAt, syncing, connected, mappings, onSync, onAssign,
+  products, syncedAt, syncing, connected, mappings, onSync, onAssign, onLoadCatalog,
 }: {
   products: PrintfulProduct[];
   syncedAt: string | null;
@@ -295,9 +298,47 @@ function CatalogTab({
   mappings: PrintfulMapping[];
   onSync: () => void;
   onAssign: (ourProductId: string, variantId: number) => void;
+  onLoadCatalog: () => Promise<void>;
 }) {
-  const [search, setSearch]     = useState("");
+  const [search, setSearch]         = useState("");
   const [typeFilter, setTypeFilter] = useState("all");
+
+  // Category browser state
+  const [catOpen, setCatOpen]                   = useState(false);
+  const [categories, setCategories]             = useState<PrintfulCategory[] | null>(null);
+  const [loadingCats, setLoadingCats]           = useState(false);
+  const [syncingCat, setSyncingCat]             = useState<number | null>(null);
+  const [catToast, setCatToast]                 = useState<string | null>(null);
+
+  const showCatToast = (msg: string) => {
+    setCatToast(msg);
+    setTimeout(() => setCatToast(null), 3000);
+  };
+
+  const handleLoadCategories = async () => {
+    setLoadingCats(true);
+    try {
+      const cats = await getPrintfulCategories();
+      setCategories(cats);
+    } catch {
+      setCategories([]);
+    } finally {
+      setLoadingCats(false);
+    }
+  };
+
+  const handleSyncCategory = async (cat: PrintfulCategory) => {
+    setSyncingCat(cat.id);
+    try {
+      const result = await syncPrintfulCategory(cat.id);
+      await onLoadCatalog();
+      showCatToast(`Added ${result.added} product${result.added !== 1 ? "s" : ""} from "${cat.title}" (${result.total} total)`);
+    } catch (e: unknown) {
+      showCatToast(`Failed: ${e instanceof Error ? e.message : String(e)}`);
+    } finally {
+      setSyncingCat(null);
+    }
+  };
 
   const uniqueTypes = Array.from(new Set(products.map((p) => p.type))).sort();
 
@@ -353,6 +394,84 @@ function CatalogTab({
           {syncing ? <Loader2 size={14} className="animate-spin" /> : <RefreshCw size={14} />}
           Sync from Printful
         </button>
+      </div>
+
+      {/* ── Category browser ─────────────────────────────────────────────── */}
+      <div className="border border-white/10 rounded-xl overflow-hidden">
+        <button
+          onClick={() => {
+            const next = !catOpen;
+            setCatOpen(next);
+            if (next && categories === null && !loadingCats) handleLoadCategories();
+          }}
+          className="w-full flex items-center justify-between px-4 py-3 text-left hover:bg-white/5 transition-colors"
+        >
+          <div className="flex items-center gap-2">
+            <Package size={13} className="text-white/40" />
+            <span className="text-sm text-white/70 font-medium">Sync by Printful category</span>
+            <span className="text-[10px] text-white/30 bg-white/6 px-2 py-0.5 rounded-full">
+              find wall art, posters, canvas…
+            </span>
+          </div>
+          <span className="text-white/30">
+            {catOpen ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
+          </span>
+        </button>
+
+        {catOpen && (
+          <div className="border-t border-white/8 px-4 py-3 space-y-2">
+            {/* load / reload */}
+            <div className="flex items-center justify-between">
+              <p className="text-xs text-white/40">
+                Pick a category and click Sync to merge its products into your catalog.
+              </p>
+              <button
+                onClick={handleLoadCategories}
+                disabled={loadingCats}
+                className="flex items-center gap-1.5 text-xs text-white/50 hover:text-white transition-colors disabled:opacity-40"
+              >
+                {loadingCats ? <Loader2 size={11} className="animate-spin" /> : <RefreshCw size={11} />}
+                Reload
+              </button>
+            </div>
+
+            {loadingCats && categories === null ? (
+              <div className="flex items-center gap-2 py-4 text-white/40 text-xs justify-center">
+                <Loader2 size={14} className="animate-spin" /> Loading categories…
+              </div>
+            ) : (categories ?? []).length === 0 ? (
+              <p className="text-xs text-white/30 py-3 text-center">No categories found</p>
+            ) : (
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5 max-h-80 overflow-y-auto pr-1">
+                {(categories ?? []).map((cat) => (
+                  <div
+                    key={cat.id}
+                    className="flex items-center justify-between gap-3 bg-white/4 hover:bg-white/7 border border-white/8 rounded-lg px-3 py-2 transition-colors"
+                  >
+                    <span className="text-xs text-white/70 truncate">{cat.title}</span>
+                    <button
+                      onClick={() => handleSyncCategory(cat)}
+                      disabled={syncingCat === cat.id || connected === false}
+                      className="flex items-center gap-1 text-[10px] font-medium text-[#C4622D] bg-[#C4622D]/12 border border-[#C4622D]/20 hover:bg-[#C4622D]/22 disabled:opacity-40 px-2.5 py-1 rounded-md transition-colors whitespace-nowrap shrink-0"
+                    >
+                      {syncingCat === cat.id
+                        ? <Loader2 size={10} className="animate-spin" />
+                        : <RefreshCw size={10} />}
+                      Sync
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {/* inline toast */}
+            {catToast && (
+              <p className="text-xs text-emerald-400 bg-emerald-400/8 border border-emerald-400/15 rounded-lg px-3 py-2">
+                {catToast}
+              </p>
+            )}
+          </div>
+        )}
       </div>
 
       {/* meta row */}
@@ -583,6 +702,7 @@ function PrintfulPage() {
               mappings={mappings}
               onSync={handleSync}
               onAssign={handleAssign}
+              onLoadCatalog={loadCatalog}
             />
           )}
 
