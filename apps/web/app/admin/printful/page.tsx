@@ -161,22 +161,25 @@ function PrintfulPage() {
 
   // ── Load catalog cache ────────────────────────────────────────────────────
   const loadCatalog = useCallback(async () => {
-    const data = await getPrintfulCatalog();
-    setProducts(data.products ?? []);
-    setSyncedAt(data.syncedAt ?? null);
+    try {
+      const data = await getPrintfulCatalog();
+      setProducts(data.products ?? []);
+      setSyncedAt(data.syncedAt ?? null);
+    } catch { /* catalog not yet synced */ }
   }, []);
 
   // ── Load mappings ─────────────────────────────────────────────────────────
   const loadMappings = useCallback(async () => {
-    const raw = await getPrintfulMappings();
-    // Ensure every product has an entry
-    const existing = new Map(raw.map((m: PrintfulMapping) => [m.ourProductId, m.printfulVariantId]));
-    setMappings(
-      OUR_PRODUCTS.map((p) => ({
-        ourProductId:       p.id,
-        printfulVariantId:  existing.get(p.id) ?? "",
-      }))
-    );
+    try {
+      const raw = await getPrintfulMappings();
+      const existing = new Map((raw ?? []).map((m: PrintfulMapping) => [m.ourProductId, m.printfulVariantId]));
+      setMappings(
+        OUR_PRODUCTS.map((p) => ({
+          ourProductId:       p.id,
+          printfulVariantId:  existing.get(p.id) ?? "",
+        }))
+      );
+    } catch { /* mappings not yet saved */ }
   }, []);
 
   // ── Load webhooks ─────────────────────────────────────────────────────────
