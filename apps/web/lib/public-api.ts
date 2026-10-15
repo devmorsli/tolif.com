@@ -212,7 +212,13 @@ export async function getPublicReviews(): Promise<PublicReview[]> {
 
 export function templateImageUrl(key: string): string {
   if (!key) return "";
-  // Always uses the public URL — this is called from client components
+  // Production: NEXT_PUBLIC_STORAGE_URL points directly to S3/R2/CDN.
+  // Browser fetches from the CDN edge — the API server is never involved.
+  const storageBase = process.env.NEXT_PUBLIC_STORAGE_URL;
+  if (storageBase) {
+    return `${storageBase.replace(/\/$/, "")}/${key}`;
+  }
+  // Dev fallback: proxy through the API (MinIO is on Docker internal network).
   const base = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:5000";
   return `${base}/api/storage/preview?key=${encodeURIComponent(key)}`;
 }
