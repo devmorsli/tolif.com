@@ -32,6 +32,13 @@ export interface ProductVariant {
   frame?: string;
 }
 
+export interface CartItem {
+  id: string;           // unique cart-item id (crypto.randomUUID())
+  sessionId: string;    // the PortraitSession GUID for this portrait
+  previewUrl: string | null;
+  variant: ProductVariant;
+}
+
 export interface ShippingOption {
   id: string;
   label: string;
@@ -53,6 +60,7 @@ interface WizardState {
   regenerationsLeft: number;
   selectedVariant: ProductVariant | null;
   selectedShipping: ShippingOption | null;
+  cartItems: CartItem[];
 
   // Actions
   goTo: (step: WizardStep) => void;
@@ -68,6 +76,8 @@ interface WizardState {
   setRegenerationsLeft: (n: number) => void;
   selectVariant: (v: ProductVariant) => void;
   setShipping: (option: ShippingOption) => void;
+  addCartItem: (item: CartItem) => void;
+  removeCartItem: (id: string) => void;
   clearCart: () => void;
   reset: () => void;
 }
@@ -83,6 +93,7 @@ const initialState = {
   regenerationsLeft: 5,
   selectedVariant: null,
   selectedShipping: null,
+  cartItems: [] as CartItem[],
 };
 
 export const useWizardStore = create<WizardState>()(
@@ -113,6 +124,8 @@ export const useWizardStore = create<WizardState>()(
       setRegenerationsLeft: (n) => set({ regenerationsLeft: n }),
       selectVariant: (v) => set({ selectedVariant: v }),
       setShipping: (option) => set({ selectedShipping: option }),
+      addCartItem: (item) => set((s) => ({ cartItems: [...s.cartItems, item] })),
+      removeCartItem: (id) => set((s) => ({ cartItems: s.cartItems.filter((i) => i.id !== id) })),
       clearCart: () => set({ selectedVariant: null, selectedShipping: null }),
       reset: () => set(initialState),
     }),
@@ -131,6 +144,7 @@ export const useWizardStore = create<WizardState>()(
         regenerationsLeft: state.regenerationsLeft,
         gdprConsent:      state.gdprConsent,
         generationStatus: state.generationStatus,
+        cartItems:        state.cartItems,
       }),
       // After rehydration, restore uploadSlots from selectedTemplate
       // (they were excluded because File objects aren't JSON-serialisable,

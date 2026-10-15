@@ -1,7 +1,9 @@
 "use client";
 
+import { useEffect } from "react";
 import { motion } from "framer-motion";
 import Link from "next/link";
+import { useWizardStore } from "@/store/wizardStore";
 import { Download, Package, CheckCircle, Clock, Truck, Star, ArrowLeft } from "lucide-react";
 
 // ── Types ──────────────────────────────────────────────────────────────────────
@@ -140,6 +142,12 @@ export function OrderPageClient({
   apiBase: string;
   accessToken: string;
 }) {
+  const reset = useWizardStore((s) => s.reset);
+
+  // Clear the wizard + multi-portrait cart once the customer lands on the
+  // success page so the next portrait starts fresh.
+  useEffect(() => { reset(); }, [reset]);
+
   const date = new Date(order.createdAt);
   const formattedDate = date.toLocaleDateString("en-GB", {
     day: "numeric",

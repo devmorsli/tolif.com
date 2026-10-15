@@ -20,7 +20,7 @@ import {
   Plus,
 } from "lucide-react";
 import Link from "next/link";
-import { useWizardStore } from "@/store/wizardStore";
+import { useWizardStore, type CartItem } from "@/store/wizardStore";
 import { getShippingOptions, type ShippingOption } from "@/lib/public-api";
 
 function getApiBase(): string {
@@ -193,7 +193,10 @@ export function Step4Cart() {
     sessionId,
     selectedVariant,
     selectedShipping,
+    cartItems,
     setShipping,
+    addCartItem,
+    removeCartItem,
     clearCart,
     goTo,
     back,
@@ -205,7 +208,12 @@ export function Step4Cart() {
   const [checkoutLoading, setCheckoutLoading] = useState(false);
   const [checkoutError, setCheckoutError] = useState<string | null>(null);
 
-  const isDigital = selectedVariant?.type === "digital";
+  // true only if EVERY item in the whole order is digital
+  const allItems = [
+    ...cartItems,
+    ...(selectedVariant && sessionId ? [{ id: "__current__", sessionId, previewUrl, variant: selectedVariant } as CartItem] : []),
+  ];
+  const isDigital = allItems.length > 0 && allItems.every((i) => i.variant.type === "digital");
 
   // Only fetch shipping when it's actually needed
   useEffect(() => {
@@ -219,7 +227,7 @@ export function Step4Cart() {
   }, [isDigital]);
 
   // ── Empty cart ───────────────────────────────────────────────────────────────
-  if (!selectedVariant) {
+  if (allItems.length === 0) {
     return (
       <div className="max-w-2xl mx-auto text-center py-24">
         <div className="w-16 h-16 rounded-full bg-[#F0EAE0] flex items-center justify-center mx-auto mb-4">
@@ -239,22 +247,37 @@ export function Step4Cart() {
 
   // ── Derived values ───────────────────────────────────────────────────────────
   const shippingCost = isDigital ? 0 : (selectedShipping?.price ?? 0);
-  const productTotal = selectedVariant.price;
+  const productTotal = allItems.reduce((sum, i) => sum + i.variant.price, 0);
   const orderTotal   = productTotal + shippingCost;
 
-  const frameLabel = (() => {
-    if (selectedVariant.type === "digital") return "Digital file";
-    if (selectedVariant.type === "canvas")  return "Canvas print";
-    const f = selectedVariant.frame ?? "";
+  const frameLabelFor = (item: CartItem) => {
+    if (item.variant.type === "digital") return "Digital file";
+    if (item.variant.type === "canvas")  return "Canvas print";
+    const f = item.variant.frame ?? "";
     if (f === "black")   return "Black frame";
     if (f === "red-oak") return "Red oak frame";
     if (f === "white")   return "White frame";
     return "No frame";
-  })();
+  };
 
-  const handleRemove = () => {
+  // Remove the current (non-saved) item — go back to step 3 to re-customise
+  const handleRemoveCurrent = () => {
     clearCart();
     goTo(3);
+  };
+
+  // Save current item to the persistent cart and start a fresh wizard flow
+  const handleAddAnother = () => {
+    if (selectedVariant && sessionId) {
+      addCartItem({
+        id: `${sessionId}-${selectedVariant.id}`,
+        sessionId,
+        previewUrl,
+        variant: selectedVariant,
+      });
+      clearCart();
+    }
+    router.push("/portraits");
   };
 
   const handleCheckout = async () => {
@@ -262,22 +285,21 @@ export function Step4Cart() {
       setCheckoutError("Please enter a valid email address.");
       return;
     }
-    if (!sessionId) {
-      setCheckoutError("Session expired — please go back and regenerate your portrait.");
-      return;
-    }
-
     setCheckoutLoading(true);
     setCheckoutError(null);
 
     try {
+      const checkoutItems = allItems.map((i) => ({
+        sessionId: i.sessionId,
+        variantId: i.variant.id,
+        quantity: 1,
+      }));
+
       const res = await fetch(`${getApiBase()}/api/checkout/session`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          sessionId,
-          variantId: selectedVariant.id,
-          quantity: 1,
+          items: checkoutItems,
           customerEmail: email,
         }),
       });
@@ -309,62 +331,68 @@ export function Step4Cart() {
 
       <div className="flex flex-col gap-5">
 
-        {/* ── Order item ──────────────────────────────────────────────────── */}
+        {/* ── Order items ─────────────────────────────────────────────────── */}
         <div className="bg-white rounded-2xl border border-[#E4D8CC] p-5">
           <p className="text-[10px] font-semibold tracking-[0.18em] uppercase text-[#8C7B6B] mb-4">
-            Order item
+            Order {allItems.length > 1 ? `items (${allItems.length})` : "item"}
           </p>
-          <div className="flex items-center gap-4">
-            <PortraitThumb
-              url={previewUrl}
-              frameColor={selectedVariant.frame ?? selectedVariant.type}
-            />
-
-            <div className="flex-1 min-w-0">
-              <p className="font-semibold text-[#1A1714] leading-snug">
-                {selectedVariant.productName}
-              </p>
-              <div className="mt-1.5 flex flex-wrap gap-1.5">
-                <span className="text-[10px] bg-[#F0EAE0] text-[#8C7B6B] px-2 py-0.5 rounded-full font-medium">
-                  {selectedVariant.size}
-                </span>
-                <span className="text-[10px] bg-[#F0EAE0] text-[#8C7B6B] px-2 py-0.5 rounded-full font-medium">
-                  {frameLabel}
-                </span>
-                {!isDigital && (
-                  <span className="text-[10px] bg-[#EAF2EE] text-[#2D4A3E] px-2 py-0.5 rounded-full font-medium">
-                    + Digital file included
-                  </span>
-                )}
-              </div>
-              <p className="mt-2 text-xl font-display font-semibold text-[#1A1714]">
-                ${productTotal}
-              </p>
-            </div>
-
-            {/* Edit / Remove */}
-            <div className="shrink-0 flex flex-col items-end gap-2">
-              <button
-                onClick={back}
-                className="flex items-center gap-1 text-xs text-[#8C7B6B] hover:text-[#C4622D] transition-colors"
-              >
-                Edit <ChevronRight size={11} />
-              </button>
-              <button
-                onClick={handleRemove}
-                className="flex items-center gap-1 text-xs text-[#8C7B6B] hover:text-red-500 transition-colors"
-                title="Remove from cart"
-              >
-                <Trash2 size={11} />
-                Remove
-              </button>
-            </div>
+          <div className="flex flex-col gap-5">
+            {allItems.map((item, idx) => {
+              const isCurrent = item.id === "__current__";
+              const label = frameLabelFor(item);
+              const itemIsPhysical = item.variant.type !== "digital";
+              return (
+                <div key={item.id} className={`flex items-center gap-4 ${idx > 0 ? "pt-5 border-t border-[#F0E8DC]" : ""}`}>
+                  <PortraitThumb
+                    url={item.previewUrl}
+                    frameColor={item.variant.frame ?? item.variant.type}
+                  />
+                  <div className="flex-1 min-w-0">
+                    <p className="font-semibold text-[#1A1714] leading-snug">{item.variant.productName}</p>
+                    <div className="mt-1.5 flex flex-wrap gap-1.5">
+                      <span className="text-[10px] bg-[#F0EAE0] text-[#8C7B6B] px-2 py-0.5 rounded-full font-medium">
+                        {item.variant.size}
+                      </span>
+                      <span className="text-[10px] bg-[#F0EAE0] text-[#8C7B6B] px-2 py-0.5 rounded-full font-medium">
+                        {label}
+                      </span>
+                      {itemIsPhysical && (
+                        <span className="text-[10px] bg-[#EAF2EE] text-[#2D4A3E] px-2 py-0.5 rounded-full font-medium">
+                          + Digital file included
+                        </span>
+                      )}
+                    </div>
+                    <p className="mt-2 text-lg font-display font-semibold text-[#1A1714]">
+                      ${item.variant.price}
+                    </p>
+                  </div>
+                  <div className="shrink-0 flex flex-col items-end gap-2">
+                    {isCurrent && (
+                      <button
+                        onClick={back}
+                        className="flex items-center gap-1 text-xs text-[#8C7B6B] hover:text-[#C4622D] transition-colors"
+                      >
+                        Edit <ChevronRight size={11} />
+                      </button>
+                    )}
+                    <button
+                      onClick={isCurrent ? handleRemoveCurrent : () => removeCartItem(item.id)}
+                      className="flex items-center gap-1 text-xs text-[#8C7B6B] hover:text-red-500 transition-colors"
+                      title="Remove from cart"
+                    >
+                      <Trash2 size={11} />
+                      Remove
+                    </button>
+                  </div>
+                </div>
+              );
+            })}
           </div>
         </div>
 
         {/* ── Add another portrait ──────────────────────────────────────────── */}
         <button
-          onClick={() => router.push("/portraits")}
+          onClick={handleAddAnother}
           className="w-full flex items-center justify-center gap-2 rounded-2xl border-2 border-dashed border-[#E4D8CC] hover:border-[#C4622D]/50 bg-white hover:bg-[#FFF9F6] py-4 text-sm font-medium text-[#8C7B6B] hover:text-[#C4622D] transition-all duration-200"
         >
           <Plus size={15} />
@@ -422,9 +450,15 @@ export function Step4Cart() {
           </p>
 
           <div className="space-y-2.5">
-            <LineItem label={selectedVariant.productName} value={`$${productTotal}`} />
-            {!isDigital && (
-              <LineItem label="Digital file (high-res)" value="Free" green />
+            {allItems.map((item) => (
+              <LineItem
+                key={item.id}
+                label={item.variant.productName}
+                value={`$${item.variant.price}`}
+              />
+            ))}
+            {allItems.some((i) => i.variant.type !== "digital") && (
+              <LineItem label="Digital files (high-res)" value="Free" green />
             )}
             {!isDigital && (
               <LineItem
@@ -517,13 +551,15 @@ export function Step4Cart() {
         </div>
 
         {/* ── Back ──────────────────────────────────────────────────────────── */}
-        <button
-          onClick={back}
-          className="flex items-center justify-center gap-1.5 text-sm text-[#8C7B6B] hover:text-[#1A1714] transition-colors mx-auto pb-2"
-        >
-          <ArrowLeft size={13} />
-          Edit personalisation
-        </button>
+        {selectedVariant && (
+          <button
+            onClick={back}
+            className="flex items-center justify-center gap-1.5 text-sm text-[#8C7B6B] hover:text-[#1A1714] transition-colors mx-auto pb-2"
+          >
+            <ArrowLeft size={13} />
+            Edit personalisation
+          </button>
+        )}
       </div>
     </div>
   );

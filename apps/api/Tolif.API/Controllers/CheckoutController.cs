@@ -23,9 +23,10 @@ public class CheckoutController(
     ///
     /// Body:
     /// {
-    ///   "sessionId":       "guid",          // PortraitSession ID
-    ///   "variantId":       "guid",          // ProductVariant ID
-    ///   "quantity":        1,
+    ///   "items": [
+    ///     { "sessionId": "guid", "variantId": "guid", "quantity": 1 },
+    ///     ...
+    ///   ],
     ///   "customerEmail":   "...",
     ///   "customerName":    "...",           // optional
     ///   "shippingAddress": { ... },         // required for physical products
@@ -38,31 +39,40 @@ public class CheckoutController(
         [FromBody] CreateCheckoutRequest req,
         CancellationToken ct)
     {
-        // ── Validate portrait session ──────────────────────────────────────
-        if (!Guid.TryParse(req.SessionId, out var sessionId))
-            return BadRequest(new { message = "Invalid sessionId." });
+        if (req.Items is null || req.Items.Count == 0)
+            return BadRequest(new { message = "At least one item is required." });
 
-        var portraitSession = await db.PortraitSessions
-            .AsNoTracking()
-            .FirstOrDefaultAsync(s => s.Id == sessionId, ct);
+        // ── Validate each item ─────────────────────────────────────────────
+        var resolvedItems = new List<ResolvedItem>();
 
-        if (portraitSession is null)
-            return NotFound(new { message = "Portrait session not found." });
+        foreach (var reqItem in req.Items)
+        {
+            if (!Guid.TryParse(reqItem.SessionId, out var sessionId))
+                return BadRequest(new { message = $"Invalid sessionId: {reqItem.SessionId}" });
 
-        if (portraitSession.Status != PortraitSessionStatus.PreviewReady)
-            return BadRequest(new { message = "Portrait session is not ready for checkout." });
+            var portraitSession = await db.PortraitSessions
+                .AsNoTracking()
+                .FirstOrDefaultAsync(s => s.Id == sessionId, ct);
 
-        // ── Validate product variant ───────────────────────────────────────
-        if (!Guid.TryParse(req.VariantId, out var variantId))
-            return BadRequest(new { message = "Invalid variantId." });
+            if (portraitSession is null)
+                return NotFound(new { message = $"Portrait session not found: {reqItem.SessionId}" });
 
-        var variant = await db.ProductVariants
-            .Include(v => v.Product)
-            .AsNoTracking()
-            .FirstOrDefaultAsync(v => v.Id == variantId && v.IsActive, ct);
+            if (portraitSession.Status != PortraitSessionStatus.PreviewReady)
+                return BadRequest(new { message = $"Portrait session is not ready for checkout: {reqItem.SessionId}" });
 
-        if (variant is null)
-            return NotFound(new { message = "Product variant not found." });
+            if (!Guid.TryParse(reqItem.VariantId, out var variantId))
+                return BadRequest(new { message = $"Invalid variantId: {reqItem.VariantId}" });
+
+            var variant = await db.ProductVariants
+                .Include(v => v.Product)
+                .AsNoTracking()
+                .FirstOrDefaultAsync(v => v.Id == variantId && v.IsActive, ct);
+
+            if (variant is null)
+                return NotFound(new { message = $"Product variant not found: {reqItem.VariantId}" });
+
+            resolvedItems.Add(new ResolvedItem(sessionId, variant, reqItem.Quantity));
+        }
 
         // ── Validate discount code (optional) ─────────────────────────────
         DiscountCode? discount = null;
@@ -87,9 +97,10 @@ public class CheckoutController(
 
         var siteUrl = await settings.GetAsync("site.url", ct) ?? "https://tolif.com";
 
-        // ── Calculate amount ───────────────────────────────────────────────
-        var unitPrice    = variant.Price;
-        var currency     = variant.Currency.ToLowerInvariant();
+        // ── Calculate order total ──────────────────────────────────────────
+        var currency = resolvedItems[0].Variant.Currency.ToLowerInvariant();
+
+        decimal rawTotal = resolvedItems.Sum(i => i.Variant.Price * i.Quantity);
 
         long amountInCents;
         string? stripeCouponId = null;
@@ -98,17 +109,15 @@ public class CheckoutController(
         {
             stripeCouponId = discount.StripeCouponId;
             amountInCents  = discount.Type == "percent"
-                ? (long)Math.Round(unitPrice * req.Quantity * (1 - discount.Value / 100m) * 100)
-                : (long)Math.Max(0, (unitPrice * req.Quantity - discount.Value) * 100);
+                ? (long)Math.Round(rawTotal * (1 - discount.Value / 100m) * 100)
+                : (long)Math.Max(0, (rawTotal - discount.Value) * 100);
         }
         else
         {
-            amountInCents = (long)Math.Round(unitPrice * req.Quantity * 100);
+            amountInCents = (long)Math.Round(rawTotal * 100);
         }
 
         // ── Stripe minimum charge guard ────────────────────────────────────
-        // Stripe requires ≥50 cents for most currencies (≥30p for GBP).
-        // Validate before inserting the Order row to avoid orphan records.
         var stripeMinCents = currency == "gbp" ? 30L : 50L;
         if (amountInCents < stripeMinCents)
         {
@@ -129,7 +138,7 @@ public class CheckoutController(
             CustomerName   = req.CustomerName,
             Status         = OrderStatus.Pending,
             TotalAmount    = amountInCents / 100m,
-            Currency       = variant.Currency,
+            Currency       = resolvedItems[0].Variant.Currency,
             DiscountCodeId = discount?.Id,
             ShippingAddressJson = req.ShippingAddress is null
                 ? null
@@ -138,43 +147,44 @@ public class CheckoutController(
             UpdatedAt      = DateTime.UtcNow,
         };
 
-        order.Items.Add(new OrderItem
+        foreach (var item in resolvedItems)
         {
-            Id               = Guid.NewGuid(),
-            OrderId          = order.Id,
-            ProductVariantId = variant.Id,
-            PortraitSessionId = sessionId,
-            Quantity         = req.Quantity,
-            UnitPrice        = variant.Price,
-            Currency         = variant.Currency,
-            CreatedAt        = DateTime.UtcNow,
-            UpdatedAt        = DateTime.UtcNow,
-        });
+            order.Items.Add(new OrderItem
+            {
+                Id                = Guid.NewGuid(),
+                OrderId           = order.Id,
+                ProductVariantId  = item.Variant.Id,
+                PortraitSessionId = item.SessionId,
+                Quantity          = item.Quantity,
+                UnitPrice         = item.Variant.Price,
+                Currency          = item.Variant.Currency,
+                CreatedAt         = DateTime.UtcNow,
+                UpdatedAt         = DateTime.UtcNow,
+            });
+        }
 
         db.Orders.Add(order);
         await db.SaveChangesAsync(ct);
 
-        // ── Create Stripe Checkout Session ─────────────────────────────────
-        var isPhysical = variant.Product?.Type != ProductType.Digital;
+        // ── Build Stripe line items (one per portrait) ─────────────────────
+        var isPhysical = resolvedItems.Any(i => i.Variant.Product?.Type != ProductType.Digital);
 
-        var lineItems = new List<SessionLineItemOptions>
+        var lineItems = resolvedItems.Select(item => new SessionLineItemOptions
         {
-            new()
+            PriceData = new SessionLineItemPriceDataOptions
             {
-                PriceData = new SessionLineItemPriceDataOptions
+                Currency    = item.Variant.Currency.ToLowerInvariant(),
+                UnitAmount  = (long)Math.Round(item.Variant.Price * 100),
+                ProductData = new SessionLineItemPriceDataProductDataOptions
                 {
-                    Currency    = currency,
-                    UnitAmount  = (long)Math.Round(variant.Price * 100),
-                    ProductData = new SessionLineItemPriceDataProductDataOptions
-                    {
-                        Name        = $"{variant.Product?.Name ?? "AI Portrait"} — {variant.Size}",
-                        Description = "Custom AI-generated portrait by Tolif",
-                    },
+                    Name        = $"{item.Variant.Product?.Name ?? "AI Portrait"} — {item.Variant.Size}",
+                    Description = "Custom AI-generated portrait by Tolif",
                 },
-                Quantity = req.Quantity,
-            }
-        };
+            },
+            Quantity = item.Quantity,
+        }).ToList();
 
+        // ── Create Stripe Checkout Session ─────────────────────────────────
         var options = new SessionCreateOptions
         {
             PaymentMethodTypes = ["card"],
@@ -185,8 +195,8 @@ public class CheckoutController(
             CancelUrl          = $"{siteUrl}/create?cancelled=1",
             Metadata           = new Dictionary<string, string>
             {
-                ["orderId"]   = order.Id.ToString(),
-                ["sessionId"] = sessionId.ToString(),
+                ["orderId"]    = order.Id.ToString(),
+                ["sessionIds"] = string.Join(",", resolvedItems.Select(i => i.SessionId.ToString())),
             },
             Discounts = stripeCouponId is null
                 ? null
@@ -201,10 +211,9 @@ public class CheckoutController(
 
         try
         {
-            var service        = new SessionService();
-            var stripeSession  = await service.CreateAsync(options, cancellationToken: ct);
+            var service       = new SessionService();
+            var stripeSession = await service.CreateAsync(options, cancellationToken: ct);
 
-            // Update order with Stripe session ID
             var savedOrder = await db.Orders.FindAsync([order.Id], ct);
             if (savedOrder is not null)
             {
@@ -225,16 +234,22 @@ public class CheckoutController(
             return StatusCode(500, new { message = "Could not create Stripe checkout session.", detail = ex.Message });
         }
     }
+
+    private sealed record ResolvedItem(Guid SessionId, ProductVariant Variant, int Quantity);
 }
 
 public record CreateCheckoutRequest(
-    string SessionId,
-    string VariantId,
-    int    Quantity,
+    List<CheckoutItem> Items,
     string CustomerEmail,
     string? CustomerName,
     ShippingAddressDto? ShippingAddress,
     string? DiscountCode
+);
+
+public record CheckoutItem(
+    string SessionId,
+    string VariantId,
+    int    Quantity
 );
 
 public record ShippingAddressDto(
