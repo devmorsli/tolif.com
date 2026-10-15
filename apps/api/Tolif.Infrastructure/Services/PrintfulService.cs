@@ -89,7 +89,8 @@ public sealed class PrintfulService(ISettingsService settings, IHttpClientFactor
         await EnsureSuccessAsync(res, ct);
 
         var root = JsonNode.Parse(await res.Content.ReadAsStringAsync(ct));
-        var list = root?["result"]?.AsArray() ?? [];
+        // /categories returns { result: { categories: [...] } }
+        var list = root?["result"]?["categories"]?.AsArray() ?? [];
 
         return list.Select(c => new PrintfulCategory(
             Id:       c?["id"]?.GetValue<long>()    ?? 0,
