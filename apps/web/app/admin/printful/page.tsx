@@ -30,6 +30,8 @@ import {
   AlertCircle,
   ChevronDown,
   ChevronRight,
+  Search,
+  X,
 } from "lucide-react";
 
 type Tab = "catalog" | "mappings" | "webhooks";
@@ -207,6 +209,110 @@ function ProductCard({
               </table>
             </div>
           )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ── Catalog tab (search + filter) ─────────────────────────────────────────────
+function CatalogTab({
+  products, syncedAt, syncing, connected, mappings, onSync, onAssign,
+}: {
+  products: PrintfulProduct[];
+  syncedAt: string | null;
+  syncing: boolean;
+  connected: boolean | null;
+  mappings: PrintfulMapping[];
+  onSync: () => void;
+  onAssign: (ourProductId: string, variantId: number) => void;
+}) {
+  const [search, setSearch]     = useState("");
+  const [typeFilter, setTypeFilter] = useState("all");
+
+  const uniqueTypes = Array.from(new Set(products.map((p) => p.type))).sort();
+
+  const visible = products.filter((p) => {
+    const q = search.trim().toLowerCase();
+    const matchesSearch = !q || p.name.toLowerCase().includes(q) || p.type.toLowerCase().includes(q);
+    const matchesType   = typeFilter === "all" || p.type === typeFilter;
+    return matchesSearch && matchesType;
+  });
+
+  return (
+    <div className="space-y-4">
+      {/* toolbar */}
+      <div className="flex flex-col sm:flex-row sm:items-center gap-3">
+        {/* search */}
+        <div className="relative flex-1">
+          <Search size={13} className="absolute left-3 top-1/2 -translate-y-1/2 text-white/30 pointer-events-none" />
+          <input
+            type="text"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder="Search products…"
+            className="w-full bg-white/6 border border-white/10 rounded-lg pl-8 pr-8 py-2 text-sm text-white placeholder:text-white/25 focus:outline-none focus:border-[#C4622D]/60"
+          />
+          {search && (
+            <button
+              onClick={() => setSearch("")}
+              className="absolute right-2.5 top-1/2 -translate-y-1/2 text-white/30 hover:text-white/60"
+            >
+              <X size={13} />
+            </button>
+          )}
+        </div>
+
+        {/* type filter */}
+        <select
+          value={typeFilter}
+          onChange={(e) => setTypeFilter(e.target.value)}
+          className="bg-white/6 border border-white/10 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-[#C4622D]/60 shrink-0"
+        >
+          <option value="all">All types</option>
+          {uniqueTypes.map((t) => (
+            <option key={t} value={t}>{t}</option>
+          ))}
+        </select>
+
+        {/* sync button */}
+        <button
+          onClick={onSync}
+          disabled={syncing || connected === false}
+          className="flex items-center gap-2 bg-[#C4622D] hover:bg-[#b35527] disabled:opacity-50 text-white text-sm font-medium px-4 py-2 rounded-lg transition-colors shrink-0"
+        >
+          {syncing ? <Loader2 size={14} className="animate-spin" /> : <RefreshCw size={14} />}
+          Sync from Printful
+        </button>
+      </div>
+
+      {/* meta row */}
+      {products.length > 0 && (
+        <p className="text-xs text-white/30">
+          Showing {visible.length} of {products.length} products
+          {syncedAt && <> · Last synced {new Date(syncedAt).toLocaleString()}</>}
+        </p>
+      )}
+
+      {/* list */}
+      {products.length === 0 ? (
+        <div className="text-center py-20 border border-dashed border-white/10 rounded-xl">
+          <Wifi size={32} className="text-white/20 mx-auto mb-3" />
+          <p className="text-white/40 text-sm">Click "Sync from Printful" to load your catalog</p>
+        </div>
+      ) : visible.length === 0 ? (
+        <div className="text-center py-16 border border-dashed border-white/10 rounded-xl">
+          <Search size={28} className="text-white/20 mx-auto mb-3" />
+          <p className="text-white/40 text-sm">No products match your search</p>
+          <button onClick={() => { setSearch(""); setTypeFilter("all"); }} className="mt-2 text-xs text-[#C4622D] hover:underline">
+            Clear filters
+          </button>
+        </div>
+      ) : (
+        <div className="space-y-2">
+          {visible.map((p) => (
+            <ProductCard key={p.productId} product={p} mappings={mappings} onAssign={onAssign} />
+          ))}
         </div>
       )}
     </div>
@@ -400,43 +506,15 @@ function PrintfulPage() {
 
           {/* ── Tab: Catalog ──────────────────────────────────────────────── */}
           {tab === "catalog" && (
-            <div className="space-y-5">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm text-white/60">
-                    {products.length > 0
-                      ? `${products.length} products cached`
-                      : "No catalog synced yet"}
-                  </p>
-                  {syncedAt && (
-                    <p className="text-xs text-white/30 mt-0.5">
-                      Last synced {new Date(syncedAt).toLocaleString()}
-                    </p>
-                  )}
-                </div>
-                <button
-                  onClick={handleSync}
-                  disabled={syncing || connected === false}
-                  className="flex items-center gap-2 bg-[#C4622D] hover:bg-[#b35527] disabled:opacity-50 text-white text-sm font-medium px-4 py-2 rounded-lg transition-colors"
-                >
-                  {syncing ? <Loader2 size={14} className="animate-spin" /> : <RefreshCw size={14} />}
-                  Sync from Printful
-                </button>
-              </div>
-
-              {products.length === 0 ? (
-                <div className="text-center py-20 border border-dashed border-white/10 rounded-xl">
-                  <Wifi size={32} className="text-white/20 mx-auto mb-3" />
-                  <p className="text-white/40 text-sm">Click "Sync from Printful" to load your catalog</p>
-                </div>
-              ) : (
-                <div className="space-y-2">
-                  {products.map((p) => (
-                    <ProductCard key={p.productId} product={p} mappings={mappings} onAssign={handleAssign} />
-                  ))}
-                </div>
-              )}
-            </div>
+            <CatalogTab
+              products={products}
+              syncedAt={syncedAt}
+              syncing={syncing}
+              connected={connected}
+              mappings={mappings}
+              onSync={handleSync}
+              onAssign={handleAssign}
+            />
           )}
 
           {/* ── Tab: Mappings ──────────────────────────────────────────────── */}
