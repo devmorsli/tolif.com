@@ -79,15 +79,25 @@ function StatusPill({
 }
 
 // ── Collapsible product card ───────────────────────────────────────────────────
-function ProductCard({ product }: { product: PrintfulProduct }) {
-  const [open, setOpen]         = useState(false);
-  const [variants, setVariants] = useState<PrintfulVariant[] | null>(null);
-  const [loading, setLoading]   = useState(false);
+function ProductCard({
+  product,
+  mappings,
+  onAssign,
+}: {
+  product: PrintfulProduct;
+  mappings: PrintfulMapping[];
+  onAssign: (ourProductId: string, variantId: number) => void;
+}) {
+  const [open, setOpen]             = useState(false);
+  const [variants, setVariants]     = useState<PrintfulVariant[] | null>(null);
+  const [loading, setLoading]       = useState(false);
+  const [assignOpen, setAssignOpen] = useState<number | null>(null);
 
   const handleToggle = async () => {
     const next = !open;
     setOpen(next);
-    if (next && variants === null && !loading) {
+    if (!next) { setAssignOpen(null); return; }
+    if (variants === null && !loading) {
       setLoading(true);
       try {
         const data = await getPrintfulProductVariants(product.productId);
@@ -98,6 +108,12 @@ function ProductCard({ product }: { product: PrintfulProduct }) {
         setLoading(false);
       }
     }
+  };
+
+  // Label of our product currently mapped to this variant (if any)
+  const assignedLabel = (variantId: number) => {
+    const ourId = mappings.find((m) => m.printfulVariantId === String(variantId))?.ourProductId;
+    return ourId ? (OUR_PRODUCTS.find((p) => p.id === ourId)?.label ?? ourId) : null;
   };
 
   return (
@@ -135,17 +151,58 @@ function ProductCard({ product }: { product: PrintfulProduct }) {
                     <th className="text-left pb-2 font-medium">Name</th>
                     <th className="text-left pb-2 font-medium">Size</th>
                     <th className="text-left pb-2 font-medium">Price</th>
+                    <th className="text-left pb-2 font-medium">Assign to</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-white/5">
-                  {(variants ?? []).map((v) => (
-                    <tr key={v.variantId}>
-                      <td className="py-1.5 text-white/60 font-mono">{v.variantId}</td>
-                      <td className="py-1.5 text-white/80">{v.name}</td>
-                      <td className="py-1.5 text-white/50">{v.size ?? "—"}</td>
-                      <td className="py-1.5 text-white/60">${v.price} {v.currency}</td>
-                    </tr>
-                  ))}
+                  {(variants ?? []).map((v) => {
+                    const label = assignedLabel(v.variantId);
+                    return (
+                      <tr key={v.variantId}>
+                        <td className="py-1.5 text-white/60 font-mono">{v.variantId}</td>
+                        <td className="py-1.5 text-white/80">{v.name}</td>
+                        <td className="py-1.5 text-white/50">{v.size ?? "—"}</td>
+                        <td className="py-1.5 text-white/60">${v.price} {v.currency}</td>
+                        <td className="py-1.5 relative">
+                          <button
+                            onClick={() => setAssignOpen(assignOpen === v.variantId ? null : v.variantId)}
+                            className={`flex items-center gap-1.5 text-[10px] font-medium px-2.5 py-1 rounded-lg transition-colors whitespace-nowrap ${
+                              label
+                                ? "bg-emerald-500/15 text-emerald-400 border border-emerald-500/20 hover:bg-emerald-500/25"
+                                : "bg-[#C4622D]/15 text-[#C4622D] border border-[#C4622D]/20 hover:bg-[#C4622D]/25"
+                            }`}
+                          >
+                            <Link2 size={10} />
+                            {label ?? "Assign"}
+                          </button>
+                          {assignOpen === v.variantId && (
+                            <div className="absolute left-0 top-8 z-30 w-64 bg-[#1A1714] border border-white/15 rounded-xl shadow-2xl py-1 max-h-64 overflow-y-auto">
+                              <p className="px-3 py-1.5 text-[10px] text-white/30 font-medium uppercase tracking-wider border-b border-white/8">
+                                Assign variant {v.variantId} to…
+                              </p>
+                              {OUR_PRODUCTS.map((p) => {
+                                const isSelected = mappings.find((m) => m.ourProductId === p.id)?.printfulVariantId === String(v.variantId);
+                                return (
+                                  <button
+                                    key={p.id}
+                                    onClick={() => { onAssign(p.id, v.variantId); setAssignOpen(null); }}
+                                    className={`w-full text-left px-3 py-2 text-xs transition-colors flex items-center justify-between gap-2 ${
+                                      isSelected
+                                        ? "text-emerald-400 bg-emerald-500/10"
+                                        : "text-white/70 hover:bg-white/8 hover:text-white"
+                                    }`}
+                                  >
+                                    <span>{p.label}</span>
+                                    {isSelected && <CheckCircle size={11} />}
+                                  </button>
+                                );
+                              })}
+                            </div>
+                          )}
+                        </td>
+                      </tr>
+                    );
+                  })}
                 </tbody>
               </table>
             </div>
@@ -233,6 +290,23 @@ function PrintfulPage() {
       showToast(`Sync failed: ${e instanceof Error ? e.message : String(e)}`);
     } finally {
       setSyncing(false);
+    }
+  };
+
+  // ── Quick-assign from catalog tab ────────────────────────────────────────
+  const handleAssign = async (ourProductId: string, variantId: number) => {
+    const next = mappings.map((m) =>
+      m.ourProductId === ourProductId
+        ? { ...m, printfulVariantId: String(variantId) }
+        : m
+    );
+    setMappings(next);
+    try {
+      await savePrintfulMappings(next);
+      const label = OUR_PRODUCTS.find((p) => p.id === ourProductId)?.label ?? ourProductId;
+      showToast(`Assigned ${variantId} → ${label}`);
+    } catch {
+      showToast("Failed to save mapping");
     }
   };
 
@@ -358,7 +432,7 @@ function PrintfulPage() {
               ) : (
                 <div className="space-y-2">
                   {products.map((p) => (
-                    <ProductCard key={p.productId} product={p} />
+                    <ProductCard key={p.productId} product={p} mappings={mappings} onAssign={handleAssign} />
                   ))}
                 </div>
               )}
