@@ -3,6 +3,9 @@ using System.Text;
 using System.Text.Json;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using SixLabors.ImageSharp;
+using SixLabors.ImageSharp.Formats.Webp;
+using SixLabors.ImageSharp.Processing;
 using Tolif.Application.Interfaces;
 
 namespace Tolif.API.Controllers.Admin;
@@ -144,8 +147,9 @@ public class AdminTemplateAiController(
                 return StatusCode(500, new { message = "No image returned from fal.ai." });
 
             var imageBytes = await http.GetByteArrayAsync(imageUrl, ct);
-            var key = $"templates/{Guid.NewGuid()}.jpg";
-            await storageService.UploadAsync(key, imageBytes, "image/jpeg", ct);
+            var optimised = OptimiseForWeb(imageBytes);
+            var key = $"templates/{Guid.NewGuid()}.webp";
+            await storageService.UploadAsync(key, optimised, "image/webp", ct);
             var presignedUrl = await storageService.GenerateDownloadUrlAsync(key, TimeSpan.FromHours(24), ct);
             return Ok(new { key, url = presignedUrl });
         }
@@ -200,15 +204,18 @@ public class AdminTemplateAiController(
             return StatusCode(500, new { message = $"Gemini model '{model}' did not return an image. The model may not support image generation.", detail = preview });
         }
 
-        var geminiKey = $"templates/{Guid.NewGuid()}.jpg";
-        await storageService.UploadAsync(geminiKey, geminiImageData, "image/jpeg", ct);
+        var geminiOptimised = OptimiseForWeb(geminiImageData);
+        var geminiKey = $"templates/{Guid.NewGuid()}.webp";
+        await storageService.UploadAsync(geminiKey, geminiOptimised, "image/webp", ct);
         var geminiPresignedUrl = await storageService.GenerateDownloadUrlAsync(geminiKey, TimeSpan.FromHours(24), ct);
         return Ok(new { key = geminiKey, url = geminiPresignedUrl });
     }
 
     // ── POST /api/admin/templates/upload-image ────────────────────────────────
     /// <summary>
-    /// Accepts a multipart file upload, stores it in S3, returns key + presigned URL.
+    /// Accepts a multipart file upload, optimises it (resize to max 1200 px wide,
+    /// re-encode as WebP quality 85), stores the result in S3, and returns the key.
+    /// Optimisation happens once here so the proxy never needs to process on-the-fly.
     /// </summary>
     [HttpPost("upload-image")]
     [Consumes("multipart/form-data")]
@@ -224,14 +231,28 @@ public class AdminTemplateAiController(
 
         using var ms = new MemoryStream();
         await file.CopyToAsync(ms, ct);
-        var bytes = ms.ToArray();
+        var optimised = OptimiseForWeb(ms.ToArray());
 
-        var contentType = file.ContentType.StartsWith("image/") ? file.ContentType : "image/jpeg";
-        var key = $"templates/{Guid.NewGuid()}{ext}";
-        await storageService.UploadAsync(key, bytes, contentType, ct);
+        var key = $"templates/{Guid.NewGuid()}.webp";
+        await storageService.UploadAsync(key, optimised, "image/webp", ct);
         var presignedUrl = await storageService.GenerateDownloadUrlAsync(key, TimeSpan.FromHours(24), ct);
 
         return Ok(new { key, url = presignedUrl });
+    }
+
+    // ── Image optimisation ────────────────────────────────────────────────────
+    /// <summary>
+    /// Resizes to at most 1200 px wide (no upscaling) and re-encodes as WebP 85.
+    /// Called once at upload/generation time so serving never needs to process.
+    /// </summary>
+    private static byte[] OptimiseForWeb(byte[] raw)
+    {
+        using var image = Image.Load(raw);
+        if (image.Width > 1200)
+            image.Mutate(x => x.Resize(1200, 0)); // 0 = auto-height
+        using var ms = new MemoryStream();
+        image.SaveAsWebp(ms, new WebpEncoder { Quality = 85 });
+        return ms.ToArray();
     }
 }
 
