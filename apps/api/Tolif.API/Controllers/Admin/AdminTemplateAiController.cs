@@ -47,9 +47,14 @@ public class AdminTemplateAiController(
               "description": "One-sentence description shown in the listing card (max 100 chars)",
               "seoTitle": "SEO page title max 60 chars — include | Tolif at end",
               "seoDescription": "Meta description max 155 chars, compelling, keyword-rich",
-              "uploadSlotsJson": "JSON array string of upload slots e.g. [{\"name\":\"person\",\"label\":\"Your photo\",\"type\":\"person\",\"required\":true}]"
+              "uploadSlotsJson": "JSON array string of upload slots e.g. [{\"name\":\"person\",\"label\":\"Your photo\",\"type\":\"person\",\"required\":true}]",
+              "extraPersonsAllowed": 10,
+              "extraPetsAllowed": 10
             }
-            For uploadSlotsJson: type must be \"person\" or \"pet\". Make slots match the portrait type.
+            For uploadSlotsJson: type must be "person" or "pet". Make slots match the portrait type.
+            For extraPersonsAllowed and extraPetsAllowed: set to the maximum extra subjects a customer can add beyond the fixed slots.
+            Use 10 as default unless the template is clearly fixed (e.g. "Solo portrait" → extraPersonsAllowed: 0, extraPetsAllowed: 0).
+            A family template should allow extra persons (10). A pet-only template should allow extra pets (10). A couple template could allow extra persons (10).
             """;
 
         var userText = $"Generate metadata for this portrait template:\n\n{req.Prompt}";

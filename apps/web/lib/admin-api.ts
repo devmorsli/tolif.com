@@ -109,6 +109,8 @@ export interface GeneratedMetadata {
   seoTitle: string;
   seoDescription: string;
   uploadSlotsJson: string;
+  extraPersonsAllowed?: number;
+  extraPetsAllowed?: number;
 }
 
 export async function getAdminTemplates() {

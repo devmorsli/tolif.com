@@ -238,6 +238,8 @@ function TemplateModal({
           seoTitle: meta.seoTitle ?? f.seoTitle,
           seoDescription: meta.seoDescription ?? f.seoDescription,
           uploadSlotsJson: meta.uploadSlotsJson ?? f.uploadSlotsJson,
+          extraPersonsAllowed: meta.extraPersonsAllowed ?? f.extraPersonsAllowed,
+          extraPetsAllowed: meta.extraPetsAllowed ?? f.extraPetsAllowed,
         }));
       } else {
         setGenError(metaResult.reason instanceof Error ? metaResult.reason.message : "Metadata generation failed. Check your Gemini API key in Settings.");
