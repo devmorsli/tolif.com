@@ -16,7 +16,7 @@ public sealed class PrintfulService(ISettingsService settings, IHttpClientFactor
 {
     private const string BaseUrl = "https://api.printful.com";
 
-    // Required webhook event types (Printful v2 expects an object: { "event_name": {} })
+    // Required webhook event types
     private static readonly string[] RequiredWebhookTypes =
     [
         "package_shipped",
@@ -24,8 +24,9 @@ public sealed class PrintfulService(ISettingsService settings, IHttpClientFactor
         "order_canceled"
     ];
 
-    private static object BuildEventsObject() =>
-        RequiredWebhookTypes.ToDictionary(e => e, _ => new { });
+    // Printful v2 expects: "events": [ { "type": "package_shipped" }, ... ]
+    private static object[] BuildEventsArray() =>
+        RequiredWebhookTypes.Select(e => new { type = e }).ToArray<object>();
 
     private static readonly JsonSerializerOptions Json = new()
     {
@@ -369,9 +370,13 @@ public sealed class PrintfulService(ISettingsService settings, IHttpClientFactor
         if (string.IsNullOrEmpty(url)) return [];
 
         var id    = obj["id"]?.GetValue<long>() ?? 0;
-        // v2 returns events as an object { "event_name": {...} } — keys are the event names
-        var types = obj["events"] is JsonObject eventsObj
-                        ? eventsObj.Select(kv => kv.Key).ToList()
+        // v2 returns events as [ { "type": "package_shipped" }, ... ]
+        var types = obj["events"] is JsonArray eventsArr
+                        ? eventsArr
+                            .OfType<JsonObject>()
+                            .Select(e => e["type"]?.GetValue<string>() ?? "")
+                            .Where(s => s.Length > 0)
+                            .ToList()
                         : (IReadOnlyList<string>)[];
 
         return [new PrintfulWebhook(id, url, types)];
@@ -388,7 +393,7 @@ public sealed class PrintfulService(ISettingsService settings, IHttpClientFactor
         var body = new
         {
             url    = webhookUrl,
-            events = BuildEventsObject(),
+            events = BuildEventsArray(),
         };
         var res = await client.PostAsync("/v2/webhooks", JsonBody(body), ct);
         await EnsureSuccessAsync(res, ct);
