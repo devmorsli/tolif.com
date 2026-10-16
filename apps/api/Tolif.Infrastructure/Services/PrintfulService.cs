@@ -19,7 +19,7 @@ public sealed class PrintfulService(ISettingsService settings, IHttpClientFactor
     // Required webhook event types
     private static readonly string[] RequiredWebhookTypes =
     [
-        "package_shipped",
+        "shipment_sent",    // v2 name for package_shipped
         "order_failed",
         "order_canceled"
     ];

@@ -767,7 +767,7 @@ function PrintfulPage() {
                 <div>
                   <h3 className="text-sm font-semibold text-white mb-1">Register webhooks</h3>
                   <p className="text-xs text-white/40">
-                    Tolif will listen for <code className="text-[#C4622D]">package_shipped</code>,{" "}
+                    Tolif will listen for <code className="text-[#C4622D]">shipment_sent</code>,{" "}
                     <code className="text-[#C4622D]">order_failed</code>, and{" "}
                     <code className="text-[#C4622D]">order_canceled</code> at{" "}
                     <code className="text-white/60">/api/webhooks/printful</code>.

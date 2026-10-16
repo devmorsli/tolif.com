@@ -30,7 +30,7 @@ public class PrintfulWebhookController(
 
         switch (type)
         {
-            case "package_shipped":
+            case "shipment_sent":
                 await HandlePackageShipped(root!, ct);
                 break;
             case "order_failed":
