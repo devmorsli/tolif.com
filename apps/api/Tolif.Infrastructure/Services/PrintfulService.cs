@@ -366,7 +366,7 @@ public sealed class PrintfulService(ISettingsService settings, IHttpClientFactor
         if (string.IsNullOrEmpty(url)) return [];
 
         var id    = obj["id"]?.GetValue<long>() ?? 0;
-        var types = obj["types"]?.AsArray()
+        var types = obj["events"]?.AsArray()
                         .Select(t => t?.GetValue<string>() ?? "")
                         .ToList()
                     ?? (IReadOnlyList<string>)[];
@@ -384,8 +384,8 @@ public sealed class PrintfulService(ISettingsService settings, IHttpClientFactor
 
         var body = new
         {
-            url   = webhookUrl,
-            types = RequiredWebhookTypes,
+            url    = webhookUrl,
+            events = RequiredWebhookTypes,
         };
         var res = await client.PostAsync("/v2/webhooks", JsonBody(body), ct);
         await EnsureSuccessAsync(res, ct);
