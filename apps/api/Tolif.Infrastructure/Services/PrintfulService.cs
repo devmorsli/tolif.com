@@ -16,13 +16,16 @@ public sealed class PrintfulService(ISettingsService settings, IHttpClientFactor
 {
     private const string BaseUrl = "https://api.printful.com";
 
-    // Required webhook event types
+    // Required webhook event types (Printful v2 expects an object: { "event_name": {} })
     private static readonly string[] RequiredWebhookTypes =
     [
         "package_shipped",
         "order_failed",
         "order_canceled"
     ];
+
+    private static object BuildEventsObject() =>
+        RequiredWebhookTypes.ToDictionary(e => e, _ => new { });
 
     private static readonly JsonSerializerOptions Json = new()
     {
@@ -366,10 +369,10 @@ public sealed class PrintfulService(ISettingsService settings, IHttpClientFactor
         if (string.IsNullOrEmpty(url)) return [];
 
         var id    = obj["id"]?.GetValue<long>() ?? 0;
-        var types = obj["events"]?.AsArray()
-                        .Select(t => t?.GetValue<string>() ?? "")
-                        .ToList()
-                    ?? (IReadOnlyList<string>)[];
+        // v2 returns events as an object { "event_name": {...} } — keys are the event names
+        var types = obj["events"] is JsonObject eventsObj
+                        ? eventsObj.Select(kv => kv.Key).ToList()
+                        : (IReadOnlyList<string>)[];
 
         return [new PrintfulWebhook(id, url, types)];
     }
@@ -385,7 +388,7 @@ public sealed class PrintfulService(ISettingsService settings, IHttpClientFactor
         var body = new
         {
             url    = webhookUrl,
-            events = RequiredWebhookTypes,
+            events = BuildEventsObject(),
         };
         var res = await client.PostAsync("/v2/webhooks", JsonBody(body), ct);
         await EnsureSuccessAsync(res, ct);
