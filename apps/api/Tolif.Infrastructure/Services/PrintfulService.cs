@@ -390,12 +390,20 @@ public sealed class PrintfulService(ISettingsService settings, IHttpClientFactor
         // In Printful v2, DELETE /v2/webhooks removes the current config (no ID needed)
         await client.DeleteAsync("/v2/webhooks", ct);
 
-        var body = new
+        // Build JSON manually to guarantee exact field names (bypasses SnakeCaseLower policy)
+        var eventsArray = new JsonArray(
+            RequiredWebhookTypes
+                .Select(e => (JsonNode)new JsonObject { ["type"] = JsonValue.Create(e) })
+                .ToArray()
+        );
+        var payload = new JsonObject
         {
-            url    = webhookUrl,
-            events = BuildEventsArray(),
+            ["url"]    = webhookUrl,
+            ["events"] = eventsArray,
         };
-        var res = await client.PostAsync("/v2/webhooks", JsonBody(body), ct);
+
+        var content = new StringContent(payload.ToJsonString(), Encoding.UTF8, "application/json");
+        var res = await client.PostAsync("/v2/webhooks", content, ct);
         await EnsureSuccessAsync(res, ct);
     }
 }
