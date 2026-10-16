@@ -173,7 +173,15 @@ public class AdminPrintfulController(
     [HttpPost("webhooks/register")]
     public async Task<IActionResult> RegisterWebhooks([FromBody] RegisterWebhooksRequest req, CancellationToken ct)
     {
-        await printful.RegisterWebhooksAsync(req.BaseUrl, ct);
+        try
+        {
+            await printful.RegisterWebhooksAsync(req.BaseUrl, ct);
+        }
+        catch (Exception ex)
+        {
+            return BadRequest(new { error = ex.Message });
+        }
+
         var hooks = await printful.GetWebhooksAsync(ct);
         return Ok(hooks);
     }

@@ -10,6 +10,12 @@ const BYPASS_PATHS = [
   "/sitemap",
 ];
 
+// Module-level cache — middleware runs in the edge runtime where
+// `next: { revalidate }` fetch hints are ignored, so we cache manually.
+let maintenanceCached: boolean | null = null;
+let maintenanceCachedAt = 0;
+const CACHE_TTL_MS = 30_000;
+
 export async function middleware(req: NextRequest) {
   const { pathname } = req.nextUrl;
 
@@ -26,24 +32,27 @@ export async function middleware(req: NextRequest) {
     return NextResponse.next();
   }
 
-  // Check maintenance status from API
+  // Check maintenance status from API (cached for 30 s)
   try {
-    const apiBase =
-      process.env.API_INTERNAL_URL ??
-      process.env.NEXT_PUBLIC_API_URL ??
-      "http://localhost:5000";
+    const now = Date.now();
+    if (maintenanceCached === null || now - maintenanceCachedAt > CACHE_TTL_MS) {
+      const apiBase =
+        process.env.API_INTERNAL_URL ??
+        process.env.NEXT_PUBLIC_API_URL ??
+        "http://localhost:5000";
 
-    const res = await fetch(`${apiBase}/api/settings/maintenance`, {
-      next: { revalidate: 30 },
-    });
-
-    if (res.ok) {
-      const data: { enabled: boolean } = await res.json();
-      if (data.enabled) {
-        const url = req.nextUrl.clone();
-        url.pathname = "/maintenance";
-        return NextResponse.rewrite(url);
+      const res = await fetch(`${apiBase}/api/settings/maintenance`);
+      if (res.ok) {
+        const data: { enabled: boolean } = await res.json();
+        maintenanceCached  = data.enabled;
+        maintenanceCachedAt = now;
       }
+    }
+
+    if (maintenanceCached) {
+      const url = req.nextUrl.clone();
+      url.pathname = "/maintenance";
+      return NextResponse.rewrite(url);
     }
   } catch {
     // If the API is unreachable, don't block the storefront
