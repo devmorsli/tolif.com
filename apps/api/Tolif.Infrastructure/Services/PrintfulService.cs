@@ -363,22 +363,35 @@ public sealed class PrintfulService(ISettingsService settings, IHttpClientFactor
 
         if (data is null) return [];
 
-        // Printful v2 returns a single webhook object, not an array
-        if (data is not JsonObject obj) return [];
+        // Printful v2: data may be a single object or an array of event subscriptions
+        IReadOnlyList<string> types;
+        string url;
+        long   id;
 
-        var url = obj["url"]?.GetValue<string>() ?? "";
+        if (data is JsonObject obj)
+        {
+            // Root-level url + events array
+            url   = obj["url"]?.GetValue<string>() ?? "";
+            id    = obj["id"]?.GetValue<long>() ?? 0;
+            types = obj["events"] is JsonArray arr
+                        ? arr.OfType<JsonObject>()
+                             .Select(e => e["type"]?.GetValue<string>() ?? "")
+                             .Where(s => s.Length > 0).ToList()
+                        : [];
+        }
+        else if (data is JsonArray dataArr)
+        {
+            // Per-event array — extract url from first event
+            var firstEvent = dataArr.OfType<JsonObject>().FirstOrDefault();
+            url   = firstEvent?["url"]?.GetValue<string>() ?? "";
+            id    = firstEvent?["id"]?.GetValue<long>() ?? 0;
+            types = dataArr.OfType<JsonObject>()
+                           .Select(e => e["type"]?.GetValue<string>() ?? "")
+                           .Where(s => s.Length > 0).ToList();
+        }
+        else return [];
+
         if (string.IsNullOrEmpty(url)) return [];
-
-        var id    = obj["id"]?.GetValue<long>() ?? 0;
-        // v2 returns events as [ { "type": "package_shipped" }, ... ]
-        var types = obj["events"] is JsonArray eventsArr
-                        ? eventsArr
-                            .OfType<JsonObject>()
-                            .Select(e => e["type"]?.GetValue<string>() ?? "")
-                            .Where(s => s.Length > 0)
-                            .ToList()
-                        : (IReadOnlyList<string>)[];
-
         return [new PrintfulWebhook(id, url, types)];
     }
 
@@ -390,15 +403,18 @@ public sealed class PrintfulService(ISettingsService settings, IHttpClientFactor
         // In Printful v2, DELETE /v2/webhooks removes the current config (no ID needed)
         await client.DeleteAsync("/v2/webhooks", ct);
 
-        // Build JSON manually to guarantee exact field names (bypasses SnakeCaseLower policy)
+        // Printful v2: each event carries its own url
         var eventsArray = new JsonArray(
             RequiredWebhookTypes
-                .Select(e => (JsonNode)new JsonObject { ["type"] = JsonValue.Create(e) })
+                .Select(e => (JsonNode)new JsonObject
+                {
+                    ["type"] = JsonValue.Create(e),
+                    ["url"]  = JsonValue.Create(webhookUrl),
+                })
                 .ToArray()
         );
         var payload = new JsonObject
         {
-            ["url"]    = webhookUrl,
             ["events"] = eventsArray,
         };
 
