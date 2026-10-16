@@ -1,9 +1,11 @@
+using Hangfire;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using Tolif.Application.Helpers;
 using Tolif.Application.Interfaces;
 using Tolif.Domain.Enums;
+using Tolif.Infrastructure.Jobs;
 
 namespace Tolif.API.Controllers.Admin;
 
@@ -12,7 +14,8 @@ namespace Tolif.API.Controllers.Admin;
 [Authorize(Roles = "Admin")]
 public class AdminOrdersController(
     IApplicationDbContext db,
-    IOrderEmailService    orderEmail) : ControllerBase
+    IOrderEmailService    orderEmail,
+    IBackgroundJobClient  hangfire) : ControllerBase
 {
     private static readonly OrderStatus[] PaidStatuses =
     [
@@ -71,6 +74,11 @@ public class AdminOrdersController(
                 o.TotalAmount,
                 o.Currency,
                 o.CreatedAt,
+                printStatus   = db.PrintOrders
+                    .Where(p => p.OrderId == o.Id)
+                    .OrderByDescending(p => p.CreatedAt)
+                    .Select(p => p.Status)
+                    .FirstOrDefault(),
             })
             .ToListAsync(ct);
 
@@ -84,6 +92,7 @@ public class AdminOrdersController(
             o.TotalAmount,
             o.Currency,
             o.CreatedAt,
+            o.printStatus,
         });
 
         return Ok(new { items, total, page, pageSize, revenue });
@@ -272,6 +281,37 @@ public class AdminOrdersController(
         }
     }
 
+    // ── POST /api/admin/orders/{id}/submit-to-printful ───────────────────────
+    /// <summary>Manually submit a single paid order to Printful (ignores autoSubmit setting).</summary>
+    [HttpPost("{id:guid}/submit-to-printful")]
+    public async Task<IActionResult> SubmitToPrintful(Guid id, CancellationToken ct)
+    {
+        var exists = await db.Orders.AnyAsync(o => o.Id == id, ct);
+        if (!exists) return NotFound();
+
+        hangfire.Enqueue<SubmitPrintOrderJob>(j => j.ForceExecuteAsync(id, CancellationToken.None));
+        return Ok(new { queued = true });
+    }
+
+    // ── POST /api/admin/orders/submit-bulk ────────────────────────────────────
+    /// <summary>Manually submit multiple paid orders to Printful in bulk.</summary>
+    [HttpPost("submit-bulk")]
+    public async Task<IActionResult> SubmitBulk([FromBody] BulkSubmitRequest req, CancellationToken ct)
+    {
+        if (req.Ids is not { Count: > 0 })
+            return BadRequest(new { message = "No order IDs provided." });
+
+        var validIds = await db.Orders
+            .Where(o => req.Ids.Contains(o.Id))
+            .Select(o => o.Id)
+            .ToListAsync(ct);
+
+        foreach (var id in validIds)
+            hangfire.Enqueue<SubmitPrintOrderJob>(j => j.ForceExecuteAsync(id, CancellationToken.None));
+
+        return Ok(new { queued = validIds.Count });
+    }
+
     // ── POST /api/admin/orders/abandonment-campaign ───────────────────────────
     [HttpPost("abandonment-campaign")]
     public async Task<IActionResult> SendAbandonmentCampaign(CancellationToken ct)
@@ -299,3 +339,5 @@ public class AdminOrdersController(
         return Ok(new { sent, failed, total = orders.Count });
     }
 }
+
+public record BulkSubmitRequest(List<Guid> Ids);

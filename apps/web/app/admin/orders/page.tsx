@@ -3,13 +3,14 @@
 import { useEffect, useState, useCallback } from "react";
 import {
   Search, TrendingUp, ShoppingBag, AlertCircle, Mail,
-  Clock, Calendar, X, RefreshCw, Send, CheckCircle,
+  Clock, Calendar, X, RefreshCw, Send, CheckCircle, Printer,
 } from "lucide-react";
 import { AdminGuard } from "@/components/admin/AdminGuard";
 import { AdminSidebar } from "@/components/admin/AdminSidebar";
 import {
   getOrders, getOrderStats, getAbandonedCarts,
   sendAbandonmentEmail, sendAbandonmentCampaign,
+  submitOrderToPrintful, bulkSubmitOrdersToPrintful,
   type OrderListItem, type OrdersPage,
   type OrderStats, type AbandonedCartItem, type AbandonedCartsPage,
 } from "@/lib/admin-api";
@@ -103,6 +104,12 @@ function OrdersView() {
   const [customFrom,  setCustomFrom]  = useState("");
   const [customTo,    setCustomTo]    = useState("");
 
+  // Bulk / Printful
+  const [selected,      setSelected]      = useState<Set<string>>(new Set());
+  const [submitting,    setSubmitting]    = useState<string | null>(null);  // single order id
+  const [bulkSending,   setBulkSending]   = useState(false);
+  const [successIds,    setSuccessIds]    = useState<Set<string>>(new Set());
+
   const getDateRange = useCallback(() => {
     if (period === "custom") {
       return {
@@ -127,6 +134,47 @@ function OrdersView() {
   const handlePeriod = (p: Period) => { setPeriod(p); setPage(1); };
   const handleStatus = (s: string) => { setStatus(s); setPage(1); };
   const handleSearch = () => { setSearch(searchInput); setPage(1); };
+
+  const handleSendOne = async (id: string, e: React.MouseEvent) => {
+    e.preventDefault();
+    setSubmitting(id);
+    try {
+      await submitOrderToPrintful(id);
+      setSuccessIds(prev => new Set(prev).add(id));
+    } catch { /* button reverts */ }
+    finally { setSubmitting(null); }
+  };
+
+  const handleBulkSend = async () => {
+    if (selected.size === 0) return;
+    setBulkSending(true);
+    try {
+      await bulkSubmitOrdersToPrintful([...selected]);
+      setSuccessIds(prev => new Set([...prev, ...selected]));
+      setSelected(new Set());
+    } catch { /* silent */ }
+    finally { setBulkSending(false); }
+  };
+
+  const toggleSelect = (id: string) => {
+    setSelected(prev => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id); else next.add(id);
+      return next;
+    });
+  };
+
+  const toggleSelectAll = () => {
+    if (!data) return;
+    const paidIds = data.items
+      .filter(o => ["Paid","Ready","GeneratingHighRes"].includes(o.status))
+      .map(o => o.id);
+    if (paidIds.every(id => selected.has(id))) {
+      setSelected(new Set());
+    } else {
+      setSelected(new Set(paidIds));
+    }
+  };
 
   const totalPages = data ? Math.ceil(data.total / data.pageSize) : 1;
 
@@ -238,6 +286,30 @@ function OrdersView() {
         </div>
       )}
 
+      {selected.size > 0 && (
+        <div className="flex items-center justify-between bg-[#1A1714] text-white rounded-xl px-5 py-3 mb-4">
+          <p className="text-sm font-medium">{selected.size} order{selected.size !== 1 ? "s" : ""} selected</p>
+          <div className="flex items-center gap-3">
+            <button
+              onClick={() => setSelected(new Set())}
+              className="text-xs text-white/60 hover:text-white transition-colors"
+            >
+              Clear
+            </button>
+            <button
+              onClick={handleBulkSend}
+              disabled={bulkSending}
+              className="flex items-center gap-1.5 px-4 py-1.5 rounded-lg bg-[#C4622D] hover:bg-[#9E4A1E] text-sm font-semibold transition-colors disabled:opacity-60"
+            >
+              {bulkSending
+                ? <div className="w-3.5 h-3.5 border-2 border-white/40 border-t-white rounded-full animate-spin" />
+                : <Printer size={13} />}
+              Send to Printful
+            </button>
+          </div>
+        </div>
+      )}
+
       {error && (
         <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 text-amber-800 text-sm mb-4">
           <strong>API error:</strong> {error}
@@ -246,9 +318,19 @@ function OrdersView() {
 
       {/* Table */}
       <div className="bg-white rounded-2xl border border-[#E4D8CC] overflow-hidden">
-        <div className="grid grid-cols-[1fr_auto_auto_auto] gap-4 px-6 py-3 bg-[#FAF6F0] border-b border-[#E4D8CC] text-xs font-semibold text-[#8C7B6B] uppercase tracking-wider">
+        <div className="grid grid-cols-[auto_1fr_auto_auto_auto_auto] gap-4 px-6 py-3 bg-[#FAF6F0] border-b border-[#E4D8CC] text-xs font-semibold text-[#8C7B6B] uppercase tracking-wider">
+          <input
+            type="checkbox"
+            className="rounded accent-[#C4622D]"
+            onChange={toggleSelectAll}
+            checked={
+              !!(data?.items.filter(o => ["Paid","Ready","GeneratingHighRes"].includes(o.status)).length) &&
+              data!.items.filter(o => ["Paid","Ready","GeneratingHighRes"].includes(o.status)).every(o => selected.has(o.id))
+            }
+          />
           <span>Customer</span>
           <span>Status</span>
+          <span>Print</span>
           <span>Amount</span>
           <span>Date</span>
         </div>
@@ -263,30 +345,71 @@ function OrdersView() {
           <p className="text-sm text-[#8C7B6B] text-center py-12">No orders found.</p>
         )}
 
-        {data?.items.map((order: OrderListItem) => (
-          <Link
-            key={order.id}
-            href={`/admin/orders/${order.id}`}
-            className="grid grid-cols-[1fr_auto_auto_auto] gap-4 items-center px-6 py-4 border-b border-[#F2EAE0] last:border-0 hover:bg-[#FAF6F0] transition-colors"
-          >
-            <div>
-              {order.customerName && (
-                <p className="text-sm font-medium text-[#1A1714]">{order.customerName}</p>
+        {data?.items.map((order: OrderListItem) => {
+          const canSubmit = ["Paid", "Ready", "GeneratingHighRes"].includes(order.status) && !order.printStatus;
+          const isSending = submitting === order.id;
+          const isDone    = successIds.has(order.id) || (order.printStatus != null && order.printStatus !== "");
+
+          return (
+            <div
+              key={order.id}
+              className="grid grid-cols-[auto_1fr_auto_auto_auto_auto] gap-4 items-center px-6 py-4 border-b border-[#F2EAE0] last:border-0 hover:bg-[#FAF6F0] transition-colors"
+            >
+              {/* Checkbox — only for orders eligible for Printful */}
+              <input
+                type="checkbox"
+                className="rounded accent-[#C4622D]"
+                checked={selected.has(order.id)}
+                onChange={() => toggleSelect(order.id)}
+                disabled={!canSubmit}
+                onClick={e => e.stopPropagation()}
+              />
+
+              {/* Customer — clicking navigates to detail */}
+              <Link href={`/admin/orders/${order.id}`} className="min-w-0">
+                {order.customerName && (
+                  <p className="text-sm font-medium text-[#1A1714] truncate">{order.customerName}</p>
+                )}
+                <p className={`text-sm text-[#${order.customerName ? "8C7B6B" : "1A1714"}] truncate`}>{order.customerEmail}</p>
+                <p className="text-xs text-[#8C7B6B] mt-0.5 font-mono">{order.orderNumber ?? order.id.slice(0, 12) + "…"}</p>
+              </Link>
+
+              <span className={`text-xs font-medium px-2.5 py-1 rounded-full whitespace-nowrap ${STATUS_COLORS[order.status] ?? "bg-gray-100 text-gray-800"}`}>
+                {STATUS_LABELS[order.status] ?? order.status}
+              </span>
+
+              {/* Print status / send button */}
+              {isDone ? (
+                <span className="text-xs font-medium px-2.5 py-1 rounded-full bg-indigo-50 text-indigo-700 whitespace-nowrap">
+                  {order.printStatus ?? "Queued"}
+                </span>
+              ) : canSubmit ? (
+                <button
+                  onClick={(e) => handleSendOne(order.id, e)}
+                  disabled={isSending}
+                  className="flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-semibold
+                             bg-[#F5F0EA] text-[#5A4E46] border border-[#E4D8CC]
+                             hover:bg-[#C4622D] hover:text-white hover:border-[#C4622D]
+                             transition-all duration-200 disabled:opacity-60 whitespace-nowrap"
+                >
+                  {isSending
+                    ? <div className="w-3 h-3 border border-current border-t-transparent rounded-full animate-spin" />
+                    : <Printer size={11} />}
+                  Send
+                </button>
+              ) : (
+                <span className="text-xs text-[#C8BAB0]">—</span>
               )}
-              <p className={`text-sm text-[#${order.customerName ? "8C7B6B" : "1A1714"}]`}>{order.customerEmail}</p>
-              <p className="text-xs text-[#8C7B6B] mt-0.5 font-mono">{order.orderNumber ?? order.id.slice(0, 12) + "…"}</p>
+
+              <span className="text-sm font-semibold text-[#1A1714]">
+                {order.currency} {order.totalAmount.toFixed(2)}
+              </span>
+              <span className="text-xs text-[#8C7B6B]">
+                {new Date(order.createdAt).toLocaleDateString()}
+              </span>
             </div>
-            <span className={`text-xs font-medium px-2.5 py-1 rounded-full whitespace-nowrap ${STATUS_COLORS[order.status] ?? "bg-gray-100 text-gray-800"}`}>
-              {STATUS_LABELS[order.status] ?? order.status}
-            </span>
-            <span className="text-sm font-semibold text-[#1A1714]">
-              {order.currency} {order.totalAmount.toFixed(2)}
-            </span>
-            <span className="text-xs text-[#8C7B6B]">
-              {new Date(order.createdAt).toLocaleDateString()}
-            </span>
-          </Link>
-        ))}
+          );
+        })}
       </div>
 
       {/* Pagination */}

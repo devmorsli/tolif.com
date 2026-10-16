@@ -12,7 +12,7 @@ namespace Tolif.API.Controllers;
 /// </summary>
 [ApiController]
 [Route("api/orders")]
-public class OrdersController(IApplicationDbContext db) : ControllerBase
+public class OrdersController(IApplicationDbContext db, IStorageService storage) : ControllerBase
 {
     // ── GET /api/orders/{accessToken} ─────────────────────────────────────────
     /// <summary>
@@ -57,6 +57,7 @@ public class OrdersController(IApplicationDbContext db) : ControllerBase
             // Client uses sessionId to build the preview image URL
             sessionId     = i.PortraitSession?.Id as Guid?,
             hasPreview    = i.PortraitSession?.WatermarkedPreviewKey != null,
+            hasFinalImage = i.PortraitSession?.FinalImageKey != null,
         }).ToList();
 
         return Ok(new
@@ -75,6 +76,53 @@ public class OrdersController(IApplicationDbContext db) : ControllerBase
                 i.ProductVariant?.Product?.Type == Domain.Enums.ProductType.Digital
                 || i.ProductVariant?.Product?.Name?.Contains("Digital", StringComparison.OrdinalIgnoreCase) == true),
         });
+    }
+
+    // ── GET /api/orders/{accessToken}/download/{sessionId} ────────────────────
+    /// <summary>
+    /// Generates a short-lived presigned URL for the final (watermark-free) portrait
+    /// and redirects the browser to it, triggering a download.
+    /// Only works for paid orders that have a final image generated.
+    /// </summary>
+    [HttpGet("{accessToken}/download/{sessionId:guid}")]
+    public async Task<IActionResult> Download(string accessToken, Guid sessionId, CancellationToken ct)
+    {
+        if (string.IsNullOrWhiteSpace(accessToken) || accessToken.Length < 16)
+            return BadRequest(new { message = "Invalid access token." });
+
+        var order = await db.Orders
+            .Include(o => o.Items)
+                .ThenInclude(i => i.PortraitSession)
+            .AsNoTracking()
+            .FirstOrDefaultAsync(o => o.AccessToken == accessToken, ct);
+
+        if (order is null)
+            return NotFound(new { message = "Order not found." });
+
+        // Must be paid
+        var paidStatuses = new[]
+        {
+            Domain.Enums.OrderStatus.Paid,
+            Domain.Enums.OrderStatus.GeneratingHighRes,
+            Domain.Enums.OrderStatus.Ready,
+            Domain.Enums.OrderStatus.SubmittedToPrinter,
+            Domain.Enums.OrderStatus.Shipped,
+        };
+        if (!paidStatuses.Contains(order.Status))
+            return BadRequest(new { message = "Order has not been paid." });
+
+        // Session must belong to this order
+        var item = order.Items.FirstOrDefault(i => i.PortraitSessionId == sessionId);
+        if (item is null)
+            return NotFound(new { message = "Session not found in this order." });
+
+        var finalKey = item.PortraitSession?.FinalImageKey;
+        if (string.IsNullOrEmpty(finalKey))
+            return NotFound(new { message = "High-resolution file is not ready yet. Please try again in a moment." });
+
+        // Generate a presigned URL valid for 30 days
+        var presignedUrl = await storage.GenerateDownloadUrlAsync(finalKey, TimeSpan.FromDays(30), ct);
+        return Redirect(presignedUrl);
     }
 
     // ── Private helpers ───────────────────────────────────────────────────────

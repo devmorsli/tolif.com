@@ -77,6 +77,7 @@ const SETTING_GROUPS = [
     icon: "🖨️",
     settings: [
       { key: "print.defaultProvider", label: "Default Provider", type: "select", options: ["printful", "printify"] },
+      { key: "print.autoSubmit", label: "Auto-submit orders to Printful", type: "select", options: ["true", "false"] },
       { key: "printful.api_key", label: "Printful API Key", type: "password", placeholder: "••••••••", sensitive: true },
       { key: "printify.api_key", label: "Printify API Key", type: "password", placeholder: "••••••••", sensitive: true },
       { key: "printify.shop_id", label: "Printify Shop ID", type: "text", placeholder: "12345" },

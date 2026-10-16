@@ -18,7 +18,29 @@ public class SubmitPrintOrderJob(
     ISettingsService                  settings,
     ILogger<SubmitPrintOrderJob>      logger)
 {
+    /// <summary>
+    /// Called by Hangfire automatically after payment — respects the print.autoSubmit setting.
+    /// </summary>
     public async Task ExecuteAsync(Guid orderId, CancellationToken ct = default)
+    {
+        var autoSubmit = await settings.GetAsync("print.autoSubmit", ct) ?? "true";
+        if (string.Equals(autoSubmit, "false", StringComparison.OrdinalIgnoreCase))
+        {
+            logger.LogInformation(
+                "print.autoSubmit is disabled — skipping auto-submission for order {OrderId}", orderId);
+            return;
+        }
+
+        await RunAsync(orderId, ct);
+    }
+
+    /// <summary>
+    /// Called by the admin panel for manual or bulk submission — always submits regardless of autoSubmit setting.
+    /// </summary>
+    public Task ForceExecuteAsync(Guid orderId, CancellationToken ct = default) =>
+        RunAsync(orderId, ct);
+
+    private async Task RunAsync(Guid orderId, CancellationToken ct)
     {
         logger.LogInformation("SubmitPrintOrderJob starting for order {OrderId}", orderId);
 
@@ -48,7 +70,7 @@ public class SubmitPrintOrderJob(
         }
 
         // Determine provider (admin setting, default Printful)
-        var providerName  = await settings.GetAsync("print.activeProvider", ct) ?? "Printful";
+        var providerName  = await settings.GetAsync("print.defaultProvider", ct) ?? "Printful";
         var providerEnum  = Enum.TryParse<PrintProvider>(providerName, out var pe) ? pe : PrintProvider.Printful;
         var provider      = printProviders.FirstOrDefault(p => p.ProviderType == providerEnum)
                             ?? printProviders.First();

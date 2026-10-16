@@ -182,6 +182,7 @@ export interface OrderListItem {
   customerEmail: string;
   customerName?: string;
   status: string;
+  printStatus?: string;
   totalAmount: number;
   currency: string;
   createdAt: string;
@@ -291,6 +292,19 @@ export async function sendAbandonmentCampaign() {
     "/api/admin/orders/abandonment-campaign",
     { method: "POST" }
   );
+}
+
+export async function submitOrderToPrintful(id: string) {
+  return apiFetch<{ queued: boolean }>(`/api/admin/orders/${id}/submit-to-printful`, {
+    method: "POST",
+  });
+}
+
+export async function bulkSubmitOrdersToPrintful(ids: string[]) {
+  return apiFetch<{ queued: number }>("/api/admin/orders/submit-bulk", {
+    method: "POST",
+    body: JSON.stringify({ ids }),
+  });
 }
 
 // ── Settings ──────────────────────────────────────────────────────────────────

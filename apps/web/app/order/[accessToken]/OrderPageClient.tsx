@@ -17,6 +17,7 @@ interface OrderItem {
   currency: string;
   sessionId: string | null;
   hasPreview: boolean;
+  hasFinalImage: boolean;
 }
 
 interface Order {
@@ -54,11 +55,15 @@ function getStatusIndex(status: string): number {
 function PortraitThumb({
   item,
   apiBase,
+  accessToken,
+  isPaid,
 }: {
   item: OrderItem;
   apiBase: string;
+  accessToken: string;
+  isPaid: boolean;
 }) {
-  if (!item.hasPreview || !item.sessionId) {
+  if (!item.sessionId) {
     return (
       <div
         className="w-full h-full flex items-center justify-center"
@@ -71,6 +76,33 @@ function PortraitThumb({
       </div>
     );
   }
+
+  // Show the clean final image for paid orders that have it ready
+  if (isPaid && item.hasFinalImage) {
+    return (
+      // eslint-disable-next-line @next/next/no-img-element
+      <img
+        src={`${apiBase}/api/orders/${accessToken}/download/${item.sessionId}`}
+        alt="Your portrait"
+        className="w-full h-full object-cover"
+      />
+    );
+  }
+
+  if (!item.hasPreview) {
+    return (
+      <div
+        className="w-full h-full flex items-center justify-center"
+        style={{
+          background:
+            "linear-gradient(135deg,rgba(196,98,45,0.15) 0%,rgba(45,74,62,0.12) 100%)",
+        }}
+      >
+        <span style={{ fontSize: 36, opacity: 0.3 }}>🎨</span>
+      </div>
+    );
+  }
+
   return (
     // eslint-disable-next-line @next/next/no-img-element
     <img
@@ -157,7 +189,12 @@ export function OrderPageClient({
 
   const isPaid   = ["Paid", "GeneratingHighRes", "Ready", "SubmittedToPrinter", "Shipped"].includes(order.status);
   const isShipped = order.status === "Shipped";
-  const downloadUrl = `/order/${accessToken}`;
+
+  // Find the first item that has a final (watermark-free) image ready
+  const downloadItem = order.items.find(i => i.hasFinalImage && i.sessionId);
+  const downloadUrl  = downloadItem
+    ? `${apiBase}/api/orders/${accessToken}/download/${downloadItem.sessionId}`
+    : null;
 
   return (
     <div
@@ -246,24 +283,31 @@ export function OrderPageClient({
           style={{ boxShadow: "0 2px 20px rgba(26,23,20,0.06)" }}
         >
           {/* Portrait preview strip */}
-          {order.items[0]?.hasPreview && (
+          {(order.items[0]?.hasPreview || order.items[0]?.hasFinalImage) && (
             <div
               className="relative w-full overflow-hidden"
               style={{ height: 220, background: "#1A1714" }}
             >
-              <PortraitThumb item={order.items[0]} apiBase={apiBase} />
-              {/* Watermark notice overlay */}
-              <div
-                className="absolute inset-0 flex items-end p-4"
-                style={{
-                  background:
-                    "linear-gradient(to top,rgba(26,23,20,0.7) 0%,transparent 55%)",
-                }}
-              >
-                <p className="text-white/70 text-xs">
-                  Watermarked preview · Full resolution available after download
-                </p>
-              </div>
+              <PortraitThumb
+                item={order.items[0]}
+                apiBase={apiBase}
+                accessToken={accessToken}
+                isPaid={isPaid}
+              />
+              {/* Show watermark notice only when showing the watermarked preview */}
+              {!(isPaid && order.items[0]?.hasFinalImage) && (
+                <div
+                  className="absolute inset-0 flex items-end p-4"
+                  style={{
+                    background:
+                      "linear-gradient(to top,rgba(26,23,20,0.7) 0%,transparent 55%)",
+                  }}
+                >
+                  <p className="text-white/70 text-xs">
+                    Watermarked preview · Full resolution available after download
+                  </p>
+                </div>
+              )}
             </div>
           )}
 
@@ -381,7 +425,7 @@ export function OrderPageClient({
           transition={{ delay: 0.8, duration: 0.5 }}
           className="space-y-3"
         >
-          {order.hasDigital && isPaid && (
+          {order.hasDigital && isPaid && downloadUrl && (
             <a
               href={downloadUrl}
               className="w-full flex items-center justify-center gap-2 py-4 rounded-full
@@ -392,6 +436,13 @@ export function OrderPageClient({
               <Download size={15} />
               Download Your Portrait
             </a>
+          )}
+          {order.hasDigital && isPaid && !downloadUrl && (
+            <div className="w-full flex items-center justify-center gap-2 py-4 rounded-full
+                            bg-[#F5F0EA] text-[#8C7B6B] text-sm border border-[#E4D8CC]">
+              <Clock size={15} />
+              Preparing your file… check back shortly
+            </div>
           )}
 
           <div className="grid grid-cols-2 gap-3">
