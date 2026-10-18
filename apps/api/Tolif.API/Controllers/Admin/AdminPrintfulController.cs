@@ -1,5 +1,6 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.EntityFrameworkCore;
 using System.Text.Json;
 using Tolif.Application.Interfaces;
 
@@ -10,7 +11,8 @@ namespace Tolif.API.Controllers.Admin;
 [Authorize]
 public class AdminPrintfulController(
     IPrintfulService printful,
-    ISettingsService settings) : ControllerBase
+    ISettingsService settings,
+    IApplicationDbContext db) : ControllerBase
 {
     private static readonly JsonSerializerOptions JsonOpts = new()
     {
@@ -187,4 +189,49 @@ public class AdminPrintfulController(
     }
 
     public record RegisterWebhooksRequest(string BaseUrl);
+
+    // ── Variant mappings (writes directly to ProductVariant entity) ────────────
+
+    /// <summary>
+    /// Set the Printful variant ID directly on a ProductVariant entity.
+    /// This is what SubmitPrintOrderJob reads when submitting to Printful.
+    /// </summary>
+    [HttpPost("set-variant-id")]
+    public async Task<IActionResult> SetVariantId([FromBody] SetVariantIdRequest req, CancellationToken ct)
+    {
+        var variant = await db.ProductVariants.FindAsync([req.ProductVariantId], ct);
+        if (variant is null) return NotFound();
+        variant.PrintfulVariantId = string.IsNullOrWhiteSpace(req.PrintfulVariantId) ? null : req.PrintfulVariantId.Trim();
+        variant.UpdatedAt = DateTime.UtcNow;
+        await db.SaveChangesAsync(ct);
+        return Ok(new { variant.Id, variant.PrintfulVariantId });
+    }
+
+    /// <summary>
+    /// Return all ProductVariants with their current PrintfulVariantId so the
+    /// mapping UI can show which are already mapped.
+    /// </summary>
+    [HttpGet("variant-mappings")]
+    public async Task<IActionResult> GetVariantMappings(CancellationToken ct)
+    {
+        var variants = await db.ProductVariants
+            .Include(v => v.Product)
+            .Where(v => v.IsActive)
+            .OrderBy(v => v.Product.Name)
+            .ThenBy(v => v.Size)
+            .Select(v => new
+            {
+                v.Id,
+                v.Size,
+                v.Price,
+                v.Currency,
+                v.PrintfulVariantId,
+                productName = v.Product.Name,
+                productType = v.Product.Type.ToString(),
+            })
+            .ToListAsync(ct);
+        return Ok(variants);
+    }
+
+    public record SetVariantIdRequest(Guid ProductVariantId, string? PrintfulVariantId);
 }

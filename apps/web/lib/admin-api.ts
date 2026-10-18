@@ -432,6 +432,27 @@ export async function registerPrintfulWebhooks(baseUrl: string) {
   });
 }
 
+export interface VariantMapping {
+  id: string;
+  size: string;
+  price: number;
+  currency: string;
+  printfulVariantId?: string;
+  productName: string;
+  productType: string;
+}
+
+export async function getVariantMappings() {
+  return apiFetch<VariantMapping[]>("/api/admin/printful/variant-mappings");
+}
+
+export async function setPrintfulVariantId(productVariantId: string, printfulVariantId: string | null) {
+  return apiFetch<{ id: string; printfulVariantId: string | null }>(
+    "/api/admin/printful/set-variant-id",
+    { method: "POST", body: JSON.stringify({ productVariantId, printfulVariantId }) }
+  );
+}
+
 // ── Storage ───────────────────────────────────────────────────────────────────
 
 /** Returns the URL that will redirect to a short-lived presigned download URL. */

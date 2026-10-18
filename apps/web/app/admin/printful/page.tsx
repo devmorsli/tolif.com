@@ -8,18 +8,18 @@ import {
   getPrintfulConnection,
   syncPrintfulCatalog,
   getPrintfulCatalog,
-  getPrintfulMappings,
-  savePrintfulMappings,
   getPrintfulWebhooks,
   registerPrintfulWebhooks,
   getPrintfulProductVariants,
   getPrintfulCategories,
   syncPrintfulCategory,
+  getVariantMappings,
+  setPrintfulVariantId,
   type PrintfulProduct,
   type PrintfulVariant,
-  type PrintfulMapping,
   type PrintfulWebhook,
   type PrintfulCategory,
+  type VariantMapping,
 } from "@/lib/admin-api";
 import {
   RefreshCw,
@@ -29,7 +29,6 @@ import {
   Package,
   Link2,
   Webhook,
-  Save,
   Loader2,
   AlertCircle,
   ChevronDown,
@@ -40,24 +39,14 @@ import {
 
 type Tab = "catalog" | "mappings" | "webhooks";
 
-// ── Our product IDs that need a Printful variant mapped ───────────────────────
-const OUR_PRODUCTS = [
-  { id: "poster-black-12x16",   label: "Poster · Black frame · 12×16\"" },
-  { id: "poster-redoak-12x16",  label: "Poster · Red Oak frame · 12×16\"" },
-  { id: "poster-white-12x16",   label: "Poster · White frame · 12×16\"" },
-  { id: "poster-none-12x16",    label: "Poster · No frame · 12×16\"" },
-  { id: "poster-black-18x24",   label: "Poster · Black frame · 18×24\"" },
-  { id: "poster-redoak-18x24",  label: "Poster · Red Oak frame · 18×24\"" },
-  { id: "poster-white-18x24",   label: "Poster · White frame · 18×24\"" },
-  { id: "poster-none-18x24",    label: "Poster · No frame · 18×24\"" },
-  { id: "poster-black-24x36",   label: "Poster · Black frame · 24×36\"" },
-  { id: "poster-redoak-24x36",  label: "Poster · Red Oak frame · 24×36\"" },
-  { id: "poster-white-24x36",   label: "Poster · White frame · 24×36\"" },
-  { id: "poster-none-24x36",    label: "Poster · No frame · 24×36\"" },
-  { id: "canvas-none-12x16",    label: "Canvas · 12×16\"" },
-  { id: "canvas-none-18x24",    label: "Canvas · 18×24\"" },
-  { id: "canvas-none-24x36",    label: "Canvas · 24×36\"" },
-];
+/** Convert a Printful size string like "12x16" or "12×16\"" to "30 × 40 cm" format */
+function inchToCm(size: string): string {
+  const match = size.replace(/["""]/g, "").match(/(\d+(?:\.\d+)?)\s*[x×]\s*(\d+(?:\.\d+)?)/i);
+  if (!match) return "";
+  const w = Math.round(parseFloat(match[1]) * 2.54);
+  const h = Math.round(parseFloat(match[2]) * 2.54);
+  return `${w} × ${h} cm`;
+}
 
 // ── Pill component ─────────────────────────────────────────────────────────────
 function StatusPill({
@@ -87,18 +76,18 @@ function StatusPill({
 // ── Assign modal (portal — never clipped by overflow containers) ──────────────
 function AssignModal({
   variant,
-  mappings,
+  dbVariants,
   onAssign,
   onClose,
 }: {
   variant: PrintfulVariant;
-  mappings: PrintfulMapping[];
-  onAssign: (ourProductId: string, variantId: number) => void;
+  dbVariants: VariantMapping[];
+  onAssign: (dbVariantId: string, printfulVariantId: number) => void;
   onClose: () => void;
 }) {
   const ref = useRef<HTMLDivElement>(null);
+  const cmEquiv = inchToCm(variant.size ?? variant.name);
 
-  // Close on Escape
   useEffect(() => {
     const handler = (e: KeyboardEvent) => { if (e.key === "Escape") onClose(); };
     document.addEventListener("keydown", handler);
@@ -110,51 +99,52 @@ function AssignModal({
       className="fixed inset-0 z-50 flex items-center justify-center p-4"
       onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}
     >
-      {/* backdrop */}
       <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" />
-
-      {/* panel */}
       <div
         ref={ref}
         className="relative w-full max-w-md bg-[#1A1714] border border-white/15 rounded-2xl shadow-2xl overflow-hidden"
       >
-        {/* header */}
         <div className="flex items-start justify-between px-5 py-4 border-b border-white/8">
           <div>
-            <p className="text-sm font-semibold text-white">Assign variant</p>
-            <p className="text-xs text-white/40 mt-0.5 font-mono">ID {variant.variantId} · {variant.name}</p>
+            <p className="text-sm font-semibold text-white">Assign Printful variant</p>
+            <p className="text-xs text-white/40 mt-0.5 font-mono">
+              ID {variant.variantId} · {variant.name}
+              {cmEquiv && <span className="text-[#C4622D] ml-1">≈ {cmEquiv}</span>}
+            </p>
           </div>
           <button onClick={onClose} className="text-white/40 hover:text-white transition-colors ml-4 shrink-0">
             <X size={16} />
           </button>
         </div>
-
-        {/* product list */}
         <div className="overflow-y-auto max-h-[60vh] py-2">
-          {OUR_PRODUCTS.map((p) => {
-            const isSelected = mappings.find((m) => m.ourProductId === p.id)?.printfulVariantId === String(variant.variantId);
-            const hasOther   = !isSelected && !!mappings.find((m) => m.ourProductId === p.id)?.printfulVariantId;
+          {dbVariants.length === 0 && (
+            <p className="text-xs text-white/40 px-5 py-4">No product variants found. Add products in Admin → Products first.</p>
+          )}
+          {dbVariants.map((dv) => {
+            const isSelected = dv.printfulVariantId === String(variant.variantId);
+            const hasDifferent = !isSelected && !!dv.printfulVariantId;
             return (
               <button
-                key={p.id}
-                onClick={() => { onAssign(p.id, variant.variantId); onClose(); }}
+                key={dv.id}
+                onClick={() => { onAssign(dv.id, variant.variantId); onClose(); }}
                 className={`w-full text-left px-5 py-3 flex items-center justify-between gap-3 transition-colors ${
-                  isSelected
-                    ? "bg-emerald-500/10 text-emerald-400"
-                    : "text-white/70 hover:bg-white/6 hover:text-white"
+                  isSelected ? "bg-emerald-500/10 text-emerald-400" : "text-white/70 hover:bg-white/6 hover:text-white"
                 }`}
               >
-                <span className="text-sm">{p.label}</span>
-                <span className="shrink-0 flex items-center gap-1.5">
+                <div>
+                  <p className="text-sm">{dv.productName} · {dv.size}</p>
+                  <p className="text-xs opacity-50">{dv.currency} {dv.price.toFixed(2)} · {dv.productType}</p>
+                </div>
+                <div className="shrink-0 flex items-center gap-1.5">
                   {isSelected && (
                     <span className="flex items-center gap-1 text-[10px] text-emerald-400 bg-emerald-500/15 border border-emerald-500/20 px-2 py-0.5 rounded-full">
                       <CheckCircle size={9} /> assigned
                     </span>
                   )}
-                  {hasOther && (
-                    <span className="text-[10px] text-white/25">mapped</span>
+                  {hasDifferent && (
+                    <span className="text-[10px] text-white/25 font-mono">#{dv.printfulVariantId}</span>
                   )}
-                </span>
+                </div>
               </button>
             );
           })}
@@ -168,12 +158,12 @@ function AssignModal({
 // ── Collapsible product card ───────────────────────────────────────────────────
 function ProductCard({
   product,
-  mappings,
+  dbVariants,
   onAssign,
 }: {
   product: PrintfulProduct;
-  mappings: PrintfulMapping[];
-  onAssign: (ourProductId: string, variantId: number) => void;
+  dbVariants: VariantMapping[];
+  onAssign: (dbVariantId: string, variantId: number) => void;
 }) {
   const [open, setOpen]                   = useState(false);
   const [variants, setVariants]           = useState<PrintfulVariant[] | null>(null);
@@ -197,10 +187,10 @@ function ProductCard({
     }
   };
 
-  // Label of our product currently mapped to this variant (if any)
+  // Label of our DB variant currently mapped to this Printful variant (if any)
   const assignedLabel = (variantId: number) => {
-    const ourId = mappings.find((m) => m.printfulVariantId === String(variantId))?.ourProductId;
-    return ourId ? (OUR_PRODUCTS.find((p) => p.id === ourId)?.label ?? ourId) : null;
+    const dv = dbVariants.find(v => v.printfulVariantId === String(variantId));
+    return dv ? `${dv.productName} · ${dv.size}` : null;
   };
 
   return (
@@ -238,6 +228,7 @@ function ProductCard({
                       <th className="text-left pb-2 font-medium">Variant ID</th>
                       <th className="text-left pb-2 font-medium">Name</th>
                       <th className="text-left pb-2 font-medium">Size</th>
+                      <th className="text-left pb-2 font-medium">≈ cm</th>
                       <th className="text-left pb-2 font-medium">Price</th>
                       <th className="text-left pb-2 font-medium">Assign to</th>
                     </tr>
@@ -250,6 +241,7 @@ function ProductCard({
                           <td className="py-1.5 text-white/60 font-mono">{v.variantId}</td>
                           <td className="py-1.5 text-white/80">{v.name}</td>
                           <td className="py-1.5 text-white/50">{v.size ?? "—"}</td>
+                          <td className="py-1.5 text-[#C4622D]/80 text-[10px]">{inchToCm(v.size ?? "") || "—"}</td>
                           <td className="py-1.5 text-white/60">${v.price} {v.currency}</td>
                           <td className="py-1.5">
                             <button
@@ -278,7 +270,7 @@ function ProductCard({
       {assignVariant && (
         <AssignModal
           variant={assignVariant}
-          mappings={mappings}
+          dbVariants={dbVariants}
           onAssign={onAssign}
           onClose={() => setAssignVariant(null)}
         />
@@ -289,15 +281,15 @@ function ProductCard({
 
 // ── Catalog tab (search + filter + category browser) ─────────────────────────
 function CatalogTab({
-  products, syncedAt, syncing, connected, mappings, onSync, onAssign, onLoadCatalog,
+  products, syncedAt, syncing, connected, dbVariants, onSync, onAssign, onLoadCatalog,
 }: {
   products: PrintfulProduct[];
   syncedAt: string | null;
   syncing: boolean;
   connected: boolean | null;
-  mappings: PrintfulMapping[];
+  dbVariants: VariantMapping[];
   onSync: () => void;
-  onAssign: (ourProductId: string, variantId: number) => void;
+  onAssign: (dbVariantId: string, variantId: number) => void;
   onLoadCatalog: () => Promise<void>;
 }) {
   const [search, setSearch]         = useState("");
@@ -499,7 +491,7 @@ function CatalogTab({
       ) : (
         <div className="space-y-2">
           {visible.map((p) => (
-            <ProductCard key={p.productId} product={p} mappings={mappings} onAssign={onAssign} />
+            <ProductCard key={p.productId} product={p} dbVariants={dbVariants} onAssign={onAssign} />
           ))}
         </div>
       )}
@@ -515,9 +507,8 @@ function PrintfulPage() {
   const [syncing, setSyncing]       = useState(false);
   const [products, setProducts]     = useState<PrintfulProduct[]>([]);
   const [syncedAt, setSyncedAt]     = useState<string | null>(null);
-  const [mappings, setMappings]     = useState<PrintfulMapping[]>([]);
-  const [mappingsDirty, setMappingsDirty] = useState(false);
-  const [savingMappings, setSavingMappings] = useState(false);
+  const [dbVariants, setDbVariants] = useState<VariantMapping[]>([]);
+  const [savingVariant, setSavingVariant] = useState<string | null>(null);
   const [webhooks, setWebhooks]     = useState<PrintfulWebhook[]>([]);
   const [webhookUrl, setWebhookUrl] = useState("");
   const [registeringWh, setRegisteringWh] = useState(false);
@@ -548,18 +539,12 @@ function PrintfulPage() {
     } catch { /* catalog not yet synced */ }
   }, []);
 
-  // ── Load mappings ─────────────────────────────────────────────────────────
-  const loadMappings = useCallback(async () => {
+  // ── Load DB variant mappings ──────────────────────────────────────────────
+  const loadDbVariants = useCallback(async () => {
     try {
-      const raw = await getPrintfulMappings();
-      const existing = new Map((raw ?? []).map((m: PrintfulMapping) => [m.ourProductId, m.printfulVariantId]));
-      setMappings(
-        OUR_PRODUCTS.map((p) => ({
-          ourProductId:       p.id,
-          printfulVariantId:  existing.get(p.id) ?? "",
-        }))
-      );
-    } catch { /* mappings not yet saved */ }
+      const data = await getVariantMappings();
+      setDbVariants(data ?? []);
+    } catch { /* ignore */ }
   }, []);
 
   // ── Load webhooks ─────────────────────────────────────────────────────────
@@ -569,7 +554,7 @@ function PrintfulPage() {
   }, []);
 
   useEffect(() => { loadCatalog(); }, [loadCatalog]);
-  useEffect(() => { loadMappings(); }, [loadMappings]);
+  useEffect(() => { loadDbVariants(); }, [loadDbVariants]);
   useEffect(() => { loadWebhooks(); }, [loadWebhooks]);
 
   // ── Sync catalog ──────────────────────────────────────────────────────────
@@ -587,34 +572,21 @@ function PrintfulPage() {
     }
   };
 
-  // ── Quick-assign from catalog tab ────────────────────────────────────────
-  const handleAssign = async (ourProductId: string, variantId: number) => {
-    const next = mappings.map((m) =>
-      m.ourProductId === ourProductId
-        ? { ...m, printfulVariantId: String(variantId) }
-        : m
-    );
-    setMappings(next);
+  // ── Assign from catalog tab — writes directly to DB variant ──────────────
+  const handleAssign = async (dbVariantId: string, printfulVariantId: number) => {
+    setSavingVariant(dbVariantId);
     try {
-      await savePrintfulMappings(next);
-      const label = OUR_PRODUCTS.find((p) => p.id === ourProductId)?.label ?? ourProductId;
-      showToast(`Assigned ${variantId} → ${label}`);
-    } catch {
-      showToast("Failed to save mapping");
-    }
-  };
-
-  // ── Save mappings ─────────────────────────────────────────────────────────
-  const handleSaveMappings = async () => {
-    setSavingMappings(true);
-    try {
-      await savePrintfulMappings(mappings);
-      setMappingsDirty(false);
-      showToast("Mappings saved");
+      const result = await setPrintfulVariantId(dbVariantId, String(printfulVariantId));
+      setDbVariants(prev => prev.map(v => v.id === dbVariantId
+        ? { ...v, printfulVariantId: result.printfulVariantId ?? undefined }
+        : v));
+      const dv = dbVariants.find(v => v.id === dbVariantId);
+      const label = dv ? `${dv.productName} · ${dv.size}` : dbVariantId;
+      showToast(`✓ Printful ID ${printfulVariantId} → ${label}`);
     } catch (e: unknown) {
-      showToast(`Save failed: ${e instanceof Error ? e.message : String(e)}`);
+      showToast(`Failed: ${e instanceof Error ? e.message : String(e)}`);
     } finally {
-      setSavingMappings(false);
+      setSavingVariant(null);
     }
   };
 
@@ -699,7 +671,7 @@ function PrintfulPage() {
               syncedAt={syncedAt}
               syncing={syncing}
               connected={connected}
-              mappings={mappings}
+              dbVariants={dbVariants}
               onSync={handleSync}
               onAssign={handleAssign}
               onLoadCatalog={loadCatalog}
@@ -708,54 +680,99 @@ function PrintfulPage() {
 
           {/* ── Tab: Mappings ──────────────────────────────────────────────── */}
           {tab === "mappings" && (
-            <div className="space-y-5">
+            <div className="space-y-4">
               <div className="flex items-center justify-between">
-                <p className="text-sm text-white/50">
-                  Enter the Printful variant ID for each product format. Find IDs in the Catalog tab.
-                </p>
+                <div>
+                  <p className="text-sm text-white/70 font-medium">Your product variants</p>
+                  <p className="text-xs text-white/40 mt-0.5">
+                    Map each of your product variants to a Printful variant ID.
+                    Use the Catalog tab to browse Printful products and click Assign.
+                  </p>
+                </div>
                 <button
-                  onClick={handleSaveMappings}
-                  disabled={savingMappings || !mappingsDirty}
-                  className="flex items-center gap-2 bg-[#C4622D] hover:bg-[#b35527] disabled:opacity-40 text-white text-sm font-medium px-4 py-2 rounded-lg transition-colors"
+                  onClick={loadDbVariants}
+                  className="flex items-center gap-1.5 text-xs text-white/50 hover:text-white transition-colors"
                 >
-                  {savingMappings ? <Loader2 size={14} className="animate-spin" /> : <Save size={14} />}
-                  Save mappings
+                  <RefreshCw size={12} /> Refresh
                 </button>
               </div>
 
-              <div className="bg-white/5 border border-white/10 rounded-xl overflow-hidden">
-                <table className="w-full text-sm">
-                  <thead>
-                    <tr className="border-b border-white/8">
-                      <th className="text-left px-4 py-3 text-white/40 font-medium text-xs">Our product</th>
-                      <th className="text-left px-4 py-3 text-white/40 font-medium text-xs">Printful variant ID</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-white/5">
-                    {mappings.map((m, i) => (
-                      <tr key={m.ourProductId} className="hover:bg-white/3 transition-colors">
-                        <td className="px-4 py-2.5 text-white/70 text-xs">
-                          {OUR_PRODUCTS[i]?.label ?? m.ourProductId}
-                        </td>
-                        <td className="px-4 py-2.5">
-                          <input
-                            type="text"
-                            value={m.printfulVariantId}
-                            placeholder="e.g. 12345"
-                            onChange={(e) => {
-                              const next = [...mappings];
-                              next[i] = { ...next[i], printfulVariantId: e.target.value };
-                              setMappings(next);
-                              setMappingsDirty(true);
-                            }}
-                            className="bg-white/8 border border-white/12 text-white text-xs rounded-lg px-3 py-2 w-full max-w-[180px] focus:outline-none focus:border-[#C4622D] placeholder:text-white/25 font-mono"
-                          />
-                        </td>
+              {dbVariants.length === 0 ? (
+                <div className="text-center py-16 border border-dashed border-white/10 rounded-xl">
+                  <Package size={28} className="text-white/20 mx-auto mb-3" />
+                  <p className="text-white/40 text-sm">No product variants found</p>
+                  <p className="text-white/25 text-xs mt-1">Add products in Admin → Products first</p>
+                </div>
+              ) : (
+                <div className="bg-white/5 border border-white/10 rounded-xl overflow-hidden">
+                  <table className="w-full text-sm">
+                    <thead>
+                      <tr className="border-b border-white/8">
+                        <th className="text-left px-4 py-3 text-white/40 font-medium text-xs">Product &amp; size</th>
+                        <th className="text-left px-4 py-3 text-white/40 font-medium text-xs">Printful variant ID</th>
+                        <th className="text-left px-4 py-3 text-white/40 font-medium text-xs">Status</th>
                       </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
+                    </thead>
+                    <tbody className="divide-y divide-white/5">
+                      {dbVariants.map((dv) => (
+                        <tr key={dv.id} className="hover:bg-white/3 transition-colors">
+                          <td className="px-4 py-3">
+                            <p className="text-white/80 text-xs font-medium">{dv.productName}</p>
+                            <p className="text-white/40 text-xs">{dv.size} · {dv.currency} {dv.price.toFixed(2)}</p>
+                          </td>
+                          <td className="px-4 py-3">
+                            <input
+                              type="text"
+                              value={dv.printfulVariantId ?? ""}
+                              placeholder="e.g. 12345"
+                              onChange={(e) => {
+                                setDbVariants(prev => prev.map(v => v.id === dv.id
+                                  ? { ...v, printfulVariantId: e.target.value || undefined }
+                                  : v));
+                              }}
+                              onBlur={async (e) => {
+                                const val = e.target.value.trim() || null;
+                                const current = dbVariants.find(v => v.id === dv.id)?.printfulVariantId ?? null;
+                                if ((val ?? "") === (current ?? "")) return;
+                                setSavingVariant(dv.id);
+                                try {
+                                  await setPrintfulVariantId(dv.id, val);
+                                  setDbVariants(prev => prev.map(v => v.id === dv.id
+                                    ? { ...v, printfulVariantId: val ?? undefined }
+                                    : v));
+                                  showToast(`Saved: ${dv.productName} · ${dv.size}`);
+                                } catch (err: unknown) {
+                                  showToast(`Failed: ${err instanceof Error ? err.message : String(err)}`);
+                                } finally {
+                                  setSavingVariant(null);
+                                }
+                              }}
+                              className="bg-white/8 border border-white/12 text-white text-xs rounded-lg px-3 py-2 w-full max-w-[160px] focus:outline-none focus:border-[#C4622D] placeholder:text-white/25 font-mono"
+                            />
+                          </td>
+                          <td className="px-4 py-3">
+                            {savingVariant === dv.id ? (
+                              <Loader2 size={12} className="animate-spin text-white/40" />
+                            ) : dv.printfulVariantId ? (
+                              <span className="flex items-center gap-1 text-[10px] text-emerald-400 bg-emerald-500/10 border border-emerald-500/20 px-2 py-0.5 rounded-full w-fit">
+                                <CheckCircle size={9} /> Mapped
+                              </span>
+                            ) : (
+                              <span className="text-[10px] text-amber-400/70 bg-amber-400/8 border border-amber-400/15 px-2 py-0.5 rounded-full">
+                                Not mapped
+                              </span>
+                            )}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+
+              <p className="text-xs text-white/25 mt-2">
+                Changes save automatically when you click out of a field. Or use the Catalog tab to browse and assign.
+              </p>
             </div>
           )}
 
