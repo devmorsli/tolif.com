@@ -8,7 +8,7 @@ import { useWizardStore } from "@/store/wizardStore";
 
 // ── API product types (from GET /api/products) ────────────────────────────────
 interface ApiVariant { id: string; size: string; price: number; currency: string; }
-interface ApiProduct { id: string; type: string; variants: ApiVariant[]; }
+interface ApiProduct { id: string; name: string; type: string; variants: ApiVariant[]; }
 
 // ── Types ──────────────────────────────────────────────────────────────────────
 type Format  = "digital" | "poster" | "canvas";
