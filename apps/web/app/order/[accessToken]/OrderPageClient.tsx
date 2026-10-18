@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { motion } from "framer-motion";
 import Link from "next/link";
 import { useWizardStore } from "@/store/wizardStore";
@@ -166,7 +166,7 @@ function StatusTimeline({ status }: { status: string }) {
 
 // ── Main component ─────────────────────────────────────────────────────────────
 export function OrderPageClient({
-  order,
+  order: initialOrder,
   apiBase,
   accessToken,
 }: {
@@ -175,10 +175,28 @@ export function OrderPageClient({
   accessToken: string;
 }) {
   const reset = useWizardStore((s) => s.reset);
+  const [order, setOrder] = useState<Order>(initialOrder);
 
   // Clear the wizard + multi-portrait cart once the customer lands on the
   // success page so the next portrait starts fresh.
   useEffect(() => { reset(); }, [reset]);
+
+  // Poll every 5 s while the order is paid but the high-res image isn't ready.
+  // Stops automatically once any item has a final image.
+  const isPaidForPoll = ["Paid", "GeneratingHighRes", "Ready", "SubmittedToPrinter", "Shipped"]
+    .includes(order.status);
+  const needsPolling = isPaidForPoll && !order.items.some(i => i.hasFinalImage);
+
+  useEffect(() => {
+    if (!needsPolling) return;
+    const id = setInterval(async () => {
+      try {
+        const res = await fetch(`${apiBase}/api/orders/${accessToken}`);
+        if (res.ok) setOrder(await res.json());
+      } catch { /* ignore network errors */ }
+    }, 5000);
+    return () => clearInterval(id);
+  }, [needsPolling, apiBase, accessToken]);
 
   const date = new Date(order.createdAt);
   const formattedDate = date.toLocaleDateString("en-GB", {
@@ -359,7 +377,7 @@ export function OrderPageClient({
             What Happens Next
           </p>
           <div className="space-y-4">
-            {order.hasDigital && isPaid && (
+            {isPaid && downloadUrl && (
               <div className="flex gap-3">
                 <div className="w-8 h-8 rounded-lg bg-[#C4622D]/10 flex items-center justify-center shrink-0 mt-0.5">
                   <Download size={14} className="text-[#C4622D]" />
@@ -373,7 +391,20 @@ export function OrderPageClient({
                 </div>
               </div>
             )}
-            {order.hasDigital && !isPaid && (
+            {isPaid && !downloadUrl && (
+              <div className="flex gap-3">
+                <div className="w-8 h-8 rounded-lg bg-[#C4622D]/10 flex items-center justify-center shrink-0 mt-0.5">
+                  <Clock size={14} className="text-[#C4622D]" />
+                </div>
+                <div>
+                  <p className="text-sm font-semibold text-[#1A1714]">Preparing your digital file</p>
+                  <p className="text-xs text-[#8C7B6B] mt-0.5 leading-relaxed">
+                    Your high-resolution portrait is being generated. The download button will appear in about 30 seconds — the page updates automatically.
+                  </p>
+                </div>
+              </div>
+            )}
+            {!isPaid && (
               <div className="flex gap-3">
                 <div className="w-8 h-8 rounded-lg bg-[#C4622D]/10 flex items-center justify-center shrink-0 mt-0.5">
                   <Clock size={14} className="text-[#C4622D]" />
@@ -425,7 +456,7 @@ export function OrderPageClient({
           transition={{ delay: 0.8, duration: 0.5 }}
           className="space-y-3"
         >
-          {order.hasDigital && isPaid && downloadUrl && (
+          {isPaid && downloadUrl && (
             <a
               href={downloadUrl}
               className="w-full flex items-center justify-center gap-2 py-4 rounded-full
@@ -437,11 +468,11 @@ export function OrderPageClient({
               Download Your Portrait
             </a>
           )}
-          {order.hasDigital && isPaid && !downloadUrl && (
+          {isPaid && !downloadUrl && (
             <div className="w-full flex items-center justify-center gap-2 py-4 rounded-full
                             bg-[#F5F0EA] text-[#8C7B6B] text-sm border border-[#E4D8CC]">
               <Clock size={15} />
-              Preparing your file… check back shortly
+              Preparing your portrait… this takes about 30 seconds
             </div>
           )}
 

@@ -117,6 +117,32 @@ public class StripeWebhookController(
 
         order.Status    = OrderStatus.Paid;
         order.UpdatedAt = DateTime.UtcNow;
+
+        // ── Save shipping address collected by Stripe ──────────────────────
+        // Stripe collects the address on its hosted page (ShippingAddressCollection).
+        // The address arrives in ShippingDetails (preferred) or CustomerDetails.Address.
+        var stripeAddr = session.ShippingDetails?.Address ?? session.CustomerDetails?.Address;
+        if (stripeAddr is not null && string.IsNullOrWhiteSpace(order.ShippingAddressJson))
+        {
+            order.ShippingAddressJson = System.Text.Json.JsonSerializer.Serialize(new
+            {
+                Line1      = stripeAddr.Line1      ?? "",
+                Line2      = stripeAddr.Line2,
+                City       = stripeAddr.City       ?? "",
+                State      = stripeAddr.State,
+                PostalCode = stripeAddr.PostalCode ?? "",
+                Country    = stripeAddr.Country   ?? "",
+            });
+            logger.LogInformation("Saved shipping address from Stripe session for order {OrderId}", order.Id);
+        }
+
+        // ── Save customer name if Stripe collected it ──────────────────────
+        if (string.IsNullOrEmpty(order.CustomerName))
+        {
+            order.CustomerName = session.ShippingDetails?.Name
+                              ?? session.CustomerDetails?.Name;
+        }
+
         await db.SaveChangesAsync(ct);
 
         _ = analytics.TrackAsync(AnalyticsEventType.OrderPaid, null,
