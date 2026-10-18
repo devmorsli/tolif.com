@@ -80,8 +80,9 @@ public class OrdersController(IApplicationDbContext db, IStorageService storage)
 
     // ── GET /api/orders/{accessToken}/download/{sessionId} ────────────────────
     /// <summary>
-    /// Generates a short-lived presigned URL for the final (watermark-free) portrait
-    /// and redirects the browser to it, triggering a download.
+    /// Streams the final (watermark-free) portrait through the API so the browser
+    /// receives Content-Disposition: attachment and saves it as a file instead of
+    /// opening it in a new tab.
     /// Only works for paid orders that have a final image generated.
     /// </summary>
     [HttpGet("{accessToken}/download/{sessionId:guid}")]
@@ -120,9 +121,13 @@ public class OrdersController(IApplicationDbContext db, IStorageService storage)
         if (string.IsNullOrEmpty(finalKey))
             return NotFound(new { message = "High-resolution file is not ready yet. Please try again in a moment." });
 
-        // Generate a presigned URL valid for 30 days
-        var presignedUrl = await storage.GenerateDownloadUrlAsync(finalKey, TimeSpan.FromDays(30), ct);
-        return Redirect(presignedUrl);
+        // Stream the file through the API with Content-Disposition: attachment so
+        // the browser saves it instead of displaying it.  Using the storage service
+        // directly avoids an extra redirect round-trip and works regardless of
+        // whether MinIO is publicly reachable from the browser.
+        var bytes = await storage.DownloadAsync(finalKey, ct);
+        var fileName = $"tolif-portrait-{sessionId:N}.jpg";
+        return File(bytes, "image/jpeg", fileName);
     }
 
     // ── Private helpers ───────────────────────────────────────────────────────
