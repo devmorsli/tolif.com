@@ -9,3 +9,10 @@
     reverse_proxy /hangfire/* api:8080
     reverse_proxy * web:3000
 }
+
+# MinIO storage subdomain — auto-TLS via Caddy ACME.
+# Set MINIO_PUBLIC_ENDPOINT=https://storage.yourdomain.com in .env
+# and add a DNS A record: storage.yourdomain.com → your server IP.
+storage.{$DOMAIN:localhost} {
+    reverse_proxy minio:9000
+}

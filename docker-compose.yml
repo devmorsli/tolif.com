@@ -59,6 +59,10 @@ services:
       MINIO_ROOT_USER: ${MINIO_ROOT_USER:-minioadmin}
       MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:-change_me_minio}
       MINIO_BUCKET: ${MINIO_BUCKET:-tolif}
+      # Public URL browsers use to reach MinIO.
+      # Local dev:   http://localhost:9000
+      # Production:  https://storage.yourdomain.com  (add DNS + Caddy block below)
+      MINIO_PUBLIC_ENDPOINT: ${MINIO_PUBLIC_ENDPOINT:-http://localhost:9000}
       ADMIN_EMAIL: ${ADMIN_EMAIL:-admin@tolif.com}
       ADMIN_PASSWORD: ${ADMIN_PASSWORD:-Admin@12345!}
       JWT_SECRET: ${JWT_SECRET:-change_me_jwt_secret_min_32_chars_long}
