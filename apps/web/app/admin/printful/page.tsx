@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback, useRef } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { createPortal } from "react-dom";
 import { AdminGuard } from "@/components/admin/AdminGuard";
 import { AdminSidebar } from "@/components/admin/AdminSidebar";
@@ -15,11 +15,14 @@ import {
   syncPrintfulCategory,
   getVariantMappings,
   setPrintfulVariantId,
+  getPrintfulMappings,
+  addProductSizeFromPrintful,
   type PrintfulProduct,
   type PrintfulVariant,
   type PrintfulWebhook,
   type PrintfulCategory,
   type VariantMapping,
+  type PrintfulMapping,
 } from "@/lib/admin-api";
 import {
   RefreshCw,
@@ -35,9 +38,12 @@ import {
   ChevronRight,
   Search,
   X,
+  Plus,
 } from "lucide-react";
 
 type Tab = "catalog" | "mappings" | "webhooks";
+
+const CURRENCIES = ["EUR", "USD", "GBP", "CAD", "AUD"];
 
 /** Convert a Printful size string like "12x16" or "12×16\"" to "30 × 40 cm" format */
 function inchToCm(size: string): string {
@@ -49,13 +55,7 @@ function inchToCm(size: string): string {
 }
 
 // ── Pill component ─────────────────────────────────────────────────────────────
-function StatusPill({
-  ok,
-  label,
-}: {
-  ok: boolean | null;
-  label: string;
-}) {
+function StatusPill({ ok, label }: { ok: boolean | null; label: string }) {
   if (ok === null)
     return (
       <span className="inline-flex items-center gap-1.5 text-xs text-white/50 bg-white/8 px-3 py-1 rounded-full">
@@ -73,26 +73,71 @@ function StatusPill({
   );
 }
 
-// ── Assign modal (portal — never clipped by overflow containers) ──────────────
-function AssignModal({
+// ── Add Size Modal ─────────────────────────────────────────────────────────────
+// Opened from a Printful catalog variant. Creates a new product variant in DB.
+type ProductCategory = "poster" | "canvas" | "framedprint";
+type FrameColor = "black" | "red-oak" | "white";
+
+function AddSizeModal({
   variant,
-  dbVariants,
-  onAssign,
+  onAdded,
   onClose,
 }: {
   variant: PrintfulVariant;
-  dbVariants: VariantMapping[];
-  onAssign: (dbVariantId: string, printfulVariantId: number) => void;
+  onAdded: (productName: string) => void;
   onClose: () => void;
 }) {
-  const ref = useRef<HTMLDivElement>(null);
   const cmEquiv = inchToCm(variant.size ?? variant.name);
 
+  const [category, setCategory] = useState<ProductCategory>("poster");
+  const [frameColor, setFrameColor] = useState<FrameColor>("black");
+  const [sizeCm, setSizeCm] = useState(cmEquiv);
+  const [price, setPrice] = useState("");
+  const [currency, setCurrency] = useState("EUR");
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  // Close on Escape
   useEffect(() => {
     const handler = (e: KeyboardEvent) => { if (e.key === "Escape") onClose(); };
     document.addEventListener("keydown", handler);
     return () => document.removeEventListener("keydown", handler);
   }, [onClose]);
+
+  const handleSubmit = async () => {
+    const p = parseFloat(price);
+    if (isNaN(p) || p <= 0) { setError("Enter a valid price."); return; }
+    if (!sizeCm.trim()) { setError("Enter the size label (e.g. 30 × 40 cm)."); return; }
+
+    setSaving(true);
+    setError(null);
+    try {
+      const result = await addProductSizeFromPrintful({
+        printfulVariantId: String(variant.variantId),
+        productType: category,
+        frameName: category === "framedprint" ? frameColor : null,
+        sizeCm: sizeCm.trim(),
+        price: p,
+        currency,
+      });
+      onAdded(result.productName);
+    } catch (e: unknown) {
+      setError(e instanceof Error ? e.message : "Failed to add.");
+      setSaving(false);
+    }
+  };
+
+  const CATEGORIES: { key: ProductCategory; label: string; hint: string }[] = [
+    { key: "poster",      label: "Poster Print",  hint: "Wall art print, rolled or flat" },
+    { key: "canvas",      label: "Canvas Print",  hint: "Gallery-wrapped canvas" },
+    { key: "framedprint", label: "Framed Print",  hint: "Ready-to-hang with frame" },
+  ];
+
+  const FRAME_COLORS: { key: FrameColor; label: string; swatch: React.CSSProperties }[] = [
+    { key: "black",   label: "Black",   swatch: { background: "#1C1C1C" } },
+    { key: "red-oak", label: "Red Oak", swatch: { background: "linear-gradient(135deg, #8B4513 0%, #A0522D 50%, #6B3311 100%)" } },
+    { key: "white",   label: "White",   swatch: { background: "#F5F5F5", border: "1px solid #C0B5A8" } },
+  ];
 
   return createPortal(
     <div
@@ -100,54 +145,115 @@ function AssignModal({
       onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}
     >
       <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" />
-      <div
-        ref={ref}
-        className="relative w-full max-w-md bg-[#1A1714] border border-white/15 rounded-2xl shadow-2xl overflow-hidden"
-      >
+      <div className="relative w-full max-w-md bg-[#1A1714] border border-white/15 rounded-2xl shadow-2xl overflow-hidden">
+
+        {/* Header */}
         <div className="flex items-start justify-between px-5 py-4 border-b border-white/8">
           <div>
-            <p className="text-sm font-semibold text-white">Assign Printful variant</p>
+            <p className="text-sm font-semibold text-white">Add to Products</p>
             <p className="text-xs text-white/40 mt-0.5 font-mono">
-              ID {variant.variantId} · {variant.name}
+              Printful ID {variant.variantId} · {variant.name}
               {cmEquiv && <span className="text-[#C4622D] ml-1">≈ {cmEquiv}</span>}
             </p>
           </div>
-          <button onClick={onClose} className="text-white/40 hover:text-white transition-colors ml-4 shrink-0">
+          <button onClick={onClose} className="text-white/40 hover:text-white ml-4 shrink-0">
             <X size={16} />
           </button>
         </div>
-        <div className="overflow-y-auto max-h-[60vh] py-2">
-          {dbVariants.length === 0 && (
-            <p className="text-xs text-white/40 px-5 py-4">No product variants found. Add products in Admin → Products first.</p>
+
+        <div className="px-5 py-5 space-y-5">
+
+          {/* Category */}
+          <div>
+            <p className="text-xs font-semibold text-white/50 uppercase tracking-wider mb-2">Category</p>
+            <div className="grid grid-cols-3 gap-2">
+              {CATEGORIES.map(({ key, label, hint }) => (
+                <button
+                  key={key}
+                  onClick={() => setCategory(key)}
+                  className={`text-left rounded-xl border-2 p-3 transition-all ${
+                    category === key ? "border-[#C4622D] bg-[#C4622D]/10" : "border-white/10 hover:border-white/20"
+                  }`}
+                >
+                  <p className={`text-xs font-semibold ${category === key ? "text-[#C4622D]" : "text-white/70"}`}>{label}</p>
+                  <p className="text-[10px] text-white/30 mt-0.5 leading-tight">{hint}</p>
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Frame color (only for framed) */}
+          {category === "framedprint" && (
+            <div>
+              <p className="text-xs font-semibold text-white/50 uppercase tracking-wider mb-2">Frame color</p>
+              <div className="grid grid-cols-3 gap-2">
+                {FRAME_COLORS.map(({ key, label, swatch }) => (
+                  <button
+                    key={key}
+                    onClick={() => setFrameColor(key)}
+                    className={`flex items-center gap-2 rounded-xl border-2 px-3 py-2.5 transition-all ${
+                      frameColor === key ? "border-[#C4622D] bg-[#C4622D]/10" : "border-white/10 hover:border-white/20"
+                    }`}
+                  >
+                    <div className="w-5 h-5 rounded shrink-0" style={swatch} />
+                    <span className={`text-xs font-medium ${frameColor === key ? "text-[#C4622D]" : "text-white/60"}`}>{label}</span>
+                  </button>
+                ))}
+              </div>
+            </div>
           )}
-          {dbVariants.map((dv) => {
-            const isSelected = dv.printfulVariantId === String(variant.variantId);
-            const hasDifferent = !isSelected && !!dv.printfulVariantId;
-            return (
-              <button
-                key={dv.id}
-                onClick={() => { onAssign(dv.id, variant.variantId); onClose(); }}
-                className={`w-full text-left px-5 py-3 flex items-center justify-between gap-3 transition-colors ${
-                  isSelected ? "bg-emerald-500/10 text-emerald-400" : "text-white/70 hover:bg-white/6 hover:text-white"
-                }`}
+
+          {/* Size */}
+          <div>
+            <label className="text-xs font-semibold text-white/50 uppercase tracking-wider block mb-2">
+              Size label <span className="text-white/25 font-normal normal-case tracking-normal">(must match checkout format)</span>
+            </label>
+            <input
+              type="text"
+              value={sizeCm}
+              onChange={(e) => setSizeCm(e.target.value)}
+              placeholder="e.g. 30 × 40 cm"
+              className="w-full bg-white/8 border border-white/12 text-white text-sm rounded-lg px-3 py-2.5 focus:outline-none focus:border-[#C4622D] placeholder:text-white/25"
+            />
+            <p className="text-[10px] text-white/25 mt-1">Use the format: "30 × 40 cm", "45 × 60 cm", "60 × 90 cm"</p>
+          </div>
+
+          {/* Price */}
+          <div>
+            <p className="text-xs font-semibold text-white/50 uppercase tracking-wider mb-2">Price</p>
+            <div className="flex gap-2">
+              <select
+                value={currency}
+                onChange={(e) => setCurrency(e.target.value)}
+                className="bg-white/8 border border-white/12 text-white text-sm rounded-lg px-3 py-2.5 focus:outline-none focus:border-[#C4622D]"
               >
-                <div>
-                  <p className="text-sm">{dv.productName} · {dv.size}</p>
-                  <p className="text-xs opacity-50">{dv.currency} {dv.price.toFixed(2)} · {dv.productType}</p>
-                </div>
-                <div className="shrink-0 flex items-center gap-1.5">
-                  {isSelected && (
-                    <span className="flex items-center gap-1 text-[10px] text-emerald-400 bg-emerald-500/15 border border-emerald-500/20 px-2 py-0.5 rounded-full">
-                      <CheckCircle size={9} /> assigned
-                    </span>
-                  )}
-                  {hasDifferent && (
-                    <span className="text-[10px] text-white/25 font-mono">#{dv.printfulVariantId}</span>
-                  )}
-                </div>
-              </button>
-            );
-          })}
+                {CURRENCIES.map((c) => <option key={c} value={c}>{c}</option>)}
+              </select>
+              <input
+                type="number"
+                step="0.01"
+                min="0.01"
+                value={price}
+                onChange={(e) => setPrice(e.target.value)}
+                placeholder="0.00"
+                className="flex-1 bg-white/8 border border-white/12 text-white text-sm rounded-lg px-3 py-2.5 focus:outline-none focus:border-[#C4622D] placeholder:text-white/25"
+              />
+            </div>
+          </div>
+
+          {error && (
+            <p className="text-xs text-red-400 bg-red-400/8 border border-red-400/15 rounded-lg px-3 py-2">{error}</p>
+          )}
+
+          {/* CTA */}
+          <button
+            onClick={handleSubmit}
+            disabled={saving}
+            className="w-full flex items-center justify-center gap-2 bg-[#C4622D] hover:bg-[#b35527] disabled:opacity-50 text-white text-sm font-semibold py-3 rounded-xl transition-colors"
+          >
+            {saving ? <Loader2 size={14} className="animate-spin" /> : <Plus size={14} />}
+            Add to Products
+          </button>
         </div>
       </div>
     </div>,
@@ -159,16 +265,16 @@ function AssignModal({
 function ProductCard({
   product,
   dbVariants,
-  onAssign,
+  onAdded,
 }: {
   product: PrintfulProduct;
   dbVariants: VariantMapping[];
-  onAssign: (dbVariantId: string, variantId: number) => void;
+  onAdded: (productName: string) => void;
 }) {
   const [open, setOpen]                   = useState(false);
   const [variants, setVariants]           = useState<PrintfulVariant[] | null>(null);
   const [loading, setLoading]             = useState(false);
-  const [assignVariant, setAssignVariant] = useState<PrintfulVariant | null>(null);
+  const [addVariant, setAddVariant]       = useState<PrintfulVariant | null>(null);
 
   const handleToggle = async () => {
     const next = !open;
@@ -187,8 +293,8 @@ function ProductCard({
     }
   };
 
-  // Label of our DB variant currently mapped to this Printful variant (if any)
-  const assignedLabel = (variantId: number) => {
+  // Check if a Printful variant is already mapped in our DB
+  const mappedLabel = (variantId: number) => {
     const dv = dbVariants.find(v => v.printfulVariantId === String(variantId));
     return dv ? `${dv.productName} · ${dv.size}` : null;
   };
@@ -212,6 +318,7 @@ function ProductCard({
             {open ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
           </span>
         </button>
+
         {open && (
           <div className="border-t border-white/8 px-4 py-3">
             {loading ? (
@@ -225,36 +332,40 @@ function ProductCard({
                 <table className="w-full text-xs">
                   <thead>
                     <tr className="text-white/40">
-                      <th className="text-left pb-2 font-medium">Variant ID</th>
-                      <th className="text-left pb-2 font-medium">Name</th>
-                      <th className="text-left pb-2 font-medium">Size</th>
+                      <th className="text-left pb-2 font-medium">ID</th>
+                      <th className="text-left pb-2 font-medium">Name / Size</th>
                       <th className="text-left pb-2 font-medium">≈ cm</th>
                       <th className="text-left pb-2 font-medium">Price</th>
-                      <th className="text-left pb-2 font-medium">Assign to</th>
+                      <th className="text-left pb-2 font-medium">Action</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-white/5">
                     {(variants ?? []).map((v) => {
-                      const label = assignedLabel(v.variantId);
+                      const label  = mappedLabel(v.variantId);
+                      const cmSize = inchToCm(v.size ?? "");
                       return (
                         <tr key={v.variantId}>
-                          <td className="py-1.5 text-white/60 font-mono">{v.variantId}</td>
-                          <td className="py-1.5 text-white/80">{v.name}</td>
-                          <td className="py-1.5 text-white/50">{v.size ?? "—"}</td>
-                          <td className="py-1.5 text-[#C4622D]/80 text-[10px]">{inchToCm(v.size ?? "") || "—"}</td>
-                          <td className="py-1.5 text-white/60">${v.price} {v.currency}</td>
-                          <td className="py-1.5">
-                            <button
-                              onClick={() => setAssignVariant(v)}
-                              className={`flex items-center gap-1.5 text-[10px] font-medium px-2.5 py-1 rounded-lg transition-colors whitespace-nowrap ${
-                                label
-                                  ? "bg-emerald-500/15 text-emerald-400 border border-emerald-500/20 hover:bg-emerald-500/25"
-                                  : "bg-[#C4622D]/15 text-[#C4622D] border border-[#C4622D]/20 hover:bg-[#C4622D]/25"
-                              }`}
-                            >
-                              <Link2 size={10} />
-                              {label ?? "Assign"}
-                            </button>
+                          <td className="py-2 text-white/50 font-mono pr-3">{v.variantId}</td>
+                          <td className="py-2 text-white/80 pr-3">
+                            <p>{v.name}</p>
+                            {v.size && <p className="text-white/40 text-[10px]">{v.size}</p>}
+                          </td>
+                          <td className="py-2 text-[#C4622D]/80 text-[10px] pr-3">{cmSize || "—"}</td>
+                          <td className="py-2 text-white/60 pr-3">${v.price} {v.currency}</td>
+                          <td className="py-2">
+                            {label ? (
+                              <span className="flex items-center gap-1 text-[10px] text-emerald-400 bg-emerald-500/10 border border-emerald-500/20 px-2 py-1 rounded-lg whitespace-nowrap">
+                                <CheckCircle size={9} /> {label}
+                              </span>
+                            ) : (
+                              <button
+                                onClick={() => setAddVariant(v)}
+                                className="flex items-center gap-1.5 text-[10px] font-medium bg-[#C4622D]/15 text-[#C4622D] border border-[#C4622D]/20 hover:bg-[#C4622D]/25 px-2.5 py-1 rounded-lg transition-colors whitespace-nowrap"
+                              >
+                                <Plus size={10} />
+                                Add size
+                              </button>
+                            )}
                           </td>
                         </tr>
                       );
@@ -267,21 +378,23 @@ function ProductCard({
         )}
       </div>
 
-      {assignVariant && (
-        <AssignModal
-          variant={assignVariant}
-          dbVariants={dbVariants}
-          onAssign={onAssign}
-          onClose={() => setAssignVariant(null)}
+      {addVariant && (
+        <AddSizeModal
+          variant={addVariant}
+          onAdded={(productName) => {
+            setAddVariant(null);
+            onAdded(productName);
+          }}
+          onClose={() => setAddVariant(null)}
         />
       )}
     </>
   );
 }
 
-// ── Catalog tab (search + filter + category browser) ─────────────────────────
+// ── Catalog tab ───────────────────────────────────────────────────────────────
 function CatalogTab({
-  products, syncedAt, syncing, connected, dbVariants, onSync, onAssign, onLoadCatalog,
+  products, syncedAt, syncing, connected, dbVariants, onSync, onAdded, onLoadCatalog,
 }: {
   products: PrintfulProduct[];
   syncedAt: string | null;
@@ -289,18 +402,18 @@ function CatalogTab({
   connected: boolean | null;
   dbVariants: VariantMapping[];
   onSync: () => void;
-  onAssign: (dbVariantId: string, variantId: number) => void;
+  onAdded: (productName: string) => void;
   onLoadCatalog: () => Promise<void>;
 }) {
   const [search, setSearch]         = useState("");
   const [typeFilter, setTypeFilter] = useState("all");
 
   // Category browser state
-  const [catOpen, setCatOpen]                   = useState(false);
-  const [categories, setCategories]             = useState<PrintfulCategory[] | null>(null);
-  const [loadingCats, setLoadingCats]           = useState(false);
-  const [syncingCat, setSyncingCat]             = useState<number | null>(null);
-  const [catToast, setCatToast]                 = useState<string | null>(null);
+  const [catOpen, setCatOpen]         = useState(false);
+  const [categories, setCategories]   = useState<PrintfulCategory[] | null>(null);
+  const [loadingCats, setLoadingCats] = useState(false);
+  const [syncingCat, setSyncingCat]   = useState<number | null>(null);
+  const [catToast, setCatToast]       = useState<string | null>(null);
 
   const showCatToast = (msg: string) => {
     setCatToast(msg);
@@ -309,14 +422,9 @@ function CatalogTab({
 
   const handleLoadCategories = async () => {
     setLoadingCats(true);
-    try {
-      const cats = await getPrintfulCategories();
-      setCategories(cats);
-    } catch {
-      setCategories([]);
-    } finally {
-      setLoadingCats(false);
-    }
+    try { setCategories(await getPrintfulCategories()); }
+    catch { setCategories([]); }
+    finally { setLoadingCats(false); }
   };
 
   const handleSyncCategory = async (cat: PrintfulCategory) => {
@@ -327,13 +435,10 @@ function CatalogTab({
       showCatToast(`Added ${result.added} product${result.added !== 1 ? "s" : ""} from "${cat.title}" (${result.total} total)`);
     } catch (e: unknown) {
       showCatToast(`Failed: ${e instanceof Error ? e.message : String(e)}`);
-    } finally {
-      setSyncingCat(null);
-    }
+    } finally { setSyncingCat(null); }
   };
 
   const uniqueTypes = Array.from(new Set(products.map((p) => p.type))).sort();
-
   const visible = products.filter((p) => {
     const q = search.trim().toLowerCase();
     const matchesSearch = !q || p.name.toLowerCase().includes(q) || p.type.toLowerCase().includes(q);
@@ -343,44 +448,30 @@ function CatalogTab({
 
   return (
     <div className="space-y-4">
-      {/* toolbar */}
+      {/* Toolbar */}
       <div className="flex flex-col sm:flex-row sm:items-center gap-3">
-        {/* search */}
         <div className="relative flex-1">
           <Search size={13} className="absolute left-3 top-1/2 -translate-y-1/2 text-white/30 pointer-events-none" />
           <input
-            type="text"
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
+            type="text" value={search} onChange={(e) => setSearch(e.target.value)}
             placeholder="Search products…"
             className="w-full bg-white/6 border border-white/10 rounded-lg pl-8 pr-8 py-2 text-sm text-white placeholder:text-white/25 focus:outline-none focus:border-[#C4622D]/60"
           />
           {search && (
-            <button
-              onClick={() => setSearch("")}
-              className="absolute right-2.5 top-1/2 -translate-y-1/2 text-white/30 hover:text-white/60"
-            >
+            <button onClick={() => setSearch("")} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-white/30 hover:text-white/60">
               <X size={13} />
             </button>
           )}
         </div>
-
-        {/* type filter */}
         <select
-          value={typeFilter}
-          onChange={(e) => setTypeFilter(e.target.value)}
+          value={typeFilter} onChange={(e) => setTypeFilter(e.target.value)}
           className="bg-white/6 border border-white/10 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-[#C4622D]/60 shrink-0"
         >
           <option value="all">All types</option>
-          {uniqueTypes.map((t) => (
-            <option key={t} value={t}>{t}</option>
-          ))}
+          {uniqueTypes.map((t) => <option key={t} value={t}>{t}</option>)}
         </select>
-
-        {/* sync button */}
         <button
-          onClick={onSync}
-          disabled={syncing || connected === false}
+          onClick={onSync} disabled={syncing || connected === false}
           className="flex items-center gap-2 bg-[#C4622D] hover:bg-[#b35527] disabled:opacity-50 text-white text-sm font-medium px-4 py-2 rounded-lg transition-colors shrink-0"
         >
           {syncing ? <Loader2 size={14} className="animate-spin" /> : <RefreshCw size={14} />}
@@ -388,7 +479,16 @@ function CatalogTab({
         </button>
       </div>
 
-      {/* ── Category browser ─────────────────────────────────────────────── */}
+      {/* Hint */}
+      <div className="flex items-start gap-2.5 bg-white/4 border border-white/8 rounded-xl px-4 py-3">
+        <Plus size={13} className="text-[#C4622D] shrink-0 mt-0.5" />
+        <p className="text-xs text-white/50">
+          Expand a product, find the size you want, and click <strong className="text-white/70">Add size</strong> to create it in your product list with a price.
+          Printful variant IDs are linked automatically.
+        </p>
+      </div>
+
+      {/* Category browser */}
       <div className="border border-white/10 rounded-xl overflow-hidden">
         <button
           onClick={() => {
@@ -401,32 +501,20 @@ function CatalogTab({
           <div className="flex items-center gap-2">
             <Package size={13} className="text-white/40" />
             <span className="text-sm text-white/70 font-medium">Sync by Printful category</span>
-            <span className="text-[10px] text-white/30 bg-white/6 px-2 py-0.5 rounded-full">
-              find wall art, posters, canvas…
-            </span>
+            <span className="text-[10px] text-white/30 bg-white/6 px-2 py-0.5 rounded-full">find wall art, posters, canvas…</span>
           </div>
-          <span className="text-white/30">
-            {catOpen ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
-          </span>
+          <span className="text-white/30">{catOpen ? <ChevronDown size={14} /> : <ChevronRight size={14} />}</span>
         </button>
 
         {catOpen && (
           <div className="border-t border-white/8 px-4 py-3 space-y-2">
-            {/* load / reload */}
             <div className="flex items-center justify-between">
-              <p className="text-xs text-white/40">
-                Pick a category and click Sync to merge its products into your catalog.
-              </p>
-              <button
-                onClick={handleLoadCategories}
-                disabled={loadingCats}
-                className="flex items-center gap-1.5 text-xs text-white/50 hover:text-white transition-colors disabled:opacity-40"
-              >
-                {loadingCats ? <Loader2 size={11} className="animate-spin" /> : <RefreshCw size={11} />}
-                Reload
+              <p className="text-xs text-white/40">Pick a category and click Sync to merge its products into your catalog.</p>
+              <button onClick={handleLoadCategories} disabled={loadingCats}
+                className="flex items-center gap-1.5 text-xs text-white/50 hover:text-white transition-colors disabled:opacity-40">
+                {loadingCats ? <Loader2 size={11} className="animate-spin" /> : <RefreshCw size={11} />} Reload
               </button>
             </div>
-
             {loadingCats && categories === null ? (
               <div className="flex items-center gap-2 py-4 text-white/40 text-xs justify-center">
                 <Loader2 size={14} className="animate-spin" /> Loading categories…
@@ -436,37 +524,28 @@ function CatalogTab({
             ) : (
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5 max-h-80 overflow-y-auto pr-1">
                 {(categories ?? []).map((cat) => (
-                  <div
-                    key={cat.id}
-                    className="flex items-center justify-between gap-3 bg-white/4 hover:bg-white/7 border border-white/8 rounded-lg px-3 py-2 transition-colors"
-                  >
+                  <div key={cat.id} className="flex items-center justify-between gap-3 bg-white/4 hover:bg-white/7 border border-white/8 rounded-lg px-3 py-2 transition-colors">
                     <span className="text-xs text-white/70 truncate">{cat.title}</span>
                     <button
                       onClick={() => handleSyncCategory(cat)}
                       disabled={syncingCat === cat.id || connected === false}
                       className="flex items-center gap-1 text-[10px] font-medium text-[#C4622D] bg-[#C4622D]/12 border border-[#C4622D]/20 hover:bg-[#C4622D]/22 disabled:opacity-40 px-2.5 py-1 rounded-md transition-colors whitespace-nowrap shrink-0"
                     >
-                      {syncingCat === cat.id
-                        ? <Loader2 size={10} className="animate-spin" />
-                        : <RefreshCw size={10} />}
+                      {syncingCat === cat.id ? <Loader2 size={10} className="animate-spin" /> : <RefreshCw size={10} />}
                       Sync
                     </button>
                   </div>
                 ))}
               </div>
             )}
-
-            {/* inline toast */}
             {catToast && (
-              <p className="text-xs text-emerald-400 bg-emerald-400/8 border border-emerald-400/15 rounded-lg px-3 py-2">
-                {catToast}
-              </p>
+              <p className="text-xs text-emerald-400 bg-emerald-400/8 border border-emerald-400/15 rounded-lg px-3 py-2">{catToast}</p>
             )}
           </div>
         )}
       </div>
 
-      {/* meta row */}
+      {/* Meta row */}
       {products.length > 0 && (
         <p className="text-xs text-white/30">
           Showing {visible.length} of {products.length} products
@@ -474,7 +553,7 @@ function CatalogTab({
         </p>
       )}
 
-      {/* list */}
+      {/* Product list */}
       {products.length === 0 ? (
         <div className="text-center py-20 border border-dashed border-white/10 rounded-xl">
           <Wifi size={32} className="text-white/20 mx-auto mb-3" />
@@ -491,7 +570,7 @@ function CatalogTab({
       ) : (
         <div className="space-y-2">
           {visible.map((p) => (
-            <ProductCard key={p.productId} product={p} dbVariants={dbVariants} onAssign={onAssign} />
+            <ProductCard key={p.productId} product={p} dbVariants={dbVariants} onAdded={onAdded} />
           ))}
         </div>
       )}
@@ -501,63 +580,57 @@ function CatalogTab({
 
 // ── Main page ─────────────────────────────────────────────────────────────────
 function PrintfulPage() {
-  const [tab, setTab]           = useState<Tab>("catalog");
-  const [connected, setConnected]   = useState<boolean | null>(null);
-  const [connError, setConnError]   = useState<string | null>(null);
-  const [syncing, setSyncing]       = useState(false);
-  const [products, setProducts]     = useState<PrintfulProduct[]>([]);
-  const [syncedAt, setSyncedAt]     = useState<string | null>(null);
-  const [dbVariants, setDbVariants] = useState<VariantMapping[]>([]);
+  const [tab, setTab]                     = useState<Tab>("catalog");
+  const [connected, setConnected]         = useState<boolean | null>(null);
+  const [connError, setConnError]         = useState<string | null>(null);
+  const [syncing, setSyncing]             = useState(false);
+  const [products, setProducts]           = useState<PrintfulProduct[]>([]);
+  const [syncedAt, setSyncedAt]           = useState<string | null>(null);
+  const [dbVariants, setDbVariants]       = useState<VariantMapping[]>([]);
   const [savingVariant, setSavingVariant] = useState<string | null>(null);
-  const [webhooks, setWebhooks]     = useState<PrintfulWebhook[]>([]);
-  const [webhookUrl, setWebhookUrl] = useState("");
+  const [webhooks, setWebhooks]           = useState<PrintfulWebhook[]>([]);
+  const [webhookUrl, setWebhookUrl]       = useState("");
   const [registeringWh, setRegisteringWh] = useState(false);
-  const [whError, setWhError]       = useState<string | null>(null);
-  const [toast, setToast]           = useState<string | null>(null);
+  const [whError, setWhError]             = useState<string | null>(null);
+  const [toast, setToast]                 = useState<string | null>(null);
+  const [oldMappings, setOldMappings]     = useState<PrintfulMapping[]>([]);
+  const [oldMappingsOpen, setOldMappingsOpen] = useState(true);
 
   const showToast = (msg: string) => {
     setToast(msg);
-    setTimeout(() => setToast(null), 3000);
+    setTimeout(() => setToast(null), 3500);
   };
 
-  // ── Connection check on mount ────────────────────────────────────────────
   useEffect(() => {
     getPrintfulConnection()
-      .then((r) => {
-        setConnected(r.connected);
-        setConnError(r.error ?? null);
-      })
+      .then((r) => { setConnected(r.connected); setConnError(r.error ?? null); })
       .catch(() => { setConnected(false); setConnError("Could not reach API"); });
   }, []);
 
-  // ── Load catalog cache ────────────────────────────────────────────────────
   const loadCatalog = useCallback(async () => {
     try {
       const data = await getPrintfulCatalog();
       setProducts(data.products ?? []);
       setSyncedAt(data.syncedAt ?? null);
-    } catch { /* catalog not yet synced */ }
+    } catch { /* not yet synced */ }
   }, []);
 
-  // ── Load DB variant mappings ──────────────────────────────────────────────
   const loadDbVariants = useCallback(async () => {
-    try {
-      const data = await getVariantMappings();
-      setDbVariants(data ?? []);
-    } catch { /* ignore */ }
+    try { setDbVariants((await getVariantMappings()) ?? []); }
+    catch { /* ignore */ }
   }, []);
 
-  // ── Load webhooks ─────────────────────────────────────────────────────────
   const loadWebhooks = useCallback(async () => {
-    const hooks = await getPrintfulWebhooks().catch(() => []);
-    setWebhooks(hooks);
+    setWebhooks(await getPrintfulWebhooks().catch(() => []));
   }, []);
 
   useEffect(() => { loadCatalog(); }, [loadCatalog]);
   useEffect(() => { loadDbVariants(); }, [loadDbVariants]);
   useEffect(() => { loadWebhooks(); }, [loadWebhooks]);
+  useEffect(() => {
+    getPrintfulMappings().then((raw) => setOldMappings(raw ?? [])).catch(() => {});
+  }, []);
 
-  // ── Sync catalog ──────────────────────────────────────────────────────────
   const handleSync = async () => {
     setSyncing(true);
     try {
@@ -567,50 +640,35 @@ function PrintfulPage() {
       showToast(`Synced ${data.products?.length ?? 0} products`);
     } catch (e: unknown) {
       showToast(`Sync failed: ${e instanceof Error ? e.message : String(e)}`);
-    } finally {
-      setSyncing(false);
-    }
+    } finally { setSyncing(false); }
   };
 
-  // ── Assign from catalog tab — writes directly to DB variant ──────────────
-  const handleAssign = async (dbVariantId: string, printfulVariantId: number) => {
-    setSavingVariant(dbVariantId);
-    try {
-      const result = await setPrintfulVariantId(dbVariantId, String(printfulVariantId));
-      setDbVariants(prev => prev.map(v => v.id === dbVariantId
-        ? { ...v, printfulVariantId: result.printfulVariantId ?? undefined }
-        : v));
-      const dv = dbVariants.find(v => v.id === dbVariantId);
-      const label = dv ? `${dv.productName} · ${dv.size}` : dbVariantId;
-      showToast(`✓ Printful ID ${printfulVariantId} → ${label}`);
-    } catch (e: unknown) {
-      showToast(`Failed: ${e instanceof Error ? e.message : String(e)}`);
-    } finally {
-      setSavingVariant(null);
-    }
+  const handleAdded = async (productName: string) => {
+    showToast(`✓ Added to "${productName}"`);
+    await loadDbVariants();
   };
 
-  // ── Register webhooks ─────────────────────────────────────────────────────
   const handleRegisterWebhooks = async () => {
     if (!webhookUrl) { setWhError("Enter your public base URL first"); return; }
-    setRegisteringWh(true);
-    setWhError(null);
+    setRegisteringWh(true); setWhError(null);
     try {
-      const hooks = await registerPrintfulWebhooks(webhookUrl);
-      setWebhooks(hooks);
+      setWebhooks(await registerPrintfulWebhooks(webhookUrl));
       showToast("Webhooks registered");
     } catch (e: unknown) {
       setWhError(e instanceof Error ? e.message : String(e));
-    } finally {
-      setRegisteringWh(false);
-    }
+    } finally { setRegisteringWh(false); }
   };
 
   const tabs: { key: Tab; label: string; icon: typeof Package }[] = [
-    { key: "catalog",  label: "Catalog Sync",     icon: Package },
-    { key: "mappings", label: "Product Mapping",  icon: Link2 },
-    { key: "webhooks", label: "Webhooks",          icon: Webhook },
+    { key: "catalog",  label: "Catalog Sync",    icon: Package },
+    { key: "mappings", label: "Product Mapping", icon: Link2 },
+    { key: "webhooks", label: "Webhooks",         icon: Webhook },
   ];
+
+  // Non-digital variants for mappings tab
+  const physicalVariants = dbVariants.filter(
+    (dv) => dv.productType?.toLowerCase() !== "digital"
+  );
 
   return (
     <div className="flex min-h-screen bg-[#111009]">
@@ -622,14 +680,9 @@ function PrintfulPage() {
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-8">
             <div>
               <h1 className="text-2xl font-semibold text-white">Printful Integration</h1>
-              <p className="text-sm text-white/40 mt-1">
-                Sync your catalog, map variants, and manage webhooks
-              </p>
+              <p className="text-sm text-white/40 mt-1">Sync your catalog, map variants, and manage webhooks</p>
             </div>
-            <StatusPill
-              ok={connected}
-              label={connected ? "Connected" : connError ?? "Not connected"}
-            />
+            <StatusPill ok={connected} label={connected ? "Connected" : connError ?? "Not connected"} />
           </div>
 
           {/* Connection error banner */}
@@ -638,9 +691,7 @@ function PrintfulPage() {
               <AlertCircle size={16} className="text-red-400 shrink-0 mt-0.5" />
               <div>
                 <p className="text-sm text-red-300 font-medium">API key not configured or invalid</p>
-                <p className="text-xs text-red-400/70 mt-0.5">
-                  Go to Settings → Print Providers and enter your Printful private token.
-                </p>
+                <p className="text-xs text-red-400/70 mt-0.5">Go to Settings → Print Providers and enter your Printful private token.</p>
                 <p className="text-xs text-red-400/50 mt-1 font-mono">{connError}</p>
               </div>
             </div>
@@ -653,9 +704,7 @@ function PrintfulPage() {
                 key={key}
                 onClick={() => setTab(key)}
                 className={`flex-1 flex items-center justify-center gap-2 py-2.5 rounded-lg text-sm font-medium transition-all ${
-                  tab === key
-                    ? "bg-white/12 text-white"
-                    : "text-white/50 hover:text-white/80 hover:bg-white/5"
+                  tab === key ? "bg-white/12 text-white" : "text-white/50 hover:text-white/80 hover:bg-white/5"
                 }`}
               >
                 <Icon size={14} />
@@ -664,7 +713,7 @@ function PrintfulPage() {
             ))}
           </div>
 
-          {/* ── Tab: Catalog ──────────────────────────────────────────────── */}
+          {/* ── Tab: Catalog ──────────────────────────────────────────────────── */}
           {tab === "catalog" && (
             <CatalogTab
               products={products}
@@ -673,35 +722,87 @@ function PrintfulPage() {
               connected={connected}
               dbVariants={dbVariants}
               onSync={handleSync}
-              onAssign={handleAssign}
+              onAdded={handleAdded}
               onLoadCatalog={loadCatalog}
             />
           )}
 
-          {/* ── Tab: Mappings ──────────────────────────────────────────────── */}
+          {/* ── Tab: Mappings ──────────────────────────────────────────────────── */}
           {tab === "mappings" && (
             <div className="space-y-4">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-sm text-white/70 font-medium">Your product variants</p>
+                  <p className="text-sm text-white/70 font-medium">Your physical product variants</p>
                   <p className="text-xs text-white/40 mt-0.5">
-                    Map each of your product variants to a Printful variant ID.
-                    Use the Catalog tab to browse Printful products and click Assign.
+                    Add sizes from the Catalog tab, or type Printful IDs directly here.
+                    Digital products are hidden — they don&apos;t need Printful IDs.
                   </p>
                 </div>
-                <button
-                  onClick={loadDbVariants}
-                  className="flex items-center gap-1.5 text-xs text-white/50 hover:text-white transition-colors"
-                >
+                <button onClick={loadDbVariants} className="flex items-center gap-1.5 text-xs text-white/50 hover:text-white transition-colors">
                   <RefreshCw size={12} /> Refresh
                 </button>
               </div>
 
-              {dbVariants.length === 0 ? (
+              {/* Previous mappings reference */}
+              {oldMappings.length > 0 && (
+                <div className="border border-amber-400/20 rounded-xl overflow-hidden bg-amber-400/5">
+                  <button
+                    onClick={() => setOldMappingsOpen(o => !o)}
+                    className="w-full flex items-center justify-between px-4 py-3 text-left hover:bg-white/5 transition-colors"
+                  >
+                    <div className="flex items-center gap-2">
+                      <AlertCircle size={13} className="text-amber-400 shrink-0" />
+                      <span className="text-sm text-amber-300 font-medium">Previous mappings (reference)</span>
+                      <span className="text-[10px] text-amber-400/60 bg-amber-400/10 px-2 py-0.5 rounded-full">
+                        {oldMappings.length} entries · copy IDs into the table below
+                      </span>
+                    </div>
+                    <span className="text-white/30">
+                      {oldMappingsOpen ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
+                    </span>
+                  </button>
+                  {oldMappingsOpen && (
+                    <div className="border-t border-amber-400/15 px-4 py-3">
+                      <p className="text-xs text-amber-400/60 mb-3">
+                        These are the IDs from your old mapping setup. Copy each Printful variant ID and paste it into the matching row below, or use the Catalog tab to add sizes with a single click.
+                      </p>
+                      <div className="overflow-x-auto">
+                        <table className="w-full text-xs">
+                          <thead>
+                            <tr className="text-white/40">
+                              <th className="text-left pb-2 font-medium">Old product key</th>
+                              <th className="text-left pb-2 font-medium">Printful variant ID</th>
+                            </tr>
+                          </thead>
+                          <tbody className="divide-y divide-white/5">
+                            {oldMappings.map((m) => (
+                              <tr key={m.ourProductId}>
+                                <td className="py-1.5 text-white/60 font-mono">{m.ourProductId}</td>
+                                <td className="py-1.5">
+                                  {m.printfulVariantId ? (
+                                    <span className="font-mono text-amber-300 bg-amber-400/10 border border-amber-400/20 px-2 py-0.5 rounded select-all cursor-text">
+                                      {m.printfulVariantId}
+                                    </span>
+                                  ) : (
+                                    <span className="text-white/25 italic text-[10px]">not set</span>
+                                  )}
+                                </td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* Physical variants table */}
+              {physicalVariants.length === 0 ? (
                 <div className="text-center py-16 border border-dashed border-white/10 rounded-xl">
                   <Package size={28} className="text-white/20 mx-auto mb-3" />
-                  <p className="text-white/40 text-sm">No product variants found</p>
-                  <p className="text-white/25 text-xs mt-1">Add products in Admin → Products first</p>
+                  <p className="text-white/40 text-sm">No physical product variants yet</p>
+                  <p className="text-white/25 text-xs mt-1">Use the Catalog tab to add sizes from Printful</p>
                 </div>
               ) : (
                 <div className="bg-white/5 border border-white/10 rounded-xl overflow-hidden">
@@ -714,7 +815,7 @@ function PrintfulPage() {
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-white/5">
-                      {dbVariants.map((dv) => (
+                      {physicalVariants.map((dv) => (
                         <tr key={dv.id} className="hover:bg-white/3 transition-colors">
                           <td className="px-4 py-3">
                             <p className="text-white/80 text-xs font-medium">{dv.productName}</p>
@@ -743,9 +844,7 @@ function PrintfulPage() {
                                   showToast(`Saved: ${dv.productName} · ${dv.size}`);
                                 } catch (err: unknown) {
                                   showToast(`Failed: ${err instanceof Error ? err.message : String(err)}`);
-                                } finally {
-                                  setSavingVariant(null);
-                                }
+                                } finally { setSavingVariant(null); }
                               }}
                               className="bg-white/8 border border-white/12 text-white text-xs rounded-lg px-3 py-2 w-full max-w-[160px] focus:outline-none focus:border-[#C4622D] placeholder:text-white/25 font-mono"
                             />
@@ -770,21 +869,20 @@ function PrintfulPage() {
                 </div>
               )}
 
-              <p className="text-xs text-white/25 mt-2">
-                Changes save automatically when you click out of a field. Or use the Catalog tab to browse and assign.
+              <p className="text-xs text-white/25">
+                IDs save automatically on blur. Use the Catalog tab → "Add size" to add new variants with one click.
               </p>
             </div>
           )}
 
-          {/* ── Tab: Webhooks ──────────────────────────────────────────────── */}
+          {/* ── Tab: Webhooks ──────────────────────────────────────────────────── */}
           {tab === "webhooks" && (
             <div className="space-y-6">
-              {/* Register form */}
               <div className="bg-white/5 border border-white/10 rounded-xl p-5 space-y-4">
                 <div>
                   <h3 className="text-sm font-semibold text-white mb-1">Register webhooks</h3>
                   <p className="text-xs text-white/40">
-                    Tolif will listen for <code className="text-[#C4622D]">shipment_sent</code>,{" "}
+                    Tolif listens for <code className="text-[#C4622D]">shipment_sent</code>,{" "}
                     <code className="text-[#C4622D]">order_failed</code>, and{" "}
                     <code className="text-[#C4622D]">order_canceled</code> at{" "}
                     <code className="text-white/60">/api/webhooks/printful</code>.
@@ -792,9 +890,7 @@ function PrintfulPage() {
                 </div>
                 <div className="flex gap-3">
                   <input
-                    type="url"
-                    value={webhookUrl}
-                    onChange={(e) => setWebhookUrl(e.target.value)}
+                    type="url" value={webhookUrl} onChange={(e) => setWebhookUrl(e.target.value)}
                     placeholder="https://yourdomain.com"
                     className="flex-1 bg-white/8 border border-white/12 text-white text-sm rounded-lg px-4 py-2.5 focus:outline-none focus:border-[#C4622D] placeholder:text-white/25"
                   />
@@ -803,18 +899,13 @@ function PrintfulPage() {
                     disabled={registeringWh || connected === false}
                     className="flex items-center gap-2 bg-[#C4622D] hover:bg-[#b35527] disabled:opacity-50 text-white text-sm font-medium px-5 py-2.5 rounded-lg transition-colors whitespace-nowrap"
                   >
-                    {registeringWh
-                      ? <Loader2 size={14} className="animate-spin" />
-                      : <Webhook size={14} />}
+                    {registeringWh ? <Loader2 size={14} className="animate-spin" /> : <Webhook size={14} />}
                     Register
                   </button>
                 </div>
-                {whError && (
-                  <p className="text-xs text-red-400">{whError}</p>
-                )}
+                {whError && <p className="text-xs text-red-400">{whError}</p>}
               </div>
 
-              {/* Current webhooks */}
               {webhooks.length === 0 ? (
                 <div className="text-center py-16 border border-dashed border-white/10 rounded-xl">
                   <Webhook size={28} className="text-white/20 mx-auto mb-3" />
@@ -823,21 +914,13 @@ function PrintfulPage() {
               ) : (
                 <div className="space-y-2">
                   {webhooks.map((wh) => (
-                    <div
-                      key={wh.id}
-                      className="bg-white/5 border border-white/10 rounded-xl px-4 py-3 flex items-start gap-3"
-                    >
+                    <div key={wh.id} className="bg-white/5 border border-white/10 rounded-xl px-4 py-3 flex items-start gap-3">
                       <CheckCircle size={14} className="text-emerald-400 shrink-0 mt-0.5" />
                       <div className="flex-1 min-w-0">
                         <p className="text-sm text-white font-mono truncate">{wh.url}</p>
                         <div className="flex flex-wrap gap-1.5 mt-1.5">
                           {wh.types.map((t) => (
-                            <span
-                              key={t}
-                              className="text-[10px] font-medium bg-white/8 text-white/50 px-2 py-0.5 rounded-full"
-                            >
-                              {t}
-                            </span>
+                            <span key={t} className="text-[10px] font-medium bg-white/8 text-white/50 px-2 py-0.5 rounded-full">{t}</span>
                           ))}
                         </div>
                       </div>

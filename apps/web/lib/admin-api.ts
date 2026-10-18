@@ -453,6 +453,31 @@ export async function setPrintfulVariantId(productVariantId: string, printfulVar
   );
 }
 
+export interface AddedProductSize {
+  id: string;
+  size: string;
+  price: number;
+  currency: string;
+  printfulVariantId: string;
+  productName: string;
+  productType: string;
+  updated: boolean;
+}
+
+export async function addProductSizeFromPrintful(data: {
+  printfulVariantId: string;
+  productType: "poster" | "canvas" | "framedprint";
+  frameName?: string | null;
+  sizeCm: string;
+  price: number;
+  currency: string;
+}): Promise<AddedProductSize> {
+  return apiFetch<AddedProductSize>("/api/admin/printful/add-product-size", {
+    method: "POST",
+    body: JSON.stringify(data),
+  });
+}
+
 // ── Storage ───────────────────────────────────────────────────────────────────
 
 /** Returns the URL that will redirect to a short-lived presigned download URL. */

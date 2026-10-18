@@ -3,6 +3,8 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using System.Text.Json;
 using Tolif.Application.Interfaces;
+using Tolif.Domain.Entities;
+using Tolif.Domain.Enums;
 
 namespace Tolif.API.Controllers.Admin;
 
@@ -234,4 +236,103 @@ public class AdminPrintfulController(
     }
 
     public record SetVariantIdRequest(Guid ProductVariantId, string? PrintfulVariantId);
+
+    // ── Add product size from Printful catalog ────────────────────────────────
+
+    /// <summary>
+    /// Creates (or updates) a ProductVariant from a Printful catalog variant.
+    /// Finds or auto-creates the matching Product by type + frame name.
+    /// </summary>
+    [HttpPost("add-product-size")]
+    public async Task<IActionResult> AddProductSize([FromBody] AddProductSizeRequest req, CancellationToken ct)
+    {
+        if (!Enum.TryParse<ProductType>(req.ProductType, ignoreCase: true, out var productType))
+            return BadRequest(new { error = "Invalid product type. Use: poster, canvas, framedprint." });
+
+        // Determine canonical product name
+        var productName = productType switch
+        {
+            ProductType.Poster      => "Poster Print",
+            ProductType.Canvas      => "Canvas Print",
+            ProductType.FramedPrint => req.FrameName?.ToLowerInvariant() switch
+            {
+                "red-oak" => "Red Oak Frame Print",
+                "white"   => "White Frame Print",
+                _         => "Black Frame Print",
+            },
+            _ => req.ProductType,
+        };
+
+        // Find product: for framed prints match on name too (each colour is its own product)
+        var productQuery = db.Products.Where(p => p.Type == productType);
+        if (productType == ProductType.FramedPrint)
+            productQuery = productQuery.Where(p => p.Name == productName);
+
+        var product = await productQuery.FirstOrDefaultAsync(ct);
+
+        if (product is null)
+        {
+            product = new Product
+            {
+                Name      = productName,
+                Type      = productType,
+                IsActive  = true,
+                SortOrder = productType switch
+                {
+                    ProductType.Poster      => 10,
+                    ProductType.Canvas      => 20,
+                    ProductType.FramedPrint => 30,
+                    _                                          => 99,
+                },
+            };
+            db.Products.Add(product);
+            await db.SaveChangesAsync(ct);
+        }
+
+        // Find or create variant by size label
+        var sizeCm  = req.SizeCm.Trim();
+        var variant = await db.ProductVariants
+            .FirstOrDefaultAsync(v => v.ProductId == product.Id && v.Size == sizeCm, ct);
+
+        var updated = variant is not null;
+
+        if (variant is null)
+        {
+            variant = new ProductVariant
+            {
+                ProductId = product.Id,
+                Size      = sizeCm,
+                IsActive  = true,
+            };
+            db.ProductVariants.Add(variant);
+        }
+
+        variant.Price             = req.Price;
+        variant.Currency          = req.Currency.ToUpperInvariant();
+        variant.PrintfulVariantId = req.PrintfulVariantId;
+        variant.UpdatedAt         = DateTime.UtcNow;
+
+        await db.SaveChangesAsync(ct);
+
+        return Ok(new
+        {
+            id                = variant.Id,
+            size              = variant.Size,
+            price             = variant.Price,
+            currency          = variant.Currency,
+            printfulVariantId = variant.PrintfulVariantId,
+            productName       = product.Name,
+            productType       = product.Type.ToString().ToLower(),
+            updated,
+        });
+    }
+
+    public record AddProductSizeRequest(
+        string  PrintfulVariantId,
+        string  ProductType,
+        string? FrameName,
+        string  SizeCm,
+        decimal Price,
+        string  Currency
+    );
 }

@@ -47,7 +47,19 @@ function getLiveVariant(
     : printFmt === "canvas" ? "canvas"
     : fr !== "none" ? "framedprint"
     : "poster";
-  const prod = products.find((p) => p.type === productType);
+
+  let prod: ApiProduct | undefined;
+
+  if (productType === "framedprint" && fr !== "none") {
+    // Products are named "Black Frame Print", "Red Oak Frame Print", "White Frame Print"
+    const keyword = fr === "red-oak" ? "oak" : fr; // "black", "oak", "white"
+    const framedProds = products.filter((p) => p.type === "framedprint");
+    prod = framedProds.find((p) => p.name.toLowerCase().includes(keyword))
+        ?? framedProds[0]; // fallback to first available
+  } else {
+    prod = products.find((p) => p.type === productType);
+  }
+
   if (!prod) return undefined;
   if (isDigital) return prod.variants[0];
   const sizeObj = SIZES.find((s) => s.key === sz)!;
@@ -428,7 +440,7 @@ export function Step3PreviewOrder() {
           activeFrame !== "none" ? ` · ${cap(activeFrame.replace("-", " "))} frame` : ""
         }`;
 
-    // Look up the real DB variant GUID
+    // Look up the real DB variant GUID (frame-aware for framed prints)
     const productType = digitalOnly
       ? "digital"
       : format === "canvas"
@@ -437,7 +449,17 @@ export function Step3PreviewOrder() {
       ? "framedprint"
       : "poster";
     const targetSize = digitalOnly ? null : `${sizeObj.cmLabel} cm`; // e.g. "45 × 60 cm"
-    const apiProduct = apiProducts.find((p) => p.type === productType);
+
+    let apiProduct: ApiProduct | undefined;
+    if (productType === "framedprint" && activeFrame !== "none") {
+      const keyword = activeFrame === "red-oak" ? "oak" : activeFrame;
+      const framedProds = apiProducts.filter((p) => p.type === "framedprint");
+      apiProduct = framedProds.find((p) => p.name.toLowerCase().includes(keyword))
+               ?? framedProds[0];
+    } else {
+      apiProduct = apiProducts.find((p) => p.type === productType);
+    }
+
     const apiVariant = apiProduct?.variants.find(
       (v) => digitalOnly || v.size === targetSize
     );
