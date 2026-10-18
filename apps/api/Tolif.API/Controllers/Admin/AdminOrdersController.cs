@@ -286,8 +286,37 @@ public class AdminOrdersController(
     [HttpPost("{id:guid}/submit-to-printful")]
     public async Task<IActionResult> SubmitToPrintful(Guid id, CancellationToken ct)
     {
-        var exists = await db.Orders.AnyAsync(o => o.Id == id, ct);
-        if (!exists) return NotFound();
+        var order = await db.Orders
+            .Include(o => o.Items)
+                .ThenInclude(i => i.ProductVariant)
+                    .ThenInclude(v => v!.Product)
+            .Include(o => o.Items)
+                .ThenInclude(i => i.PortraitSession)
+            .FirstOrDefaultAsync(o => o.Id == id, ct);
+
+        if (order is null) return NotFound();
+
+        // ── Pre-flight validation ─────────────────────────────────────────
+        var physicalItems = order.Items
+            .Where(i => i.ProductVariant?.Product?.Type != Domain.Enums.ProductType.Digital)
+            .ToList();
+
+        if (physicalItems.Count == 0)
+            return BadRequest(new { error = "This order has no physical items to print." });
+
+        var noVariantId = physicalItems.FirstOrDefault(i =>
+            string.IsNullOrEmpty(i.ProductVariant?.PrintfulVariantId));
+        if (noVariantId is not null)
+            return BadRequest(new
+            {
+                error = $"Variant '{noVariantId.ProductVariant?.Size}' has no Printful Variant ID. " +
+                        "Go to Admin → Products and set it."
+            });
+
+        var noFinalImage = physicalItems.FirstOrDefault(i =>
+            string.IsNullOrEmpty(i.PortraitSession?.FinalImageKey));
+        if (noFinalImage is not null)
+            return BadRequest(new { error = "High-resolution portrait is not ready yet. Please wait a moment and try again." });
 
         hangfire.Enqueue<SubmitPrintOrderJob>(j => j.ForceExecuteAsync(id, CancellationToken.None));
         return Ok(new { queued = true });
@@ -310,6 +339,37 @@ public class AdminOrdersController(
             hangfire.Enqueue<SubmitPrintOrderJob>(j => j.ForceExecuteAsync(id, CancellationToken.None));
 
         return Ok(new { queued = validIds.Count });
+    }
+
+    // ── POST /api/admin/orders/submit-unprinted ───────────────────────────────
+    /// <summary>
+    /// Submits all paid orders that have no PrintOrder record yet (never sent to printer).
+    /// Optional date range to restrict to a specific period.
+    /// </summary>
+    [HttpPost("submit-unprinted")]
+    public async Task<IActionResult> SubmitUnprinted(
+        [FromQuery] DateTime? from,
+        [FromQuery] DateTime? to,
+        CancellationToken ct)
+    {
+        var query = db.Orders
+            .Where(o => PaidStatuses.Contains(o.Status));
+
+        if (from.HasValue)
+            query = query.Where(o => o.CreatedAt >= DateTime.SpecifyKind(from.Value, DateTimeKind.Utc));
+        if (to.HasValue)
+            query = query.Where(o => o.CreatedAt < DateTime.SpecifyKind(to.Value, DateTimeKind.Utc).AddDays(1));
+
+        // Only orders that have never been submitted (no PrintOrder row)
+        var ids = await query
+            .Where(o => !db.PrintOrders.Any(p => p.OrderId == o.Id))
+            .Select(o => o.Id)
+            .ToListAsync(ct);
+
+        foreach (var id in ids)
+            hangfire.Enqueue<SubmitPrintOrderJob>(j => j.ForceExecuteAsync(id, CancellationToken.None));
+
+        return Ok(new { queued = ids.Count });
     }
 
     // ── POST /api/admin/orders/abandonment-campaign ───────────────────────────

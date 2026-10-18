@@ -10,7 +10,7 @@ import { AdminSidebar } from "@/components/admin/AdminSidebar";
 import {
   getOrders, getOrderStats, getAbandonedCarts,
   sendAbandonmentEmail, sendAbandonmentCampaign,
-  submitOrderToPrintful, bulkSubmitOrdersToPrintful,
+  submitOrderToPrintful, bulkSubmitOrdersToPrintful, submitUnprintedOrders,
   type OrderListItem, type OrdersPage,
   type OrderStats, type AbandonedCartItem, type AbandonedCartsPage,
 } from "@/lib/admin-api";
@@ -105,10 +105,16 @@ function OrdersView() {
   const [customTo,    setCustomTo]    = useState("");
 
   // Bulk / Printful
-  const [selected,      setSelected]      = useState<Set<string>>(new Set());
-  const [submitting,    setSubmitting]    = useState<string | null>(null);  // single order id
-  const [bulkSending,   setBulkSending]   = useState(false);
-  const [successIds,    setSuccessIds]    = useState<Set<string>>(new Set());
+  const [selected,        setSelected]        = useState<Set<string>>(new Set());
+  const [submitting,      setSubmitting]      = useState<string | null>(null);
+  const [bulkSending,     setBulkSending]     = useState(false);
+  const [successIds,      setSuccessIds]      = useState<Set<string>>(new Set());
+  const [submitErrors,    setSubmitErrors]    = useState<Record<string, string>>({});
+  // "Submit all unprinted" panel
+  const [unprintedFrom,   setUnprintedFrom]   = useState("");
+  const [unprintedTo,     setUnprintedTo]     = useState("");
+  const [unprintedState,  setUnprintedState]  = useState<"idle"|"confirm"|"sending"|"done">("idle");
+  const [unprintedResult, setUnprintedResult] = useState<number | null>(null);
 
   const getDateRange = useCallback(() => {
     if (period === "custom") {
@@ -138,11 +144,16 @@ function OrdersView() {
   const handleSendOne = async (id: string, e: React.MouseEvent) => {
     e.preventDefault();
     setSubmitting(id);
+    setSubmitErrors(prev => { const n = { ...prev }; delete n[id]; return n; });
     try {
       await submitOrderToPrintful(id);
       setSuccessIds(prev => new Set(prev).add(id));
-    } catch { /* button reverts */ }
-    finally { setSubmitting(null); }
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : "Failed";
+      setSubmitErrors(prev => ({ ...prev, [id]: msg }));
+    } finally {
+      setSubmitting(null);
+    }
   };
 
   const handleBulkSend = async () => {
@@ -154,6 +165,24 @@ function OrdersView() {
       setSelected(new Set());
     } catch { /* silent */ }
     finally { setBulkSending(false); }
+  };
+
+  const handleSubmitUnprinted = async () => {
+    if (unprintedState === "idle") { setUnprintedState("confirm"); return; }
+    if (unprintedState === "confirm") {
+      setUnprintedState("sending");
+      try {
+        const res = await submitUnprintedOrders(
+          unprintedFrom ? new Date(unprintedFrom).toISOString() : undefined,
+          unprintedTo   ? new Date(unprintedTo).toISOString()   : undefined,
+        );
+        setUnprintedResult(res.queued);
+        setUnprintedState("done");
+        setTimeout(() => setUnprintedState("idle"), 8000);
+      } catch {
+        setUnprintedState("idle");
+      }
+    }
   };
 
   const toggleSelect = (id: string) => {
@@ -310,6 +339,53 @@ function OrdersView() {
         </div>
       )}
 
+      {/* ── Submit all unprinted orders ───────────────────────────────── */}
+      <div className="bg-white rounded-2xl border border-[#E4D8CC] p-5 mb-4">
+        <div className="flex flex-wrap items-end gap-3">
+          <div>
+            <p className="text-[10px] font-bold tracking-[3px] text-[#A89080] uppercase mb-2">Submit unprinted to Printful</p>
+            <p className="text-xs text-[#8C7B6B] mb-3">Send all paid orders not yet sent to Printful. Optionally filter by date.</p>
+            <div className="flex flex-wrap gap-2">
+              <div>
+                <label className="text-[10px] font-semibold text-[#A89080] uppercase tracking-wider block mb-1">From date</label>
+                <input type="date" value={unprintedFrom} onChange={e => setUnprintedFrom(e.target.value)}
+                  className="bg-[#FAF6F0] border border-[#E4D8CC] rounded-xl px-3 py-2 text-sm text-[#1A1714] focus:outline-none focus:ring-2 focus:ring-[#C4622D]/30" />
+              </div>
+              <div>
+                <label className="text-[10px] font-semibold text-[#A89080] uppercase tracking-wider block mb-1">To date</label>
+                <input type="date" value={unprintedTo} onChange={e => setUnprintedTo(e.target.value)}
+                  className="bg-[#FAF6F0] border border-[#E4D8CC] rounded-xl px-3 py-2 text-sm text-[#1A1714] focus:outline-none focus:ring-2 focus:ring-[#C4622D]/30" />
+              </div>
+            </div>
+          </div>
+          <div className="flex items-center gap-2 ml-auto">
+            {unprintedState === "confirm" && (
+              <button onClick={() => setUnprintedState("idle")}
+                className="text-xs text-[#8C7B6B] hover:text-[#1A1714] px-3 py-2 transition-colors">
+                Cancel
+              </button>
+            )}
+            {unprintedState === "done" ? (
+              <div className="flex items-center gap-2 text-sm text-green-700 bg-green-50 border border-green-200 rounded-xl px-4 py-2">
+                <CheckCircle size={14} /> Queued {unprintedResult} order{unprintedResult !== 1 ? "s" : ""}
+              </div>
+            ) : (
+              <button onClick={handleSubmitUnprinted} disabled={unprintedState === "sending"}
+                className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-semibold transition-all duration-200 disabled:opacity-60 ${
+                  unprintedState === "confirm"
+                    ? "bg-[#C4622D] text-white hover:bg-[#9E4A1E]"
+                    : "bg-[#1A1714] text-white hover:bg-[#2D2520]"
+                }`}>
+                {unprintedState === "sending"
+                  ? <div className="w-3.5 h-3.5 border-2 border-white/40 border-t-white rounded-full animate-spin" />
+                  : <Printer size={13} />}
+                {unprintedState === "confirm" ? "Confirm — submit all unprinted" : "Submit all unprinted"}
+              </button>
+            )}
+          </div>
+        </div>
+      </div>
+
       {error && (
         <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 text-amber-800 text-sm mb-4">
           <strong>API error:</strong> {error}
@@ -379,27 +455,36 @@ function OrdersView() {
               </span>
 
               {/* Print status / send button */}
-              {isDone ? (
-                <span className="text-xs font-medium px-2.5 py-1 rounded-full bg-indigo-50 text-indigo-700 whitespace-nowrap">
-                  {order.printStatus ?? "Queued"}
-                </span>
-              ) : canSubmit ? (
-                <button
-                  onClick={(e) => handleSendOne(order.id, e)}
-                  disabled={isSending}
-                  className="flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-semibold
-                             bg-[#F5F0EA] text-[#5A4E46] border border-[#E4D8CC]
-                             hover:bg-[#C4622D] hover:text-white hover:border-[#C4622D]
-                             transition-all duration-200 disabled:opacity-60 whitespace-nowrap"
-                >
-                  {isSending
-                    ? <div className="w-3 h-3 border border-current border-t-transparent rounded-full animate-spin" />
-                    : <Printer size={11} />}
-                  Send
-                </button>
-              ) : (
-                <span className="text-xs text-[#C8BAB0]">—</span>
-              )}
+              <div className="flex flex-col items-start gap-1">
+                {isDone ? (
+                  <span className={`text-xs font-medium px-2.5 py-1 rounded-full whitespace-nowrap ${
+                    order.printStatus === "failed"
+                      ? "bg-red-50 text-red-700"
+                      : "bg-indigo-50 text-indigo-700"
+                  }`}>
+                    {order.printStatus ?? "Queued"}
+                  </span>
+                ) : canSubmit ? (
+                  <button
+                    onClick={(e) => handleSendOne(order.id, e)}
+                    disabled={isSending}
+                    className="flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-semibold
+                               bg-[#F5F0EA] text-[#5A4E46] border border-[#E4D8CC]
+                               hover:bg-[#C4622D] hover:text-white hover:border-[#C4622D]
+                               transition-all duration-200 disabled:opacity-60 whitespace-nowrap"
+                  >
+                    {isSending
+                      ? <div className="w-3 h-3 border border-current border-t-transparent rounded-full animate-spin" />
+                      : <Printer size={11} />}
+                    Send
+                  </button>
+                ) : (
+                  <span className="text-xs text-[#C8BAB0]">—</span>
+                )}
+                {submitErrors[order.id] && (
+                  <p className="text-[10px] text-red-600 max-w-[160px] leading-tight">{submitErrors[order.id]}</p>
+                )}
+              </div>
 
               <span className="text-sm font-semibold text-[#1A1714]">
                 {order.currency} {order.totalAmount.toFixed(2)}

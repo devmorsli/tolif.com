@@ -30,7 +30,15 @@ async function apiFetch<T>(path: string, init?: RequestInit): Promise<T> {
   });
   if (!res.ok) {
     const text = await res.text().catch(() => "");
-    throw new Error(text || `HTTP ${res.status}`);
+    // Extract user-friendly message from JSON error responses
+    try {
+      const parsed = JSON.parse(text);
+      const msg = parsed.error || parsed.message || parsed.title || text;
+      throw new Error(typeof msg === "string" ? msg : text);
+    } catch (e) {
+      if (e instanceof SyntaxError) throw new Error(text || `HTTP ${res.status}`);
+      throw e;
+    }
   }
   if (res.status === 204) return undefined as T;
   return res.json() as Promise<T>;
@@ -305,6 +313,17 @@ export async function bulkSubmitOrdersToPrintful(ids: string[]) {
     method: "POST",
     body: JSON.stringify({ ids }),
   });
+}
+
+export async function submitUnprintedOrders(from?: string, to?: string) {
+  const q = new URLSearchParams();
+  if (from) q.set("from", from);
+  if (to)   q.set("to", to);
+  const qs = q.toString();
+  return apiFetch<{ queued: number }>(
+    `/api/admin/orders/submit-unprinted${qs ? `?${qs}` : ""}`,
+    { method: "POST" }
+  );
 }
 
 // ── Settings ──────────────────────────────────────────────────────────────────

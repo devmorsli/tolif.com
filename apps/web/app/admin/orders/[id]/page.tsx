@@ -3,13 +3,13 @@
 import { useEffect, useState } from "react";
 import {
   ChevronLeft, Mail, Package, MapPin, CreditCard, RefreshCw,
-  CheckCircle, AlertCircle, Clock, XCircle, Loader2, Image as ImageIcon,
+  CheckCircle, AlertCircle, Clock, XCircle, Loader2, Image as ImageIcon, Printer,
 } from "lucide-react";
 import Link from "next/link";
 import { use } from "react";
 import { AdminGuard } from "@/components/admin/AdminGuard";
 import { AdminSidebar } from "@/components/admin/AdminSidebar";
-import { getOrder, resendOrderEmail, storagePreviewUrl, type OrderDetail, type OrderDetailItem } from "@/lib/admin-api";
+import { getOrder, resendOrderEmail, submitOrderToPrintful, storagePreviewUrl, type OrderDetail, type OrderDetailItem } from "@/lib/admin-api";
 
 // ── Status helpers ────────────────────────────────────────────────────────────
 
@@ -87,13 +87,17 @@ function OrderItemRow({ item, currency }: { item: OrderDetailItem; currency: str
 
 function ShippingAddress({ json }: { json: string }) {
   try {
-    const addr = JSON.parse(json);
+    const raw = JSON.parse(json);
+    // Normalise to lowercase — backend may serialise PascalCase or camelCase
+    const a: Record<string, string> = {};
+    for (const [k, v] of Object.entries(raw)) a[k.toLowerCase()] = String(v ?? "");
     const lines = [
-      addr.line1,
-      addr.line2,
-      [addr.city, addr.state, addr.postalCode].filter(Boolean).join(", "),
-      addr.country,
+      a.line1,
+      a.line2,
+      [a.city, a.state, a.postalcode].filter(Boolean).join(", "),
+      a.country,
     ].filter(Boolean);
+    if (!lines.length) return <p className="text-xs text-[#8C7B6B] italic">No address on file</p>;
     return (
       <address className="not-italic text-sm text-[#1A1714] space-y-0.5">
         {lines.map((l, i) => <p key={i}>{l}</p>)}
@@ -110,9 +114,12 @@ function OrderDetailContent({ id }: { id: string }) {
   const [order, setOrder]       = useState<OrderDetail | null>(null);
   const [loading, setLoading]   = useState(true);
   const [error, setError]       = useState("");
-  const [sending, setSending]   = useState(false);
-  const [emailSent, setEmailSent] = useState(false);
+  const [sending, setSending]       = useState(false);
+  const [emailSent, setEmailSent]   = useState(false);
   const [emailError, setEmailError] = useState("");
+  const [printSending, setPrintSending] = useState(false);
+  const [printDone, setPrintDone]       = useState(false);
+  const [printError, setPrintError]     = useState("");
 
   useEffect(() => {
     getOrder(id)
@@ -134,6 +141,23 @@ function OrderDetailContent({ id }: { id: string }) {
       setEmailError(e instanceof Error ? e.message : "Failed to send email.");
     } finally {
       setSending(false);
+    }
+  };
+
+  const handlePrintful = async () => {
+    setPrintSending(true);
+    setPrintError("");
+    setPrintDone(false);
+    try {
+      await submitOrderToPrintful(id);
+      setPrintDone(true);
+      // Refresh order to pick up new print status
+      const updated = await getOrder(id).catch(() => null);
+      if (updated) setOrder(updated);
+    } catch (e: unknown) {
+      setPrintError(e instanceof Error ? e.message : "Failed to submit.");
+    } finally {
+      setPrintSending(false);
     }
   };
 
@@ -267,7 +291,7 @@ function OrderDetailContent({ id }: { id: string }) {
                     </a>
 
                     {/* Resend email */}
-                    <div className="mt-5 pt-5 border-t border-[#F2EAE0]">
+                    <div className="mt-5 pt-5 border-t border-[#F2EAE0] space-y-2">
                       <button
                         onClick={handleResend}
                         disabled={sending}
@@ -283,7 +307,26 @@ function OrderDetailContent({ id }: { id: string }) {
                         {emailSent ? "Email sent!" : "Resend confirmation email"}
                       </button>
                       {emailError && (
-                        <p className="text-xs text-red-600 mt-2 text-center">{emailError}</p>
+                        <p className="text-xs text-red-600 mt-1 text-center">{emailError}</p>
+                      )}
+
+                      {/* Submit to Printful */}
+                      <button
+                        onClick={handlePrintful}
+                        disabled={printSending || printDone}
+                        className="w-full flex items-center justify-center gap-2 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-60 text-white text-xs font-medium px-4 py-2.5 rounded-xl transition-colors"
+                      >
+                        {printSending ? (
+                          <Loader2 size={13} className="animate-spin" />
+                        ) : printDone ? (
+                          <CheckCircle size={13} />
+                        ) : (
+                          <Printer size={13} />
+                        )}
+                        {printDone ? "Queued for Printful" : "Submit to Printful"}
+                      </button>
+                      {printError && (
+                        <p className="text-xs text-red-600 mt-1 text-center">{printError}</p>
                       )}
                     </div>
                   </div>

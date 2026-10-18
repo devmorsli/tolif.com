@@ -6,16 +6,17 @@ import "./globals.css";
 const displayFont = Cormorant_Garamond({
   variable: "--font-display",
   subsets: ["latin"],
-  weight: ["300", "400", "500", "600", "700"],
-  style: ["normal", "italic"],
+  weight: ["300", "400", "600"],
   display: "swap",
+  preload: true,
 });
 
 const bodyFont = DM_Sans({
   variable: "--font-body",
   subsets: ["latin"],
-  weight: ["300", "400", "500", "600"],
+  weight: ["400", "500"],
   display: "swap",
+  preload: false,  // secondary font — let the browser load it after paint
 });
 
 export const metadata: Metadata = {
