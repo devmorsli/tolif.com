@@ -241,12 +241,14 @@ export function Step3PreviewOrder() {
   // If no framed products exist at all, show all options (might just not be set up yet)
   const showAllFrames = !hasBlack && !hasRedOak && !hasWhite;
 
-  const FRAME_OPTS: { key: Frame; label: string; sub: string; swatch: React.CSSProperties | null }[] = [
-    { key: "black",   label: "Black",   sub: "Matte black",  swatch: { background: "#1C1C1C" } },
-    { key: "red-oak", label: "Red Oak", sub: "Natural wood", swatch: { background: "linear-gradient(135deg, #8B4513 0%, #A0522D 50%, #6B3311 100%)" } },
-    { key: "white",   label: "White",   sub: "Gloss white",  swatch: { background: "#F5F5F5", border: "1px solid #D0C4B8" } },
-    { key: "none",    label: "No frame", sub: "Plain poster", swatch: null },
-  ].filter(({ key }) => {
+  const FRAME_OPTS = (
+    [
+      { key: "black"   as Frame, label: "Black",    sub: "Matte black",  swatch: { background: "#1C1C1C" } as React.CSSProperties },
+      { key: "red-oak" as Frame, label: "Red Oak",  sub: "Natural wood", swatch: { background: "linear-gradient(135deg, #8B4513 0%, #A0522D 50%, #6B3311 100%)" } as React.CSSProperties },
+      { key: "white"   as Frame, label: "White",    sub: "Gloss white",  swatch: { background: "#F5F5F5", border: "1px solid #D0C4B8" } as React.CSSProperties },
+      { key: "none"    as Frame, label: "No frame", sub: "Plain poster",  swatch: null as React.CSSProperties | null },
+    ] as { key: Frame; label: string; sub: string; swatch: React.CSSProperties | null }[]
+  ).filter(({ key }) => {
     if (key === "none") return true;
     if (showAllFrames) return true;
     if (key === "black")   return hasBlack;
