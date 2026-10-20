@@ -119,24 +119,39 @@ public class SubmitPrintOrderJob(
 
         var result = await provider.SubmitOrderAsync(printRequest, ct);
 
+        // Determine print status to persist
+        string printStatus;
+        if (result.Success)
+            printStatus = "submitted";
+        else if (result.PendingAtProvider)
+            printStatus = "pending_printful";
+        else
+            printStatus = "failed";
+
         // Save PrintOrder record
         db.PrintOrders.Add(new PrintOrder
         {
-            Id              = Guid.NewGuid(),
-            OrderId         = order.Id,
-            Provider        = provider.ProviderType,
-            ProviderOrderId = result.ProviderOrderId,
-            Status          = result.Success ? "submitted" : "failed",
+            Id               = Guid.NewGuid(),
+            OrderId          = order.Id,
+            Provider         = provider.ProviderType,
+            ProviderOrderId  = result.ProviderOrderId,
+            Status           = printStatus,
             LastErrorMessage = result.ErrorMessage,
-            SubmittedAt     = result.Success ? DateTime.UtcNow : null,
-            CreatedAt       = DateTime.UtcNow,
-            UpdatedAt       = DateTime.UtcNow,
+            SubmittedAt      = result.Success ? DateTime.UtcNow : null,
+            CreatedAt        = DateTime.UtcNow,
+            UpdatedAt        = DateTime.UtcNow,
         });
 
         if (result.Success)
         {
             order.Status    = OrderStatus.SubmittedToPrinter;
             order.UpdatedAt = DateTime.UtcNow;
+        }
+        else if (result.PendingAtProvider)
+        {
+            logger.LogInformation(
+                "Order {OrderId} draft created at provider but cost calculation timed out — marked pending_printful",
+                orderId);
         }
         else
         {

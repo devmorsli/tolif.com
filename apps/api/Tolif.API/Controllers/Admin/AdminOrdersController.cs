@@ -27,12 +27,13 @@ public class AdminOrdersController(
     // ── GET /api/admin/orders ─────────────────────────────────────────────────
     [HttpGet]
     public async Task<IActionResult> GetAll(
-        [FromQuery] int       page     = 1,
-        [FromQuery] int       pageSize = 20,
-        [FromQuery] string?   status   = null,
-        [FromQuery] string?   search   = null,
-        [FromQuery] DateTime? from     = null,
-        [FromQuery] DateTime? to       = null,
+        [FromQuery] int       page        = 1,
+        [FromQuery] int       pageSize    = 20,
+        [FromQuery] string?   status      = null,
+        [FromQuery] string?   printStatus = null,
+        [FromQuery] string?   search      = null,
+        [FromQuery] DateTime? from        = null,
+        [FromQuery] DateTime? to          = null,
         CancellationToken ct = default)
     {
         page     = Math.Max(1, page);
@@ -43,6 +44,14 @@ public class AdminOrdersController(
         if (!string.IsNullOrWhiteSpace(status) &&
             Enum.TryParse<OrderStatus>(status, ignoreCase: true, out var parsedStatus))
             query = query.Where(o => o.Status == parsedStatus);
+
+        if (!string.IsNullOrWhiteSpace(printStatus))
+            query = query.Where(o =>
+                db.PrintOrders
+                    .Where(p => p.OrderId == o.Id)
+                    .OrderByDescending(p => p.CreatedAt)
+                    .Select(p => p.Status)
+                    .FirstOrDefault() == printStatus);
 
         if (!string.IsNullOrWhiteSpace(search))
             query = query.Where(o =>

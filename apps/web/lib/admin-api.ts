@@ -241,10 +241,11 @@ export interface OrdersPage {
 
 export async function getOrders(
   page = 1, pageSize = 20, status = "", search = "",
-  from?: string, to?: string
+  from?: string, to?: string, printStatus = ""
 ) {
   const q = new URLSearchParams({ page: String(page), pageSize: String(pageSize) });
   if (status) q.set("status", status);
+  if (printStatus) q.set("printStatus", printStatus);
   if (search) q.set("search", search);
   if (from) q.set("from", from);
   if (to) q.set("to", to);

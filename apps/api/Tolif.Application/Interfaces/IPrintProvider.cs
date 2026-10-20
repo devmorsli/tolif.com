@@ -19,7 +19,8 @@ public record PrintLineItem(
 public record PrintOrderResult(
     bool Success,
     string? ProviderOrderId,
-    string? ErrorMessage = null
+    string? ErrorMessage = null,
+    bool PendingAtProvider = false  // draft created but provider is still processing (not a failure)
 );
 
 public interface IPrintProvider

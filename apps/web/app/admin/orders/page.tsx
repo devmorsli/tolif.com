@@ -3,7 +3,7 @@
 import { useEffect, useState, useCallback } from "react";
 import {
   Search, TrendingUp, ShoppingBag, AlertCircle, Mail,
-  Clock, Calendar, X, RefreshCw, Send, CheckCircle, Printer,
+  Clock, Calendar, X, RefreshCw, Send, CheckCircle, Printer, Hourglass,
 } from "lucide-react";
 import { AdminGuard } from "@/components/admin/AdminGuard";
 import { AdminSidebar } from "@/components/admin/AdminSidebar";
@@ -14,6 +14,13 @@ import {
   type OrderListItem, type OrdersPage,
   type OrderStats, type AbandonedCartItem, type AbandonedCartsPage,
 } from "@/lib/admin-api";
+
+const PRINT_STATUS_LABELS: Record<string, string> = {
+  "":                 "All print statuses",
+  submitted:          "Sent to printer",
+  pending_printful:   "Waiting at Printful",
+  failed:             "Print failed",
+};
 import Link from "next/link";
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:5000";
@@ -98,6 +105,7 @@ function OrdersView() {
   const [error,       setError]       = useState("");
   const [page,        setPage]        = useState(1);
   const [status,      setStatus]      = useState("");
+  const [printStatus, setPrintStatus] = useState("");
   const [search,      setSearch]      = useState("");
   const [searchInput, setSearchInput] = useState("");
   const [period,      setPeriod]      = useState<Period>("all");
@@ -129,17 +137,18 @@ function OrdersView() {
   const load = useCallback(() => {
     setLoading(true);
     const { from, to } = getDateRange();
-    getOrders(page, 20, status, search, from, to)
+    getOrders(page, 20, status, search, from, to, printStatus)
       .then(setData)
       .catch(() => setError("Could not load orders. Is the API running?"))
       .finally(() => setLoading(false));
-  }, [page, status, search, getDateRange]);
+  }, [page, status, printStatus, search, getDateRange]);
 
   useEffect(() => { load(); }, [load]);
 
-  const handlePeriod = (p: Period) => { setPeriod(p); setPage(1); };
-  const handleStatus = (s: string) => { setStatus(s); setPage(1); };
-  const handleSearch = () => { setSearch(searchInput); setPage(1); };
+  const handlePeriod      = (p: Period) => { setPeriod(p); setPage(1); };
+  const handleStatus      = (s: string) => { setStatus(s); setPage(1); };
+  const handlePrintStatus = (s: string) => { setPrintStatus(s); setPage(1); };
+  const handleSearch      = () => { setSearch(searchInput); setPage(1); };
 
   const handleSendOne = async (id: string, e: React.MouseEvent) => {
     e.preventDefault();
@@ -197,7 +206,7 @@ function OrdersView() {
     if (!data) return;
     const submittableIds = data.items
       .filter(o => ["Paid","Ready","GeneratingHighRes"].includes(o.status) && (!o.printStatus || o.printStatus === "failed"))
-      .map(o => o.id);
+      .map(o => o.id);  // pending_printful excluded — already at Printful
     if (submittableIds.every(id => selected.has(id))) {
       setSelected(new Set());
     } else {
@@ -284,6 +293,15 @@ function OrdersView() {
             <option key={s} value={s}>{STATUS_LABELS[s]}</option>
           ))}
         </select>
+        <select
+          value={printStatus}
+          onChange={(e) => handlePrintStatus(e.target.value)}
+          className="bg-white border border-[#E4D8CC] rounded-xl px-4 py-2.5 text-sm text-[#1A1714] focus:outline-none focus:ring-2 focus:ring-[#C4622D]/30 focus:border-[#C4622D] transition-colors"
+        >
+          {Object.entries(PRINT_STATUS_LABELS).map(([v, l]) => (
+            <option key={v} value={v}>{l}</option>
+          ))}
+        </select>
         <button
           onClick={load}
           className="flex items-center gap-2 px-4 py-2.5 rounded-xl border border-[#E4D8CC] bg-white text-sm text-[#5A4E46] hover:border-[#1A1714] hover:text-[#1A1714] transition-colors"
@@ -304,9 +322,9 @@ function OrdersView() {
               </span>
             )}
           </p>
-          {(status || search || period !== "all") && (
+          {(status || printStatus || search || period !== "all") && (
             <button
-              onClick={() => { setStatus(""); setSearch(""); setSearchInput(""); setPeriod("all"); setPage(1); }}
+              onClick={() => { setStatus(""); setPrintStatus(""); setSearch(""); setSearchInput(""); setPeriod("all"); setPage(1); }}
               className="text-xs text-[#8C7B6B] hover:text-[#C4622D] flex items-center gap-1 transition-colors"
             >
               <X size={11} /> Clear filters
@@ -423,7 +441,8 @@ function OrdersView() {
 
         {data?.items.map((order: OrderListItem) => {
           const isFailed  = order.printStatus === "failed";
-          const isPrinted = successIds.has(order.id) || (order.printStatus != null && order.printStatus !== "" && !isFailed);
+          const isPending = order.printStatus === "pending_printful";
+          const isPrinted = successIds.has(order.id) || (order.printStatus === "submitted");
           const canSubmit = ["Paid", "Ready", "GeneratingHighRes"].includes(order.status) && (!order.printStatus || isFailed);
           const isSending = submitting === order.id;
           // live error from this session OR persisted error from DB
@@ -462,6 +481,10 @@ function OrdersView() {
                 {isPrinted ? (
                   <span className="flex items-center gap-1 text-xs font-medium px-2.5 py-1 rounded-full bg-indigo-50 text-indigo-700 whitespace-nowrap">
                     <CheckCircle size={10} /> Sent to printer
+                  </span>
+                ) : isPending ? (
+                  <span className="flex items-center gap-1 text-xs font-medium px-2.5 py-1 rounded-full bg-amber-50 text-amber-700 whitespace-nowrap">
+                    <Hourglass size={10} /> Waiting at Printful
                   </span>
                 ) : isFailed ? (
                   <div className="flex flex-col gap-1.5">

@@ -88,7 +88,8 @@ public sealed class PrintfulAdapterService(
                         "Printful cost calculation failed for draft order.");
                 if (poll == maxPollAttempts)
                     return new PrintOrderResult(false, draft.PrintfulOrderId,
-                        $"Timed out waiting for Printful cost calculations. Last status: {lastStatus ?? "null"}");
+                        $"Timed out waiting for Printful cost calculations. Last status: {lastStatus ?? "null"}",
+                        PendingAtProvider: true);
             }
 
             // Costs are ready — confirm once
