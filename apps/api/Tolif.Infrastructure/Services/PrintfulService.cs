@@ -220,6 +220,54 @@ public sealed class PrintfulService(ISettingsService settings, IHttpClientFactor
         return variants;
     }
 
+    // ── Variant placement lookup ──────────────────────────────────────────────
+
+    public async Task<PrintfulPlacementInfo?> GetVariantPlacementAsync(long variantId, CancellationToken ct = default)
+    {
+        try
+        {
+            var client = await CreateClientAsync(ct);
+
+            // Step 1: get catalog_product_id from the variant
+            var variantRes = await client.GetAsync($"/v2/catalog-variants/{variantId}", ct);
+            if (!variantRes.IsSuccessStatusCode) return null;
+            var variantRoot = JsonNode.Parse(await variantRes.Content.ReadAsStringAsync(ct));
+            var productId   = variantRoot?["data"]?["catalog_product_id"]?.GetValue<long>();
+            if (productId is null) return null;
+
+            // Step 2: get placements from the product
+            var productRes = await client.GetAsync($"/v2/catalog-products/{productId}", ct);
+            if (!productRes.IsSuccessStatusCode) return null;
+            var productRoot = JsonNode.Parse(await productRes.Content.ReadAsStringAsync(ct));
+            var placements  = productRoot?["data"]?["placements"]?.AsArray();
+            if (placements is null || placements.Count == 0) return null;
+
+            // Use first placement — prefer the default technique if flagged
+            var first      = placements[0]?.AsObject();
+            var placement  = first?["placement"]?.GetValue<string>() ?? "front";
+            var techniques = first?["techniques"]?.AsArray();
+            string technique;
+            if (techniques is not null && techniques.Count > 0)
+            {
+                // Pick default technique if any, otherwise first
+                var def = techniques.OfType<JsonObject>()
+                    .FirstOrDefault(t => t["is_default"]?.GetValue<bool>() == true)
+                    ?? techniques[0]?.AsObject();
+                technique = def?["technique"]?.GetValue<string>() ?? "digital";
+            }
+            else
+            {
+                technique = "digital";
+            }
+
+            return new PrintfulPlacementInfo(placement, technique);
+        }
+        catch
+        {
+            return null;
+        }
+    }
+
     // ── File upload ────────────────────────────────────────────────────────────
 
     public async Task<string> UploadFileAsync(string publicUrl, string fileName, CancellationToken ct = default)
@@ -240,18 +288,26 @@ public sealed class PrintfulService(ISettingsService settings, IHttpClientFactor
     {
         var client = await CreateClientAsync(ct);
 
-        // Build JSON explicitly with JsonObject to guarantee exact key names
+        // Build JSON for Printful v2 order (catalog items with placements)
         var itemsArray = new JsonArray();
         foreach (var i in request.Items)
         {
             itemsArray.Add(new JsonObject
             {
-                ["variant_id"] = i.VariantId,
-                ["quantity"]   = i.Quantity,
-                ["name"]       = i.Label,
-                ["files"]      = new JsonArray
+                ["catalog_variant_id"] = i.VariantId,
+                ["quantity"]           = i.Quantity,
+                ["source"]             = "catalog",
+                ["placements"]         = new JsonArray
                 {
-                    new JsonObject { ["type"] = "default", ["source"] = "url", ["url"] = i.PrintFileUrl },
+                    new JsonObject
+                    {
+                        ["placement"] = i.Placement,
+                        ["technique"] = i.Technique,
+                        ["layers"]    = new JsonArray
+                        {
+                            new JsonObject { ["type"] = "file", ["url"] = i.PrintFileUrl },
+                        },
+                    },
                 },
             });
         }

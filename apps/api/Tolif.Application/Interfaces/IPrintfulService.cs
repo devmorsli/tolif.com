@@ -63,6 +63,8 @@ public record PrintfulDraftItem(
     long VariantId,
     int Quantity,
     string PrintFileUrl,   // presigned URL to the high-res file
+    string Placement,      // e.g. "front" — from GetVariantPlacementAsync
+    string Technique,      // e.g. "digital" — from GetVariantPlacementAsync
     string? Label = null
 );
 
@@ -79,6 +81,13 @@ public record PrintfulWebhook(
     long Id,
     string Url,
     IReadOnlyList<string> Types
+);
+
+// ── Variant placement lookup (v2) ─────────────────────────────────────────────
+
+public record PrintfulPlacementInfo(
+    string Placement,
+    string Technique
 );
 
 // ── Service interface ──────────────────────────────────────────────────────────
@@ -99,6 +108,13 @@ public interface IPrintfulService
 
     /// <summary>Fetch variants for a single catalog product by its Printful product ID.</summary>
     Task<IReadOnlyList<PrintfulCatalogVariant>> GetProductVariantsAsync(long productId, CancellationToken ct = default);
+
+    /// <summary>
+    /// For a catalog variant ID, look up the first available placement + technique
+    /// by querying /v2/catalog-variants/{id} then /v2/catalog-products/{productId}.
+    /// Returns null if the lookup fails.
+    /// </summary>
+    Task<PrintfulPlacementInfo?> GetVariantPlacementAsync(long variantId, CancellationToken ct = default);
 
     /// <summary>Upload a file (by public URL) to the Printful file library; returns the Printful file ID.</summary>
     Task<string> UploadFileAsync(string publicUrl, string fileName, CancellationToken ct = default);

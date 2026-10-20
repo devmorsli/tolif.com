@@ -35,10 +35,19 @@ public sealed class PrintfulAdapterService(
                 if (!long.TryParse(li.ProviderVariantId, out var variantId))
                     throw new InvalidOperationException($"Printful variant ID must be numeric, got: {li.ProviderVariantId}");
 
+                // Look up the correct placement + technique for this variant from Printful v2 catalog
+                var placementInfo = await printfulService.GetVariantPlacementAsync(variantId, ct);
+                if (placementInfo is null)
+                    throw new InvalidOperationException(
+                        $"Could not retrieve placement info for Printful variant {variantId}. " +
+                        "Check the Printful API key and variant ID.");
+
                 draftItems.Add(new PrintfulDraftItem(
                     VariantId:    variantId,
                     Quantity:     li.Quantity,
-                    PrintFileUrl: signedUrl));
+                    PrintFileUrl: signedUrl,
+                    Placement:    placementInfo.Placement,
+                    Technique:    placementInfo.Technique));
             }
 
             var draftRequest = new PrintfulDraftOrderRequest(
