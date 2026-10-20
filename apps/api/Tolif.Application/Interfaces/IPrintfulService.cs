@@ -120,9 +120,6 @@ public interface IPrintfulService
     /// <summary>Upload a file (by public URL) to the Printful file library; returns the Printful file ID.</summary>
     Task<string> UploadFileAsync(string publicUrl, string fileName, CancellationToken ct = default);
 
-    /// <summary>Upload raw bytes directly to the Printful file library; returns the Printful file ID.</summary>
-    Task<string> UploadFileBytesAsync(byte[] data, string fileName, string contentType, CancellationToken ct = default);
-
     /// <summary>Create a draft order (not yet submitted to production).</summary>
     Task<PrintfulDraftResult> CreateDraftOrderAsync(PrintfulDraftOrderRequest request, CancellationToken ct = default);
 

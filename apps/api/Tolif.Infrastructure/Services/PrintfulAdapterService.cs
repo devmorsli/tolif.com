@@ -38,14 +38,13 @@ public sealed class PrintfulAdapterService(
                         $"Could not retrieve placement info for Printful variant {variantId}. " +
                         "Check the Printful API key and variant ID.");
 
-                // Download the portrait from MinIO on our server, then push the bytes directly to
-                // Printful's file library. This avoids Printful needing to reach storage.tolif.com
-                // (which may not be publicly accessible from Printful's servers).
-                var fileName    = Path.GetFileName(li.PrintFileKey);
-                var contentType = fileName.EndsWith(".png", StringComparison.OrdinalIgnoreCase)
-                    ? "image/png" : "image/jpeg";
-                var fileBytes   = await storageService.DownloadAsync(li.PrintFileKey, ct);
-                var printfulFileId = await printfulService.UploadFileBytesAsync(fileBytes, fileName, contentType, ct);
+                // Pre-upload the portrait to Printful's file library using a presigned URL.
+                // Printful fetches it once and assigns a file_id we reference in the order layer.
+                // This ensures the file is fully ready before the order is created.
+                var fileName      = Path.GetFileName(li.PrintFileKey);
+                var presignedUrl  = await storageService.GenerateDownloadUrlAsync(
+                    li.PrintFileKey, TimeSpan.FromHours(1), ct);
+                var printfulFileId = await printfulService.UploadFileAsync(presignedUrl, fileName, ct);
 
                 draftItems.Add(new PrintfulDraftItem(
                     VariantId:      variantId,
