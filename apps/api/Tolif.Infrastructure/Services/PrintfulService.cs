@@ -251,14 +251,13 @@ public sealed class PrintfulService(ISettingsService settings, IHttpClientFactor
                 ["name"]       = i.Label,
                 ["files"]      = new JsonArray
                 {
-                    new JsonObject { ["type"] = "default", ["url"] = i.PrintFileUrl },
+                    new JsonObject { ["type"] = "default", ["source"] = "url", ["url"] = i.PrintFileUrl },
                 },
             });
         }
 
         var bodyNode = new JsonObject
         {
-            ["source"] = "api",
             ["recipient"] = new JsonObject
             {
                 ["name"]         = request.RecipientName,
