@@ -364,6 +364,24 @@ public sealed class PrintfulService(ISettingsService settings, IHttpClientFactor
         }
     }
 
+    // ── Order cost status poll ─────────────────────────────────────────────────
+
+    public async Task<string?> GetOrderCostStatusAsync(string printfulOrderId, CancellationToken ct = default)
+    {
+        try
+        {
+            var client = await CreateClientAsync(ct);
+            var res    = await client.GetAsync($"/v2/orders/{printfulOrderId}", ct);
+            if (!res.IsSuccessStatusCode) return null;
+            var root   = JsonNode.Parse(await res.Content.ReadAsStringAsync(ct));
+            return root?["data"]?["costs"]?["calculation_status"]?.GetValue<string>();
+        }
+        catch
+        {
+            return null;
+        }
+    }
+
     // ── Confirm order ──────────────────────────────────────────────────────────
 
     public async Task<PrintfulDraftResult> ConfirmOrderAsync(

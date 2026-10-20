@@ -126,6 +126,12 @@ public interface IPrintfulService
     /// <summary>Create a draft order (not yet submitted to production).</summary>
     Task<PrintfulDraftResult> CreateDraftOrderAsync(PrintfulDraftOrderRequest request, CancellationToken ct = default);
 
+    /// <summary>
+    /// Poll a draft order and return its cost calculation status.
+    /// Returns "completed", "calculating", "failed", or null on error.
+    /// </summary>
+    Task<string?> GetOrderCostStatusAsync(string printfulOrderId, CancellationToken ct = default);
+
     /// <summary>Confirm a draft order after payment succeeds.</summary>
     Task<PrintfulDraftResult> ConfirmOrderAsync(string printfulOrderId, CancellationToken ct = default);
 

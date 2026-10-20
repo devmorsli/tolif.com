@@ -71,30 +71,24 @@ public sealed class PrintfulAdapterService(
             if (!draft.Success)
                 return new PrintOrderResult(false, null, draft.ErrorMessage);
 
-            // Confirm (submit to production).
-            // Printful v2 needs time after draft creation to calculate costs and process the design.
-            // Retry up to 8 times with increasing delays (5s, 10s, 15s … 40s = ~2 min total).
-            PrintfulDraftResult confirm = default!;
-            const int maxConfirmAttempts = 8;
-            for (int attempt = 1; attempt <= maxConfirmAttempts; attempt++)
+            // Per Printful v2 docs: poll GET /v2/orders/{id} until costs.calculation_status == "completed"
+            // before calling confirmation. Max ~3 minutes total (20 polls × 10s).
+            const int maxPollAttempts = 20;
+            for (int poll = 1; poll <= maxPollAttempts; poll++)
             {
-                if (attempt > 1)
-                    await Task.Delay(TimeSpan.FromSeconds(attempt * 5), ct); // 5s, 10s, 15s, 20s, 25s, 30s, 35s
-
-                confirm = await printfulService.ConfirmOrderAsync(draft.PrintfulOrderId!, ct);
-                if (confirm.Success)
-                    break;
-
-                // Printful returns one of these while it is still processing
-                bool stillPending = confirm.ErrorMessage is { } msg && (
-                    msg.Contains("cost calculations still running", StringComparison.OrdinalIgnoreCase) ||
-                    msg.Contains("design is still processing",      StringComparison.OrdinalIgnoreCase) ||
-                    msg.Contains("still processing",                StringComparison.OrdinalIgnoreCase));
-
-                if (!stillPending || attempt == maxConfirmAttempts)
-                    return new PrintOrderResult(false, draft.PrintfulOrderId, confirm.ErrorMessage);
+                await Task.Delay(TimeSpan.FromSeconds(10), ct);
+                var costStatus = await printfulService.GetOrderCostStatusAsync(draft.PrintfulOrderId!, ct);
+                if (costStatus == "completed") break;
+                if (costStatus == "failed")
+                    return new PrintOrderResult(false, draft.PrintfulOrderId,
+                        "Printful cost calculation failed for draft order.");
+                if (poll == maxPollAttempts)
+                    return new PrintOrderResult(false, draft.PrintfulOrderId,
+                        "Timed out waiting for Printful cost calculations to complete.");
             }
 
+            // Costs are ready — confirm once
+            var confirm = await printfulService.ConfirmOrderAsync(draft.PrintfulOrderId!, ct);
             if (!confirm.Success)
                 return new PrintOrderResult(false, draft.PrintfulOrderId, confirm.ErrorMessage);
 
