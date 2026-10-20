@@ -62,10 +62,9 @@ public record PrintfulDraftOrderRequest(
 public record PrintfulDraftItem(
     long VariantId,
     int Quantity,
-    string Placement,       // e.g. "front" — from GetVariantPlacementAsync
-    string Technique,       // e.g. "digital" — from GetVariantPlacementAsync
-    string? PrintFileUrl  = null,  // presigned URL (fallback — Printful must be able to reach it)
-    string? PrintfulFileId = null, // preferred: pre-uploaded Printful file library ID
+    string Placement,    // e.g. "default" — from GetVariantPlacementAsync
+    string Technique,    // e.g. "digital" — from GetVariantPlacementAsync
+    string PrintFileUrl, // presigned URL to the high-res file
     string? Label = null
 );
 

@@ -38,20 +38,16 @@ public sealed class PrintfulAdapterService(
                         $"Could not retrieve placement info for Printful variant {variantId}. " +
                         "Check the Printful API key and variant ID.");
 
-                // Pre-upload the portrait to Printful's file library using a presigned URL.
-                // Printful fetches it once and assigns a file_id we reference in the order layer.
-                // This ensures the file is fully ready before the order is created.
-                var fileName      = Path.GetFileName(li.PrintFileKey);
-                var presignedUrl  = await storageService.GenerateDownloadUrlAsync(
+                // Generate a presigned URL so Printful can fetch the file when creating the draft
+                var presignedUrl = await storageService.GenerateDownloadUrlAsync(
                     li.PrintFileKey, TimeSpan.FromHours(1), ct);
-                var printfulFileId = await printfulService.UploadFileAsync(presignedUrl, fileName, ct);
 
                 draftItems.Add(new PrintfulDraftItem(
-                    VariantId:      variantId,
-                    Quantity:       li.Quantity,
-                    Placement:      placementInfo.Placement,
-                    Technique:      placementInfo.Technique,
-                    PrintfulFileId: printfulFileId));
+                    VariantId:    variantId,
+                    Quantity:     li.Quantity,
+                    Placement:    placementInfo.Placement,
+                    Technique:    placementInfo.Technique,
+                    PrintFileUrl: presignedUrl));
             }
 
             var draftRequest = new PrintfulDraftOrderRequest(

@@ -305,9 +305,7 @@ public sealed class PrintfulService(ISettingsService settings, IHttpClientFactor
                         ["technique"] = i.Technique,
                         ["layers"]    = new JsonArray
                         {
-                            i.PrintfulFileId is not null
-                                ? new JsonObject { ["type"] = "file", ["file_id"] = long.Parse(i.PrintfulFileId) }
-                                : new JsonObject { ["type"] = "file", ["url"]     = i.PrintFileUrl },
+                            new JsonObject { ["type"] = "file", ["url"] = i.PrintFileUrl },
                         },
                     },
                 },
