@@ -240,37 +240,51 @@ public sealed class PrintfulService(ISettingsService settings, IHttpClientFactor
     {
         var client = await CreateClientAsync(ct);
 
-        var body = new
+        // Build JSON explicitly with JsonObject to guarantee exact key names
+        var itemsArray = new JsonArray();
+        foreach (var i in request.Items)
         {
-            source    = "api",
-            recipient = new
+            itemsArray.Add(new JsonObject
             {
-                name         = request.RecipientName,
-                address1     = request.RecipientAddress1,
-                address2     = request.RecipientAddress2,
-                city         = request.RecipientCity,
-                state_code   = request.RecipientStateCode,
-                country_code = request.RecipientCountryCode,
-                zip          = request.RecipientZip,
-                email        = request.RecipientEmail,
-                phone        = request.RecipientPhone,
+                ["variant_id"] = i.VariantId,
+                ["quantity"]   = i.Quantity,
+                ["name"]       = i.Label,
+                ["files"]      = new JsonArray
+                {
+                    new JsonObject { ["type"] = "default", ["url"] = i.PrintFileUrl },
+                },
+            });
+        }
+
+        var bodyNode = new JsonObject
+        {
+            ["source"] = "api",
+            ["recipient"] = new JsonObject
+            {
+                ["name"]         = request.RecipientName,
+                ["address1"]     = request.RecipientAddress1,
+                ["address2"]     = request.RecipientAddress2,
+                ["city"]         = request.RecipientCity,
+                ["state_code"]   = request.RecipientStateCode,
+                ["country_code"] = request.RecipientCountryCode,
+                ["zip"]          = request.RecipientZip,
+                ["email"]        = request.RecipientEmail,
+                ["phone"]        = request.RecipientPhone ?? "",
             },
-            items = request.Items.Select(i => new
-            {
-                variant_id = i.VariantId,
-                quantity   = i.Quantity,
-                name       = i.Label,
-                files      = new[] { new { type = "default", url = i.PrintFileUrl } },
-            }).ToArray(),
+            ["items"] = itemsArray,
         };
+
+        var bodyJson = bodyNode.ToJsonString();
+        Console.WriteLine($"[Printful] POST /v2/orders body: {bodyJson}");
 
         try
         {
-            var res = await client.PostAsync("/v2/orders", JsonBody(body), ct);
+            var content = new StringContent(bodyJson, Encoding.UTF8, "application/json");
+            var res = await client.PostAsync("/v2/orders", content, ct);
             await EnsureSuccessAsync(res, ct);
-            var root        = JsonNode.Parse(await res.Content.ReadAsStringAsync(ct));
-            var orderId     = root?["data"]?["id"]?.ToString();
-            var dashUrl     = root?["data"]?["dashboard_url"]?.GetValue<string>();
+            var root    = JsonNode.Parse(await res.Content.ReadAsStringAsync(ct));
+            var orderId = root?["data"]?["id"]?.ToString();
+            var dashUrl = root?["data"]?["dashboard_url"]?.GetValue<string>();
             return new PrintfulDraftResult(true, orderId, dashUrl);
         }
         catch (Exception ex)
