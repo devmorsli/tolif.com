@@ -66,8 +66,25 @@ public sealed class PrintfulAdapterService(
             if (!draft.Success)
                 return new PrintOrderResult(false, null, draft.ErrorMessage);
 
-            // Confirm (submit to production)
-            var confirm = await printfulService.ConfirmOrderAsync(draft.PrintfulOrderId!, ct);
+            // Confirm (submit to production) — Printful may need a moment to finish cost calculations,
+            // so retry a few times if we get the "cost calculations still running" error.
+            PrintfulDraftResult confirm = default!;
+            const int maxConfirmAttempts = 6;
+            for (int attempt = 1; attempt <= maxConfirmAttempts; attempt++)
+            {
+                if (attempt > 1)
+                    await Task.Delay(TimeSpan.FromSeconds(attempt * 2), ct); // 2s, 4s, 6s, 8s, 10s
+
+                confirm = await printfulService.ConfirmOrderAsync(draft.PrintfulOrderId!, ct);
+                if (confirm.Success)
+                    break;
+
+                bool costsPending = confirm.ErrorMessage?.Contains("cost calculations still running",
+                    StringComparison.OrdinalIgnoreCase) ?? false;
+                if (!costsPending || attempt == maxConfirmAttempts)
+                    return new PrintOrderResult(false, draft.PrintfulOrderId, confirm.ErrorMessage);
+            }
+
             if (!confirm.Success)
                 return new PrintOrderResult(false, draft.PrintfulOrderId, confirm.ErrorMessage);
 
