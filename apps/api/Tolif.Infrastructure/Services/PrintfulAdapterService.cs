@@ -24,14 +24,10 @@ public sealed class PrintfulAdapterService(
                            new JsonSerializerOptions { PropertyNameCaseInsensitive = true })
                        ?? throw new InvalidOperationException("Invalid shipping address JSON.");
 
-            // Build line items — generate a presigned URL for each print file
+            // Build line items
             var draftItems = new List<PrintfulDraftItem>();
             foreach (var li in request.LineItems)
             {
-                // Generate a 60-minute presigned URL so Printful can pull the file
-                var signedUrl = await storageService.GenerateDownloadUrlAsync(
-                    li.PrintFileKey, TimeSpan.FromHours(1), ct);
-
                 if (!long.TryParse(li.ProviderVariantId, out var variantId))
                     throw new InvalidOperationException($"Printful variant ID must be numeric, got: {li.ProviderVariantId}");
 
@@ -42,12 +38,21 @@ public sealed class PrintfulAdapterService(
                         $"Could not retrieve placement info for Printful variant {variantId}. " +
                         "Check the Printful API key and variant ID.");
 
+                // Download the portrait from MinIO on our server, then push the bytes directly to
+                // Printful's file library. This avoids Printful needing to reach storage.tolif.com
+                // (which may not be publicly accessible from Printful's servers).
+                var fileName    = Path.GetFileName(li.PrintFileKey);
+                var contentType = fileName.EndsWith(".png", StringComparison.OrdinalIgnoreCase)
+                    ? "image/png" : "image/jpeg";
+                var fileBytes   = await storageService.DownloadAsync(li.PrintFileKey, ct);
+                var printfulFileId = await printfulService.UploadFileBytesAsync(fileBytes, fileName, contentType, ct);
+
                 draftItems.Add(new PrintfulDraftItem(
-                    VariantId:    variantId,
-                    Quantity:     li.Quantity,
-                    PrintFileUrl: signedUrl,
-                    Placement:    placementInfo.Placement,
-                    Technique:    placementInfo.Technique));
+                    VariantId:      variantId,
+                    Quantity:       li.Quantity,
+                    Placement:      placementInfo.Placement,
+                    Technique:      placementInfo.Technique,
+                    PrintfulFileId: printfulFileId));
             }
 
             var draftRequest = new PrintfulDraftOrderRequest(

@@ -281,6 +281,20 @@ public sealed class PrintfulService(ISettingsService settings, IHttpClientFactor
                ?? throw new InvalidOperationException("Printful file upload returned no ID.");
     }
 
+    public async Task<string> UploadFileBytesAsync(byte[] data, string fileName, string contentType, CancellationToken ct = default)
+    {
+        var client = await CreateClientAsync(ct);
+        using var form = new MultipartFormDataContent();
+        var fileContent = new ByteArrayContent(data);
+        fileContent.Headers.ContentType = new System.Net.Http.Headers.MediaTypeHeaderValue(contentType);
+        form.Add(fileContent, "file", fileName);
+        var res = await client.PostAsync("/v2/files", form, ct);
+        await EnsureSuccessAsync(res, ct);
+        var root = JsonNode.Parse(await res.Content.ReadAsStringAsync(ct));
+        return root?["data"]?["id"]?.GetValue<long>().ToString()
+               ?? throw new InvalidOperationException("Printful file upload returned no ID.");
+    }
+
     // ── Draft order ────────────────────────────────────────────────────────────
 
     public async Task<PrintfulDraftResult> CreateDraftOrderAsync(
@@ -305,7 +319,9 @@ public sealed class PrintfulService(ISettingsService settings, IHttpClientFactor
                         ["technique"] = i.Technique,
                         ["layers"]    = new JsonArray
                         {
-                            new JsonObject { ["type"] = "file", ["url"] = i.PrintFileUrl },
+                            i.PrintfulFileId is not null
+                                ? new JsonObject { ["type"] = "file", ["file_id"] = long.Parse(i.PrintfulFileId) }
+                                : new JsonObject { ["type"] = "file", ["url"]     = i.PrintFileUrl },
                         },
                     },
                 },
