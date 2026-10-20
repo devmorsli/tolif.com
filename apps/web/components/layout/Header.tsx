@@ -16,8 +16,8 @@ export function Header() {
   const [scrolled, setScrolled]   = useState(false);
   const [menuOpen, setMenuOpen]   = useState(false);
   const router                    = useRouter();
-  const { selectedVariant, goTo } = useWizardStore();
-  const cartCount                 = selectedVariant ? 1 : 0;
+  const { selectedVariant, goTo, reset } = useWizardStore();
+  const cartCount                        = selectedVariant ? 1 : 0;
 
   const handleCartClick = () => {
     if (selectedVariant) {
@@ -26,6 +26,13 @@ export function Header() {
     } else {
       router.push("/create");
     }
+  };
+
+  // Always start fresh — reset generation state but keep cart items
+  const handleCreate = () => {
+    reset();
+    setMenuOpen(false);
+    router.push("/create");
   };
 
   useEffect(() => {
@@ -80,12 +87,12 @@ export function Header() {
               )}
             </button>
 
-            <Link
-              href="/create"
+            <button
+              onClick={handleCreate}
               className="hidden md:inline-flex items-center gap-2 bg-[#C4622D] hover:bg-[#9E4A1E] text-white text-sm font-medium px-5 py-2.5 rounded-full transition-colors"
             >
               Create Portrait
-            </Link>
+            </button>
 
             {/* Mobile menu toggle */}
             <button
@@ -120,13 +127,12 @@ export function Header() {
                   {link.label}
                 </Link>
               ))}
-              <Link
-                href="/create"
-                onClick={() => setMenuOpen(false)}
+              <button
+                onClick={handleCreate}
                 className="mt-4 inline-flex items-center justify-center bg-[#C4622D] text-white text-base font-medium px-6 py-3.5 rounded-full"
               >
                 Create Your Portrait
-              </Link>
+              </button>
             </nav>
           </motion.div>
         )}

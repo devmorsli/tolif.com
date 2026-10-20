@@ -11,37 +11,96 @@ import {
   type PublicTemplate,
 } from "@/lib/public-api";
 import {
-  Check,
-  ImageIcon,
-  Upload,
-  X,
-  User,
-  PawPrint,
-  ChevronRight,
-  ChevronDown,
-  Plus,
+  Check, ImageIcon, Upload, X, User, PawPrint,
+  ChevronRight, Plus, ArrowRight, RefreshCw, ExternalLink,
 } from "lucide-react";
 
+// ── Template image ─────────────────────────────────────────────────────────────
 // eslint-disable-next-line @next/next/no-img-element
-function TemplateThumb({ imgUrl, name, category }: { imgUrl: string; name: string; category: string }) {
+function TemplateImg({ imgUrl, name, category, className }: { imgUrl: string; name: string; category: string; className?: string }) {
   const [err, setErr] = useState(false);
   if (imgUrl && !err)
-    return <img src={imgUrl} alt={name} onError={() => setErr(true)} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" />;
+    return <img src={imgUrl} alt={name} onError={() => setErr(true)} className={className ?? "w-full h-full object-cover"} />;
   return (
     <div className={`w-full h-full bg-gradient-to-br ${categoryGradient(category)} flex items-center justify-center`}>
-      <ImageIcon size={24} className="text-[#C4622D]/30" />
+      <ImageIcon size={28} className="text-[#C4622D]/30" />
     </div>
   );
 }
 
-const tips = [
+const PHOTO_TIPS = [
   "Clear, well-lit face looking toward the camera",
   "Avoid heavy filters, sunglasses, or partial faces",
   "For pets: full body or head-and-shoulders, in focus",
 ];
 
-// ── Template picker ───────────────────────────────────────────────────────────
+const ALL_CATEGORIES = ["All", "Families", "Couples", "Pets", "Solo", "Groups"];
 
+// ── Selected template card ─────────────────────────────────────────────────────
+function SelectedTemplateCard({
+  template,
+  onChangeTemplate,
+}: {
+  template: Template;
+  onChangeTemplate: () => void;
+}) {
+  const imgUrl = templateImageUrl(
+    (template as unknown as { templateImageKey?: string }).templateImageKey ?? ""
+  );
+
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 10 }}
+      animate={{ opacity: 1, y: 0 }}
+      className="mb-6"
+    >
+      <div className="flex items-center gap-2 mb-3">
+        <div className="w-6 h-6 rounded-full bg-[#2D4A3E] flex items-center justify-center shrink-0">
+          <Check size={13} className="text-white" />
+        </div>
+        <p className="text-sm font-semibold text-[#1A1714]">Portrait style selected</p>
+      </div>
+
+      {/* Card — same frame style as portraits page */}
+      <div className="flex gap-4 bg-white border border-[#E4D8CC] rounded-2xl p-4">
+        {/* Framed portrait thumbnail */}
+        <div
+          className="shrink-0"
+          style={{
+            width: 80,
+            aspectRatio: "3/4",
+            background: "linear-gradient(160deg,#D8BC96 0%,#C4A47C 30%,#B08858 55%,#CAA87A 80%,#D4B488 100%)",
+            padding: "5px",
+            boxShadow: "0 4px 12px rgba(26,23,20,0.22)",
+          }}
+        >
+          <div style={{ width: "100%", height: "100%", background: "#F7F2EA", padding: "5px" }}>
+            <div style={{ width: "100%", height: "100%", overflow: "hidden" }}>
+              <TemplateImg imgUrl={imgUrl} name={template.name} category={template.category} />
+            </div>
+          </div>
+        </div>
+
+        {/* Info */}
+        <div className="flex-1 min-w-0 flex flex-col justify-between">
+          <div>
+            <p className="font-semibold text-[#1A1714] text-sm leading-tight">{template.name}</p>
+            <p className="text-xs text-[#8C7B6B] mt-0.5">{template.category}{template.style ? ` · ${template.style}` : ""}</p>
+          </div>
+          <button
+            onClick={onChangeTemplate}
+            className="mt-3 self-start flex items-center gap-1.5 text-xs font-semibold text-[#C4622D] hover:text-[#9E4A1E] transition-colors border border-[#C4622D]/30 hover:border-[#C4622D]/60 px-3 py-1.5 rounded-full"
+          >
+            <RefreshCw size={11} />
+            Select another template
+          </button>
+        </div>
+      </div>
+    </motion.div>
+  );
+}
+
+// ── Template picker grid ───────────────────────────────────────────────────────
 function TemplatePicker({
   templates,
   selected,
@@ -51,120 +110,169 @@ function TemplatePicker({
   selected: Template | null;
   onPick: (t: PublicTemplate) => void;
 }) {
-  const [expanded, setExpanded] = useState(!selected);
+  const [activeCategory, setCategory] = useState("All");
+  const [showAll, setShowAll]          = useState(false);
+  const [open, setOpen]                = useState(!selected);
 
-  // Auto-expand when nothing selected, auto-collapse once selected
+  // When template is picked, collapse
+  const handlePick = (t: PublicTemplate) => {
+    onPick(t);
+    setOpen(false);
+    setShowAll(false);
+  };
+
+  // Re-open when user clicks "select another"
   useEffect(() => {
-    if (!selected) setExpanded(true);
+    if (!selected) setOpen(true);
   }, [selected]);
 
+  const filtered = activeCategory === "All"
+    ? templates
+    : templates.filter((t) => t.category === activeCategory);
+
+  const visible = showAll ? filtered.slice(0, 60) : filtered.slice(0, 6);
+
+  if (!open) return null;
+
   return (
-    <div>
-      {/* Header — shows selected summary when collapsed */}
-      <button
-        onClick={() => setExpanded((v) => !v)}
-        className="w-full flex items-center justify-between mb-4 group"
-      >
-        <div className="flex items-center gap-3">
-          <div
-            className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold shrink-0 ${
-              selected
-                ? "bg-[#2D4A3E] text-white"
-                : "bg-[#C4622D] text-white"
+    <motion.div
+      initial={{ opacity: 0, height: 0 }}
+      animate={{ opacity: 1, height: "auto" }}
+      exit={{ opacity: 0, height: 0 }}
+      transition={{ duration: 0.32, ease: "easeInOut" }}
+    >
+      {/* Category filter pills */}
+      <div className="flex flex-wrap gap-2 mb-4">
+        {ALL_CATEGORIES.map((cat) => (
+          <button
+            key={cat}
+            onClick={() => { setCategory(cat); setShowAll(false); }}
+            className={`px-3.5 py-1.5 rounded-full text-xs font-semibold transition-all duration-200 ${
+              activeCategory === cat
+                ? "bg-[#1A1714] text-white"
+                : "bg-white border border-[#E4D8CC] text-[#5A4E46] hover:border-[#1A1714]"
             }`}
           >
-            {selected ? <Check size={14} /> : "1"}
-          </div>
-          <div className="text-left">
-            <p className="text-sm font-semibold text-[#1A1714]">
-              {selected ? selected.name : "Choose your portrait style"}
-            </p>
-            {selected && (
-              <p className="text-xs text-[#8C7B6B]">{selected.category}{selected.style ? ` · ${selected.style}` : ""}</p>
-            )}
-          </div>
-        </div>
-        <ChevronDown
-          size={16}
-          className={`text-[#8C7B6B] transition-transform duration-300 ${expanded ? "rotate-180" : ""}`}
-        />
-      </button>
+            {cat}
+          </button>
+        ))}
+      </div>
 
-      <AnimatePresence initial={false}>
-        {expanded && (
-          <motion.div
-            initial={{ opacity: 0, height: 0 }}
-            animate={{ opacity: 1, height: "auto" }}
-            exit={{ opacity: 0, height: 0 }}
-            transition={{ duration: 0.35, ease: "easeInOut" }}
-            className="overflow-hidden"
+      {/* Grid */}
+      <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
+        {visible.map((t, i) => {
+          const isSelected = selected?.id === t.id;
+          const imgUrl     = templateImageUrl(t.templateImageKey);
+          const slotCount  = parseUploadSlots(t.uploadSlotsJson).length;
+
+          return (
+            <motion.button
+              key={t.id}
+              initial={{ opacity: 0, y: 14 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: i * 0.04, duration: 0.28 }}
+              onClick={() => handlePick(t)}
+              className="group text-left focus:outline-none"
+            >
+              {/* Frame — same style as portraits page */}
+              <div
+                className="relative"
+                style={{
+                  aspectRatio: "3/4",
+                  background: "linear-gradient(160deg,#D8BC96 0%,#C4A47C 30%,#B08858 55%,#CAA87A 80%,#D4B488 100%)",
+                  padding: "8px",
+                  boxShadow: isSelected
+                    ? "0 0 0 3px #C4622D, 0 8px 24px rgba(196,98,45,0.3)"
+                    : "0 6px 20px rgba(0,0,0,0.20)",
+                  transition: "box-shadow 0.2s",
+                }}
+              >
+                {/* Mat board */}
+                <div style={{ width: "100%", height: "100%", background: "#F7F2EA", padding: "8px", display: "flex" }}>
+                  <div style={{ flex: 1, overflow: "hidden" }}>
+                    <TemplateImg
+                      imgUrl={imgUrl}
+                      name={t.name}
+                      category={t.category}
+                      className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+                    />
+                  </div>
+                </div>
+
+                {/* Selected overlay */}
+                {isSelected && (
+                  <div className="absolute inset-0 flex items-center justify-center bg-[#C4622D]/20">
+                    <div className="w-9 h-9 rounded-full bg-[#C4622D] flex items-center justify-center shadow-lg">
+                      <Check size={16} className="text-white" />
+                    </div>
+                  </div>
+                )}
+
+                {/* Hover CTA */}
+                {!isSelected && (
+                  <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity duration-200">
+                    <span className="bg-[#C4622D] text-white text-xs font-semibold px-4 py-1.5 rounded-full shadow-md translate-y-1 group-hover:translate-y-0 transition-transform duration-200">
+                      Select →
+                    </span>
+                  </div>
+                )}
+              </div>
+
+              {/* Name below */}
+              <div className="mt-2 px-0.5">
+                <p className={`font-semibold text-sm truncate transition-colors duration-200 ${isSelected ? "text-[#C4622D]" : "text-[#1A1714] group-hover:text-[#C4622D]"}`}>
+                  {t.name}
+                </p>
+                <p className="text-[11px] text-[#8C7B6B] mt-0.5">
+                  {slotCount} photo{slotCount !== 1 ? "s" : ""} · Free preview
+                </p>
+              </div>
+            </motion.button>
+          );
+        })}
+      </div>
+
+      {/* Show all / browse all */}
+      {filtered.length > 6 && !showAll && (
+        <div className="mt-5 flex items-center gap-3">
+          <button
+            onClick={() => setShowAll(true)}
+            className="flex items-center gap-1.5 px-4 py-2 rounded-full border border-[#E4D8CC] bg-white text-xs font-semibold text-[#5A4E46] hover:border-[#1A1714] hover:text-[#1A1714] transition-all duration-200"
           >
-            <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 pb-2">
-              {templates.map((t, i) => {
-                const isSelected = selected?.id === t.id;
-                const imgUrl = templateImageUrl(t.templateImageKey);
-                return (
-                  <motion.button
-                    key={t.id}
-                    initial={{ opacity: 0, y: 12 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={{ delay: i * 0.05 }}
-                    onClick={() => {
-                      onPick(t);
-                      setExpanded(false);
-                    }}
-                    className={`relative group text-left rounded-xl overflow-hidden border-2 transition-all duration-200 ${
-                      isSelected
-                        ? "border-[#C4622D] shadow-md shadow-[#C4622D]/15"
-                        : "border-[#E4D8CC] hover:border-[#C4622D]/50"
-                    }`}
-                  >
-                    <div className="h-28 overflow-hidden relative">
-                      <TemplateThumb imgUrl={imgUrl} name={t.name} category={t.category} />
-                      {isSelected && (
-                        <div className="absolute inset-0 bg-[#C4622D]/10 flex items-center justify-center">
-                          <div className="w-7 h-7 rounded-full bg-[#C4622D] flex items-center justify-center">
-                            <Check size={13} className="text-white" />
-                          </div>
-                        </div>
-                      )}
-                    </div>
-                    <div className="bg-white px-2.5 py-2">
-                      <p className="font-medium text-[#1A1714] text-xs leading-tight">{t.name}</p>
-                      <p className="text-[10px] text-[#8C7B6B] mt-0.5">
-                        {parseUploadSlots(t.uploadSlotsJson).length} photo
-                        {parseUploadSlots(t.uploadSlotsJson).length !== 1 ? "s" : ""}
-                      </p>
-                    </div>
-                  </motion.button>
-                );
-              })}
-            </div>
-          </motion.div>
-        )}
-      </AnimatePresence>
-    </div>
+            Show all {filtered.length} templates
+          </button>
+          <a
+            href="/portraits"
+            className="flex items-center gap-1 text-xs text-[#8C7B6B] hover:text-[#C4622D] transition-colors"
+          >
+            Browse full catalog <ExternalLink size={10} className="ml-0.5" />
+          </a>
+        </div>
+      )}
+
+      {filtered.length === 0 && (
+        <div className="py-10 text-center text-sm text-[#8C7B6B]">
+          No templates in this category yet.
+        </div>
+      )}
+    </motion.div>
   );
 }
 
-// ── Photo uploader ────────────────────────────────────────────────────────────
-
+// ── Photo uploader ─────────────────────────────────────────────────────────────
 function PhotoUploader() {
   const { selectedTemplate, uploadSlots, setUploadSlot, addExtraSlot, removeExtraSlot } = useWizardStore();
-  const inputRefs = useRef<Record<string, HTMLInputElement | null>>({});
+  const inputRefs     = useRef<Record<string, HTMLInputElement | null>>({});
   const [dragOver, setDragOver] = useState<string | null>(null);
 
   const extraPersonsAdded = uploadSlots.filter((s) => s.name.startsWith("extra_person")).length;
   const extraPetsAdded    = uploadSlots.filter((s) => s.name.startsWith("extra_pet")).length;
   const extraPersonsMax   = selectedTemplate?.extraPersonsAllowed ?? 0;
   const extraPetsMax      = selectedTemplate?.extraPetsAllowed ?? 0;
-  const canAddPerson      = extraPersonsAdded < extraPersonsMax;
-  const canAddPet         = extraPetsAdded < extraPetsMax;
 
   const handleFile = (slotName: string, file: File) => {
     if (!file.type.startsWith("image/")) return;
-    const url = URL.createObjectURL(file);
-    setUploadSlot(slotName, file, url);
+    setUploadSlot(slotName, file, URL.createObjectURL(file));
   };
 
   if (uploadSlots.length === 0) {
@@ -174,7 +282,7 @@ function PhotoUploader() {
           <Upload size={22} className="text-[#C4622D]/40" />
         </div>
         <p className="text-sm font-medium text-[#1A1714]">Choose a portrait style first</p>
-        <p className="text-xs mt-1">Photo slots will appear here based on the template</p>
+        <p className="text-xs mt-1">Photo slots will appear here</p>
       </div>
     );
   }
@@ -185,28 +293,19 @@ function PhotoUploader() {
         {uploadSlots.map((slot) => (
           <div key={slot.name} className="relative">
             <p className="text-xs font-medium text-[#1A1714] mb-1.5 flex items-center gap-1.5">
-              {slot.type === "person" ? (
-                <User size={11} className="text-[#C4622D]" />
-              ) : (
-                <PawPrint size={11} className="text-[#C4622D]" />
-              )}
+              {slot.type === "person" ? <User size={11} className="text-[#C4622D]" /> : <PawPrint size={11} className="text-[#C4622D]" />}
               {slot.label}
               {slot.required && <span className="text-[#C4622D]">*</span>}
               {!slot.required && (
-                <button
-                  onClick={() => removeExtraSlot(slot.name)}
-                  className="ml-auto text-[#C0B5A8] hover:text-red-400 transition-colors"
-                >
+                <button onClick={() => removeExtraSlot(slot.name)} className="ml-auto text-[#C0B5A8] hover:text-red-400 transition-colors">
                   <X size={10} />
                 </button>
               )}
             </p>
             <div
               className={`relative rounded-xl border-2 border-dashed transition-all duration-200 overflow-hidden cursor-pointer ${
-                dragOver === slot.name
-                  ? "border-[#C4622D] bg-[#C4622D]/5"
-                  : slot.previewUrl
-                  ? "border-[#2D4A3E]"
+                dragOver === slot.name ? "border-[#C4622D] bg-[#C4622D]/5"
+                  : slot.previewUrl ? "border-[#2D4A3E]"
                   : "border-[#E4D8CC] hover:border-[#C4622D]/50 hover:bg-[#FAF6F0]"
               }`}
               style={{ height: 130 }}
@@ -215,28 +314,14 @@ function PhotoUploader() {
               onDrop={(e) => { e.preventDefault(); setDragOver(null); const f = e.dataTransfer.files[0]; if (f) handleFile(slot.name, f); }}
               onClick={() => inputRefs.current[slot.name]?.click()}
             >
-              <input
-                ref={(el) => { inputRefs.current[slot.name] = el; }}
-                type="file"
-                accept="image/*"
-                className="hidden"
-                onChange={(e) => { const f = e.target.files?.[0]; if (f) handleFile(slot.name, f); }}
-              />
+              <input ref={(el) => { inputRefs.current[slot.name] = el; }} type="file" accept="image/*" className="hidden"
+                onChange={(e) => { const f = e.target.files?.[0]; if (f) handleFile(slot.name, f); }} />
               <AnimatePresence mode="wait">
                 {slot.previewUrl ? (
-                  <motion.div
-                    key="preview"
-                    initial={{ opacity: 0 }}
-                    animate={{ opacity: 1 }}
-                    exit={{ opacity: 0 }}
-                    className="absolute inset-0"
-                  >
+                  <motion.div key="preview" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="absolute inset-0">
                     {/* eslint-disable-next-line @next/next/no-img-element */}
                     <img src={slot.previewUrl} alt={slot.label} className="w-full h-full object-cover" />
-                    <button
-                      onClick={(e) => { e.stopPropagation(); setUploadSlot(slot.name, null as unknown as File, ""); }}
-                      className="absolute top-1.5 right-1.5 w-6 h-6 bg-white/90 rounded-full flex items-center justify-center shadow"
-                    >
+                    <button onClick={(e) => { e.stopPropagation(); setUploadSlot(slot.name, null as unknown as File, ""); }} className="absolute top-1.5 right-1.5 w-6 h-6 bg-white/90 rounded-full flex items-center justify-center shadow">
                       <X size={10} className="text-[#1A1714]" />
                     </button>
                     <div className="absolute bottom-0 inset-x-0 bg-gradient-to-t from-black/30 to-transparent p-1.5">
@@ -244,19 +329,11 @@ function PhotoUploader() {
                     </div>
                   </motion.div>
                 ) : (
-                  <motion.div
-                    key="empty"
-                    initial={{ opacity: 0 }}
-                    animate={{ opacity: 1 }}
-                    exit={{ opacity: 0 }}
-                    className="absolute inset-0 flex flex-col items-center justify-center gap-2 p-3 text-center"
-                  >
+                  <motion.div key="empty" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="absolute inset-0 flex flex-col items-center justify-center gap-2 p-3 text-center">
                     <div className="w-9 h-9 rounded-xl bg-[#F2EAE0] flex items-center justify-center">
                       <Upload size={16} className="text-[#C4622D]" />
                     </div>
-                    <p className="text-[11px] text-[#8C7B6B] leading-tight">
-                      Tap to upload<br />or drag & drop
-                    </p>
+                    <p className="text-[11px] text-[#8C7B6B] leading-tight">Tap to upload<br />or drag & drop</p>
                   </motion.div>
                 )}
               </AnimatePresence>
@@ -265,29 +342,18 @@ function PhotoUploader() {
         ))}
       </div>
 
-      {/* Add extra person / pet */}
       {(extraPersonsMax > 0 || extraPetsMax > 0) && (
         <div className="flex flex-wrap gap-2 mt-3">
           {extraPersonsMax > 0 && (
-            <button
-              onClick={() => addExtraSlot("person")}
-              disabled={!canAddPerson}
-              className="flex items-center gap-1.5 border border-dashed border-[#C4622D]/40 hover:border-[#C4622D] disabled:border-[#E4D8CC] disabled:opacity-40 disabled:cursor-not-allowed bg-white hover:bg-[#FFF9F6] px-3 py-1.5 rounded-lg text-xs font-medium text-[#C4622D] transition-all duration-200"
-            >
-              <Plus size={11} />
-              Add person
-              <span className="text-[10px] text-[#C0B5A8]">({extraPersonsAdded}/{extraPersonsMax})</span>
+            <button onClick={() => addExtraSlot("person")} disabled={extraPersonsAdded >= extraPersonsMax}
+              className="flex items-center gap-1.5 border border-dashed border-[#C4622D]/40 hover:border-[#C4622D] disabled:border-[#E4D8CC] disabled:opacity-40 bg-white hover:bg-[#FFF9F6] px-3 py-1.5 rounded-lg text-xs font-medium text-[#C4622D] transition-all">
+              <Plus size={11} /> Add person <span className="text-[10px] text-[#C0B5A8]">({extraPersonsAdded}/{extraPersonsMax})</span>
             </button>
           )}
           {extraPetsMax > 0 && (
-            <button
-              onClick={() => addExtraSlot("pet")}
-              disabled={!canAddPet}
-              className="flex items-center gap-1.5 border border-dashed border-[#C4622D]/40 hover:border-[#C4622D] disabled:border-[#E4D8CC] disabled:opacity-40 disabled:cursor-not-allowed bg-white hover:bg-[#FFF9F6] px-3 py-1.5 rounded-lg text-xs font-medium text-[#C4622D] transition-all duration-200"
-            >
-              <Plus size={11} />
-              Add pet
-              <span className="text-[10px] text-[#C0B5A8]">({extraPetsAdded}/{extraPetsMax})</span>
+            <button onClick={() => addExtraSlot("pet")} disabled={extraPetsAdded >= extraPetsMax}
+              className="flex items-center gap-1.5 border border-dashed border-[#C4622D]/40 hover:border-[#C4622D] disabled:border-[#E4D8CC] disabled:opacity-40 bg-white hover:bg-[#FFF9F6] px-3 py-1.5 rounded-lg text-xs font-medium text-[#C4622D] transition-all">
+              <Plus size={11} /> Add pet <span className="text-[10px] text-[#C0B5A8]">({extraPetsAdded}/{extraPetsMax})</span>
             </button>
           )}
         </div>
@@ -296,43 +362,39 @@ function PhotoUploader() {
   );
 }
 
-// ── Main component ────────────────────────────────────────────────────────────
-
+// ── Main ───────────────────────────────────────────────────────────────────────
 export function Step1SetupPortrait() {
   const {
-    selectedTemplate,
-    selectTemplate,
-    uploadSlots,
-    gdprConsent,
-    setGdprConsent,
-    next,
+    selectedTemplate, selectTemplate,
+    uploadSlots, gdprConsent, setGdprConsent, next,
   } = useWizardStore();
 
-  const [templates, setTemplates] = useState<PublicTemplate[]>([]);
+  const [templates,        setTemplates]        = useState<PublicTemplate[]>([]);
   const [loadingTemplates, setLoadingTemplates] = useState(true);
+  const [pickerOpen,       setPickerOpen]       = useState(!selectedTemplate);
+
+  // Keep pickerOpen in sync: if template gets cleared, re-open
+  useEffect(() => {
+    if (!selectedTemplate) setPickerOpen(true);
+  }, [selectedTemplate]);
 
   useEffect(() => {
-    getPublicTemplates().then((data) => {
-      setTemplates(data);
-      setLoadingTemplates(false);
-    });
+    getPublicTemplates().then((data) => { setTemplates(data); setLoadingTemplates(false); });
   }, []);
 
   const pickTemplate = (t: PublicTemplate) => {
     selectTemplate({
-      id: t.id,
-      slug: t.slug,
-      name: t.name,
-      category: t.category,
-      style: t.style,
+      id: t.id, slug: t.slug, name: t.name,
+      category: t.category, style: t.style,
       uploadSlots: parseUploadSlots(t.uploadSlotsJson),
       extraPersonsAllowed: t.extraPersonsAllowed ?? 0,
-      extraPetsAllowed: t.extraPetsAllowed ?? 0,
+      extraPetsAllowed:    t.extraPetsAllowed    ?? 0,
     });
+    setPickerOpen(false);
   };
 
-  const allRequired = uploadSlots.filter((s) => s.required).every((s) => !!s.file);
-  const canGenerate = !!selectedTemplate && allRequired && gdprConsent;
+  const allRequired  = uploadSlots.filter((s) => s.required).every((s) => !!s.file);
+  const canGenerate  = !!selectedTemplate && allRequired && gdprConsent;
 
   return (
     <div className="max-w-4xl mx-auto">
@@ -342,39 +404,60 @@ export function Step1SetupPortrait() {
           Create your <em className="not-italic font-medium text-[#C4622D]">portrait</em>
         </h2>
         <p className="mt-3 text-[#8C7B6B] text-sm max-w-md mx-auto">
-          Pick a style, upload your photos, and we'll paint your portrait with AI.
+          Pick a style, upload your photos, and we&apos;ll paint your portrait with AI.
         </p>
       </div>
 
       <div className="grid lg:grid-cols-[1fr_1px_1fr] gap-0">
-        {/* Left — template picker */}
+
+        {/* ── Left: template selection ── */}
         <div className="lg:pr-8">
+          {/* Step header */}
+          <div className="flex items-center gap-3 mb-5">
+            <div className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold shrink-0 ${selectedTemplate ? "bg-[#2D4A3E] text-white" : "bg-[#C4622D] text-white"}`}>
+              {selectedTemplate ? <Check size={14} /> : "1"}
+            </div>
+            <p className="text-sm font-semibold text-[#1A1714]">Choose your portrait style</p>
+          </div>
+
           {loadingTemplates ? (
             <div className="flex justify-center py-12">
               <div className="w-7 h-7 border-2 border-[#C4622D] border-t-transparent rounded-full animate-spin" />
             </div>
           ) : (
-            <TemplatePicker
-              templates={templates}
-              selected={selectedTemplate}
-              onPick={pickTemplate}
-            />
+            <>
+              {/* Show selected card when picker is closed */}
+              <AnimatePresence mode="wait">
+                {selectedTemplate && !pickerOpen && (
+                  <SelectedTemplateCard
+                    key="selected"
+                    template={selectedTemplate}
+                    onChangeTemplate={() => setPickerOpen(true)}
+                  />
+                )}
+              </AnimatePresence>
+
+              {/* Template grid */}
+              <AnimatePresence>
+                {pickerOpen && (
+                  <TemplatePicker
+                    templates={templates}
+                    selected={selectedTemplate}
+                    onPick={pickTemplate}
+                  />
+                )}
+              </AnimatePresence>
+            </>
           )}
         </div>
 
         {/* Divider */}
         <div className="hidden lg:block bg-[#E4D8CC] my-2" />
 
-        {/* Right — upload */}
+        {/* ── Right: upload ── */}
         <div className="lg:pl-8 mt-8 lg:mt-0">
           <div className="flex items-center gap-3 mb-4">
-            <div
-              className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold shrink-0 ${
-                allRequired && uploadSlots.length > 0
-                  ? "bg-[#2D4A3E] text-white"
-                  : "bg-[#C4622D] text-white"
-              }`}
-            >
+            <div className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold shrink-0 ${allRequired && uploadSlots.length > 0 ? "bg-[#2D4A3E] text-white" : "bg-[#C4622D] text-white"}`}>
               {allRequired && uploadSlots.length > 0 ? <Check size={14} /> : "2"}
             </div>
             <div>
@@ -390,12 +473,11 @@ export function Step1SetupPortrait() {
 
           <PhotoUploader />
 
-          {/* Tips */}
           {uploadSlots.length > 0 && (
             <div className="mt-4 bg-[#F2EAE0] rounded-xl p-3.5">
               <p className="text-[10px] font-semibold text-[#C4622D] uppercase tracking-wider mb-2">Photo tips</p>
               <ul className="space-y-1">
-                {tips.map((tip) => (
+                {PHOTO_TIPS.map((tip) => (
                   <li key={tip} className="flex items-start gap-1.5 text-[11px] text-[#8C7B6B]">
                     <span className="text-[#C4622D] mt-px">✓</span>
                     {tip}
@@ -410,23 +492,16 @@ export function Step1SetupPortrait() {
       {/* GDPR + Generate */}
       <div className="mt-8 pt-6 border-t border-[#E4D8CC]">
         <label className="flex items-start gap-3 mb-5 cursor-pointer">
-          <input
-            type="checkbox"
-            checked={gdprConsent}
-            onChange={(e) => setGdprConsent(e.target.checked)}
-            className="mt-0.5 w-4 h-4 accent-[#C4622D] cursor-pointer shrink-0"
-          />
+          <input type="checkbox" checked={gdprConsent} onChange={(e) => setGdprConsent(e.target.checked)}
+            className="mt-0.5 w-4 h-4 accent-[#C4622D] cursor-pointer shrink-0" />
           <span className="text-xs text-[#8C7B6B] leading-relaxed">
             I consent to Tolif processing my uploaded photos to generate my portrait. Photos are
             automatically deleted after 30 days and never used to train AI models.{" "}
-            <a href="/privacy" className="text-[#C4622D] underline underline-offset-2">
-              Privacy Policy
-            </a>
+            <a href="/privacy" className="text-[#C4622D] underline underline-offset-2">Privacy Policy</a>
           </span>
         </label>
 
         <div className="flex items-center justify-between gap-4">
-          {/* Progress hint */}
           <div className="text-xs text-[#8C7B6B] hidden sm:block">
             {!selectedTemplate && "← Choose a portrait style to get started"}
             {selectedTemplate && !allRequired && `Upload ${uploadSlots.filter((s) => s.required && !s.file).length} more required photo${uploadSlots.filter((s) => s.required && !s.file).length !== 1 ? "s" : ""}`}
