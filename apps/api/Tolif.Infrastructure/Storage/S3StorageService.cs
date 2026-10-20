@@ -1,3 +1,4 @@
+using Amazon.Runtime;
 using Amazon.S3;
 using Amazon.S3.Model;
 using Microsoft.Extensions.Configuration;
@@ -7,41 +8,40 @@ namespace Tolif.Infrastructure.Storage;
 
 public class S3StorageService : IStorageService
 {
-    private readonly IAmazonS3 _s3;
+    private readonly IAmazonS3 _s3;       // internal endpoint — for actual API operations
+    private readonly IAmazonS3 _s3Public; // public endpoint  — for signing presigned URLs
     private readonly string _bucket;
-    private readonly Uri? _publicEndpoint;
 
     public S3StorageService(IAmazonS3 s3, IConfiguration config)
     {
         _s3    = s3;
         _bucket = config["S3_BUCKET"] ?? config["MINIO_BUCKET"] ?? "tolif";
 
-        // S3_PUBLIC_ENDPOINT (or MINIO_PUBLIC_ENDPOINT) is the URL browsers use to
-        // reach MinIO/S3.  When running in Docker the SDK signs URLs with the
-        // internal service name (e.g. http://minio:9000) which browsers cannot
-        // resolve.  Set this to the externally reachable address so every
-        // presigned URL returned to a client uses the right host.
+        // Presigned URLs must be signed with the same hostname that the client will
+        // use to fetch the file.  If we sign with the internal Docker hostname
+        // (e.g. http://minio:9000) but the client hits the public endpoint, MinIO
+        // rejects the request because the `host` header is a signed header.
         //
-        // Example docker-compose / .env:
-        //   S3_PUBLIC_ENDPOINT=https://storage.yourdomain.com
-        //   S3_PUBLIC_ENDPOINT=http://YOUR_SERVER_IP:9000
-        var raw = config["S3_PUBLIC_ENDPOINT"] ?? config["MINIO_PUBLIC_ENDPOINT"];
-        if (!string.IsNullOrWhiteSpace(raw))
-            _publicEndpoint = new Uri(raw.TrimEnd('/'));
-    }
-
-    // Rewrites scheme://internal-host:port → scheme://public-host:port on any
-    // presigned URL before it leaves the API.
-    private string RewritePublicUrl(string url)
-    {
-        if (_publicEndpoint is null) return url;
-        var builder = new UriBuilder(url)
+        // Solution: create a second AmazonS3Client that uses the public endpoint as
+        // its ServiceURL.  Presigned URLs are generated from that client so the
+        // signature already covers the public hostname — no host rewriting needed.
+        //
+        // Set in .env:
+        //   MINIO_PUBLIC_ENDPOINT=https://storage.yourdomain.com
+        //   MINIO_PUBLIC_ENDPOINT=http://YOUR_SERVER_IP:9000
+        var publicEndpoint = config["S3_PUBLIC_ENDPOINT"] ?? config["MINIO_PUBLIC_ENDPOINT"];
+        if (!string.IsNullOrWhiteSpace(publicEndpoint))
         {
-            Scheme = _publicEndpoint.Scheme,
-            Host   = _publicEndpoint.Host,
-            Port   = _publicEndpoint.IsDefaultPort ? -1 : _publicEndpoint.Port,
-        };
-        return builder.Uri.AbsoluteUri;
+            var accessKey = config["S3_ACCESS_KEY"] ?? config["MINIO_ROOT_USER"] ?? "minioadmin";
+            var secretKey = config["S3_SECRET_KEY"] ?? config["MINIO_ROOT_PASSWORD"] ?? "minioadmin";
+            _s3Public = new AmazonS3Client(
+                new BasicAWSCredentials(accessKey, secretKey),
+                new AmazonS3Config { ServiceURL = publicEndpoint.TrimEnd('/'), ForcePathStyle = true });
+        }
+        else
+        {
+            _s3Public = s3; // no public endpoint configured — fall back to internal client
+        }
     }
 
     public async Task<string> GenerateUploadUrlAsync(string key, string contentType, TimeSpan expiry, CancellationToken ct = default)
@@ -54,7 +54,8 @@ public class S3StorageService : IStorageService
             ContentType = contentType,
             Expires     = DateTime.UtcNow.Add(expiry)
         };
-        return await Task.FromResult(RewritePublicUrl(_s3.GetPreSignedURL(request)));
+        // Use the public-endpoint client so the signed URL is valid for external callers.
+        return await Task.FromResult(_s3Public.GetPreSignedURL(request));
     }
 
     public async Task<string> GenerateDownloadUrlAsync(string key, TimeSpan expiry, CancellationToken ct = default)
@@ -66,7 +67,8 @@ public class S3StorageService : IStorageService
             Verb       = HttpVerb.GET,
             Expires    = DateTime.UtcNow.Add(expiry)
         };
-        return await Task.FromResult(RewritePublicUrl(_s3.GetPreSignedURL(request)));
+        // Use the public-endpoint client so the signed URL is valid for external callers.
+        return await Task.FromResult(_s3Public.GetPreSignedURL(request));
     }
 
     public async Task UploadAsync(string key, byte[] data, string contentType, CancellationToken ct = default)

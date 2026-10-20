@@ -43,6 +43,7 @@ public sealed class PrintfulAdapterService(
                 // Generate a presigned URL so Printful can fetch the file when creating the draft
                 var presignedUrl = await storageService.GenerateDownloadUrlAsync(
                     li.PrintFileKey, TimeSpan.FromHours(1), ct);
+                logger.LogInformation("[Printful] Portrait URL for Printful: {Url}", presignedUrl);
 
                 draftItems.Add(new PrintfulDraftItem(
                     VariantId:    variantId,
