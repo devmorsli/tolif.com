@@ -30,21 +30,24 @@ public class GeminiImageGenerationProvider(
             var model = await settingsService.GetAsync("ai.gemini.model", ct);
             if (string.IsNullOrWhiteSpace(model)) model = "gemini-2.0-flash-exp";
 
-            // ── Download the template image (art-style reference) ────────────
-            var templateImageBytes = await storageService.DownloadAsync(request.TemplateImageKey, ct);
-            var templateBase64 = Convert.ToBase64String(templateImageBytes);
+            // ── Download template + all customer photos in parallel ──────────
+            var templateTask    = storageService.DownloadAsync(request.TemplateImageKey, ct);
+            var customerTasks   = request.UploadedImageKeys
+                                      .Select(k => storageService.DownloadAsync(k, ct))
+                                      .ToList();
+            await Task.WhenAll([templateTask, .. customerTasks]);
 
-            // ── Download all customer-uploaded photos ────────────────────────
-            var customerParts = new List<object>();
-            foreach (var uploadKey in request.UploadedImageKeys)
+            var templateBase64  = Convert.ToBase64String(await templateTask);
+
+            var customerParts   = new List<object>();
+            foreach (var task in customerTasks)
             {
-                var bytes = await storageService.DownloadAsync(uploadKey, ct);
                 customerParts.Add(new
                 {
                     inline_data = new
                     {
                         mime_type = "image/jpeg",
-                        data = Convert.ToBase64String(bytes)
+                        data = Convert.ToBase64String(await task)
                     }
                 });
             }
@@ -127,7 +130,7 @@ public class GeminiImageGenerationProvider(
                 }
             };
 
-            var http = httpClientFactory.CreateClient();
+            var http = httpClientFactory.CreateClient("ai");
             var url = $"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent?key={apiKey}";
 
             var response = await http.PostAsync(url,

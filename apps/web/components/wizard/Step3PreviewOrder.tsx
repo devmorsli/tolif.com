@@ -62,10 +62,12 @@ function FramedMockup({ url, frame, sizeKey }: { url: string | null; frame: "bla
   const color = frame === "red-oak" ? "redoak" : frame;
   return (
     <div style={{ filter: "drop-shadow(4px 10px 28px rgba(0,0,0,0.48))" }}>
-      <div className="relative w-full" style={{ aspectRatio: "1 / 1" }}>
+      {/* overflow-hidden on both levels: outer clips any bleed during AnimatePresence transitions,
+          inner aperture div clips the portrait to the exact frame opening */}
+      <div className="relative w-full overflow-hidden" style={{ aspectRatio: "1 / 1" }}>
         <div className="absolute overflow-hidden" style={{ top: "11.67%", left: "21.67%", width: "57.5%", height: "77.5%", zIndex: 0 }}>
           {url
-            ? <img src={url} alt="Portrait preview" className="w-full h-full object-cover block" draggable={false} />  // eslint-disable-line @next/next/no-img-element
+            ? <img src={url} alt="Portrait preview" className="absolute inset-0 w-full h-full object-cover block" draggable={false} />  // eslint-disable-line @next/next/no-img-element
             : <PortraitPlaceholder absolute={false} />}
         </div>
         {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -81,10 +83,10 @@ function FramedMockup({ url, frame, sizeKey }: { url: string | null; frame: "bla
 function CanvasMockup({ url }: { url: string | null }) {
   return (
     <div style={{ filter: "drop-shadow(4px 10px 24px rgba(0,0,0,0.38))" }}>
-      <div className="relative w-full" style={{ aspectRatio: "1 / 1" }}>
+      <div className="relative w-full overflow-hidden" style={{ aspectRatio: "1 / 1" }}>
         <div className="absolute overflow-hidden" style={{ top: "10.83%", left: "24.17%", width: "52.5%", height: "79.17%", zIndex: 0 }}>
           {url
-            ? <img src={url} alt="Portrait preview" className="w-full h-full object-cover block" draggable={false} />  // eslint-disable-line @next/next/no-img-element
+            ? <img src={url} alt="Portrait preview" className="absolute inset-0 w-full h-full object-cover block" draggable={false} />  // eslint-disable-line @next/next/no-img-element
             : <PortraitPlaceholder absolute={false} />}
         </div>
         {/* eslint-disable-next-line @next/next/no-img-element */}

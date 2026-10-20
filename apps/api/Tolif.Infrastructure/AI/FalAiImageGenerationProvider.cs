@@ -36,9 +36,10 @@ public class FalAiImageGenerationProvider(
             var model = await settingsService.GetAsync("ai.falai.model", ct);
             if (string.IsNullOrWhiteSpace(model)) model = "fal-ai/flux-pro";
 
-            // Download template image to embed as reference
+            // Download template image to embed as reference (parallel with any future customer photo tasks)
             var templateBytes  = await storageService.DownloadAsync(request.TemplateImageKey, ct);
             var templateBase64 = $"data:image/jpeg;base64,{Convert.ToBase64String(templateBytes)}";
+            // Note: fal.ai flux-pro takes a single image_url reference — no customer photo downloads needed here
 
             // Build combined prompt
             var prompt = $"""
@@ -58,7 +59,7 @@ public class FalAiImageGenerationProvider(
                 aspect_ratio      = "1:1",
             };
 
-            var http = httpClientFactory.CreateClient();
+            var http = httpClientFactory.CreateClient("ai");
             http.DefaultRequestHeaders.Authorization =
                 new AuthenticationHeaderValue("Key", apiKey);
 

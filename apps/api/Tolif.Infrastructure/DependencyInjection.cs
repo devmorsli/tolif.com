@@ -65,6 +65,10 @@ public static class DependencyInjection
         services.AddSingleton<IWatermarkService, WatermarkService>();
 
         // ── AI Providers ────────────────────────────────────────────────────
+        // Named HTTP client with 5-minute timeout — Gemini/FalAi receive large base64
+        // payloads (template + customer photos) and the inference itself can take 60–90 s.
+        services.AddHttpClient("ai", c => c.Timeout = TimeSpan.FromMinutes(5));
+
         // Register concrete providers (used by FallbackImageGenerationProvider)
         services.AddScoped<GeminiImageGenerationProvider>();
         services.AddScoped<FalAiImageGenerationProvider>();
