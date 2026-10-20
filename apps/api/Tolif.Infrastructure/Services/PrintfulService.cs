@@ -2,6 +2,7 @@ using System.Net.Http.Headers;
 using System.Text;
 using System.Text.Json;
 using System.Text.Json.Nodes;
+using Microsoft.Extensions.Logging;
 using Tolif.Application.Interfaces;
 
 namespace Tolif.Infrastructure.Services;
@@ -11,7 +12,10 @@ namespace Tolif.Infrastructure.Services;
 /// API reference: https://developers.printful.com/docs
 /// Auth: Bearer token sent via Authorization header (private token from store settings).
 /// </summary>
-public sealed class PrintfulService(ISettingsService settings, IHttpClientFactory httpClientFactory)
+public sealed class PrintfulService(
+    ISettingsService settings,
+    IHttpClientFactory httpClientFactory,
+    ILogger<PrintfulService> logger)
     : IPrintfulService
 {
     private const string BaseUrl = "https://api.printful.com";
@@ -354,14 +358,31 @@ public sealed class PrintfulService(ISettingsService settings, IHttpClientFactor
     {
         try
         {
-            var client = await CreateClientAsync(ct);
-            var res    = await client.GetAsync($"/v2/orders/{printfulOrderId}", ct);
-            if (!res.IsSuccessStatusCode) return null;
-            var root   = JsonNode.Parse(await res.Content.ReadAsStringAsync(ct));
-            return root?["data"]?["costs"]?["calculation_status"]?.GetValue<string>();
+            var client  = await CreateClientAsync(ct);
+            var res     = await client.GetAsync($"/v2/orders/{printfulOrderId}", ct);
+            var body    = await res.Content.ReadAsStringAsync(ct);
+
+            if (!res.IsSuccessStatusCode)
+            {
+                logger.LogWarning("[Printful] GET /v2/orders/{Id} returned {Status}: {Body}",
+                    printfulOrderId, (int)res.StatusCode, body);
+                return null;
+            }
+
+            var root   = JsonNode.Parse(body);
+            var status = root?["data"]?["costs"]?["calculation_status"]?.GetValue<string>();
+
+            logger.LogInformation(
+                "[Printful] Order {Id} cost calculation_status = {Status} | costs node = {Costs}",
+                printfulOrderId,
+                status ?? "(null)",
+                root?["data"]?["costs"]?.ToJsonString() ?? "(null)");
+
+            return status;
         }
-        catch
+        catch (Exception ex)
         {
+            logger.LogError(ex, "[Printful] GetOrderCostStatusAsync threw for order {Id}", printfulOrderId);
             return null;
         }
     }

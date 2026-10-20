@@ -1,4 +1,5 @@
 using System.Text.Json;
+using Microsoft.Extensions.Logging;
 using Tolif.Application.Interfaces;
 using Tolif.Domain.Enums;
 
@@ -10,7 +11,8 @@ namespace Tolif.Infrastructure.Services;
 /// </summary>
 public sealed class PrintfulAdapterService(
     IPrintfulService printfulService,
-    IStorageService  storageService) : IPrintProvider
+    IStorageService  storageService,
+    ILogger<PrintfulAdapterService> logger) : IPrintProvider
 {
     public PrintProvider ProviderType => PrintProvider.Printful;
 
@@ -66,20 +68,26 @@ public sealed class PrintfulAdapterService(
             if (!draft.Success)
                 return new PrintOrderResult(false, null, draft.ErrorMessage);
 
+            logger.LogInformation("[Printful] Draft order {DraftId} created. Starting cost calculation poll.", draft.PrintfulOrderId);
+
             // Per Printful v2 docs: poll GET /v2/orders/{id} until costs.calculation_status == "completed"
             // before calling confirmation. Max ~3 minutes total (20 polls × 10s).
             const int maxPollAttempts = 20;
+            string? lastStatus = null;
             for (int poll = 1; poll <= maxPollAttempts; poll++)
             {
                 await Task.Delay(TimeSpan.FromSeconds(10), ct);
                 var costStatus = await printfulService.GetOrderCostStatusAsync(draft.PrintfulOrderId!, ct);
+                lastStatus = costStatus;
+                logger.LogInformation("[Printful] Poll {Poll}/{Max} for order {DraftId}: calculation_status = {Status}",
+                    poll, maxPollAttempts, draft.PrintfulOrderId, costStatus ?? "(null)");
                 if (costStatus == "completed") break;
                 if (costStatus == "failed")
                     return new PrintOrderResult(false, draft.PrintfulOrderId,
                         "Printful cost calculation failed for draft order.");
                 if (poll == maxPollAttempts)
                     return new PrintOrderResult(false, draft.PrintfulOrderId,
-                        "Timed out waiting for Printful cost calculations to complete.");
+                        $"Timed out waiting for Printful cost calculations. Last status: {lastStatus ?? "null"}");
             }
 
             // Costs are ready — confirm once
