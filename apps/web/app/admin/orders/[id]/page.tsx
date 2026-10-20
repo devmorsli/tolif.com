@@ -118,7 +118,7 @@ function OrderDetailContent({ id }: { id: string }) {
   const [emailSent, setEmailSent]   = useState(false);
   const [emailError, setEmailError] = useState("");
   const [printSending, setPrintSending] = useState(false);
-  const [printDone, setPrintDone]       = useState(false);
+  const [printSuccess, setPrintSuccess] = useState(false);
   const [printError, setPrintError]     = useState("");
 
   useEffect(() => {
@@ -147,10 +147,10 @@ function OrderDetailContent({ id }: { id: string }) {
   const handlePrintful = async () => {
     setPrintSending(true);
     setPrintError("");
-    setPrintDone(false);
+    setPrintSuccess(false);
     try {
       await submitOrderToPrintful(id);
-      setPrintDone(true);
+      setPrintSuccess(true);
       // Refresh order to pick up new print status
       const updated = await getOrder(id).catch(() => null);
       if (updated) setOrder(updated);
@@ -311,22 +311,51 @@ function OrderDetailContent({ id }: { id: string }) {
                       )}
 
                       {/* Submit to Printful */}
-                      <button
-                        onClick={handlePrintful}
-                        disabled={printSending || printDone}
-                        className="w-full flex items-center justify-center gap-2 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-60 text-white text-xs font-medium px-4 py-2.5 rounded-xl transition-colors"
-                      >
-                        {printSending ? (
-                          <Loader2 size={13} className="animate-spin" />
-                        ) : printDone ? (
-                          <CheckCircle size={13} />
-                        ) : (
-                          <Printer size={13} />
-                        )}
-                        {printDone ? "Queued for Printful" : "Submit to Printful"}
-                      </button>
-                      {printError && (
-                        <p className="text-xs text-red-600 mt-1 text-center">{printError}</p>
+                      {order.printStatus === "submitted" ? (
+                        <div className="flex items-center gap-2 w-full justify-center bg-indigo-50 border border-indigo-200 text-indigo-700 text-xs font-medium px-4 py-2.5 rounded-xl">
+                          <CheckCircle size={13} /> Sent to Printful
+                        </div>
+                      ) : order.printStatus === "failed" ? (
+                        <div className="space-y-2">
+                          <div className="flex items-center gap-2 w-full justify-center bg-red-50 border border-red-200 text-red-700 text-xs font-medium px-4 py-2.5 rounded-xl">
+                            <AlertCircle size={13} /> Print submission failed
+                          </div>
+                          {(printError || order.printLastError) && (
+                            <div className="bg-red-50 border border-red-200 rounded-xl p-3">
+                              <p className="text-[10px] font-semibold text-red-700 uppercase tracking-wide mb-1">Error details</p>
+                              <p className="text-xs text-red-800 break-words leading-relaxed">{printError || order.printLastError}</p>
+                            </div>
+                          )}
+                          <button
+                            onClick={handlePrintful}
+                            disabled={printSending}
+                            className="w-full flex items-center justify-center gap-2 bg-[#C4622D] hover:bg-[#9E4A1E] disabled:opacity-60 text-white text-xs font-medium px-4 py-2.5 rounded-xl transition-colors"
+                          >
+                            {printSending ? <Loader2 size={13} className="animate-spin" /> : <RefreshCw size={13} />}
+                            Retry submission
+                          </button>
+                        </div>
+                      ) : printSuccess ? (
+                        <div className="flex items-center gap-2 w-full justify-center bg-indigo-50 border border-indigo-200 text-indigo-700 text-xs font-medium px-4 py-2.5 rounded-xl">
+                          <CheckCircle size={13} /> Scheduled for printing
+                        </div>
+                      ) : (
+                        <div className="space-y-2">
+                          <button
+                            onClick={handlePrintful}
+                            disabled={printSending}
+                            className="w-full flex items-center justify-center gap-2 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-60 text-white text-xs font-medium px-4 py-2.5 rounded-xl transition-colors"
+                          >
+                            {printSending ? <Loader2 size={13} className="animate-spin" /> : <Printer size={13} />}
+                            {printSending ? "Submitting…" : "Submit to Printful"}
+                          </button>
+                          {printError && (
+                            <div className="bg-red-50 border border-red-200 rounded-xl p-3">
+                              <p className="text-[10px] font-semibold text-red-700 uppercase tracking-wide mb-1">Error</p>
+                              <p className="text-xs text-red-800 break-words leading-relaxed">{printError}</p>
+                            </div>
+                          )}
+                        </div>
                       )}
                     </div>
                   </div>

@@ -191,6 +191,7 @@ export interface OrderListItem {
   customerName?: string;
   status: string;
   printStatus?: string;
+  printLastError?: string;
   totalAmount: number;
   currency: string;
   createdAt: string;
@@ -220,6 +221,7 @@ export interface OrderDetail extends OrderListItem {
   accessToken?: string;
   updatedAt?: string;
   discountCode?: string;
+  printRetryCount?: number;
   items: OrderDetailItem[];
 }
 

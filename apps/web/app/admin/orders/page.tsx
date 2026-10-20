@@ -195,13 +195,13 @@ function OrdersView() {
 
   const toggleSelectAll = () => {
     if (!data) return;
-    const paidIds = data.items
-      .filter(o => ["Paid","Ready","GeneratingHighRes"].includes(o.status))
+    const submittableIds = data.items
+      .filter(o => ["Paid","Ready","GeneratingHighRes"].includes(o.status) && (!o.printStatus || o.printStatus === "failed"))
       .map(o => o.id);
-    if (paidIds.every(id => selected.has(id))) {
+    if (submittableIds.every(id => selected.has(id))) {
       setSelected(new Set());
     } else {
-      setSelected(new Set(paidIds));
+      setSelected(new Set(submittableIds));
     }
   };
 
@@ -367,7 +367,7 @@ function OrdersView() {
             )}
             {unprintedState === "done" ? (
               <div className="flex items-center gap-2 text-sm text-green-700 bg-green-50 border border-green-200 rounded-xl px-4 py-2">
-                <CheckCircle size={14} /> Queued {unprintedResult} order{unprintedResult !== 1 ? "s" : ""}
+                <CheckCircle size={14} /> Scheduled {unprintedResult} order{unprintedResult !== 1 ? "s" : ""} for printing
               </div>
             ) : (
               <button onClick={handleSubmitUnprinted} disabled={unprintedState === "sending"}
@@ -400,8 +400,8 @@ function OrdersView() {
             className="rounded accent-[#C4622D]"
             onChange={toggleSelectAll}
             checked={
-              !!(data?.items.filter(o => ["Paid","Ready","GeneratingHighRes"].includes(o.status)).length) &&
-              data!.items.filter(o => ["Paid","Ready","GeneratingHighRes"].includes(o.status)).every(o => selected.has(o.id))
+              !!(data?.items.filter(o => ["Paid","Ready","GeneratingHighRes"].includes(o.status) && (!o.printStatus || o.printStatus === "failed")).length) &&
+              data!.items.filter(o => ["Paid","Ready","GeneratingHighRes"].includes(o.status) && (!o.printStatus || o.printStatus === "failed")).every(o => selected.has(o.id))
             }
           />
           <span>Customer</span>
@@ -422,9 +422,12 @@ function OrdersView() {
         )}
 
         {data?.items.map((order: OrderListItem) => {
-          const canSubmit = ["Paid", "Ready", "GeneratingHighRes"].includes(order.status) && !order.printStatus;
+          const isFailed  = order.printStatus === "failed";
+          const isPrinted = successIds.has(order.id) || (order.printStatus != null && order.printStatus !== "" && !isFailed);
+          const canSubmit = ["Paid", "Ready", "GeneratingHighRes"].includes(order.status) && (!order.printStatus || isFailed);
           const isSending = submitting === order.id;
-          const isDone    = successIds.has(order.id) || (order.printStatus != null && order.printStatus !== "");
+          // live error from this session OR persisted error from DB
+          const errorMsg  = submitErrors[order.id] ?? (isFailed ? order.printLastError : undefined);
 
           return (
             <div
@@ -446,7 +449,7 @@ function OrdersView() {
                 {order.customerName && (
                   <p className="text-sm font-medium text-[#1A1714] truncate">{order.customerName}</p>
                 )}
-                <p className={`text-sm text-[#${order.customerName ? "8C7B6B" : "1A1714"}] truncate`}>{order.customerEmail}</p>
+                <p className={`text-sm ${order.customerName ? "text-[#8C7B6B]" : "text-[#1A1714]"} truncate`}>{order.customerEmail}</p>
                 <p className="text-xs text-[#8C7B6B] mt-0.5 font-mono">{order.orderNumber ?? order.id.slice(0, 12) + "…"}</p>
               </Link>
 
@@ -455,34 +458,56 @@ function OrdersView() {
               </span>
 
               {/* Print status / send button */}
-              <div className="flex flex-col items-start gap-1">
-                {isDone ? (
-                  <span className={`text-xs font-medium px-2.5 py-1 rounded-full whitespace-nowrap ${
-                    order.printStatus === "failed"
-                      ? "bg-red-50 text-red-700"
-                      : "bg-indigo-50 text-indigo-700"
-                  }`}>
-                    {order.printStatus ?? "Queued"}
+              <div className="flex flex-col items-start gap-1.5 min-w-[120px]">
+                {isPrinted ? (
+                  <span className="flex items-center gap-1 text-xs font-medium px-2.5 py-1 rounded-full bg-indigo-50 text-indigo-700 whitespace-nowrap">
+                    <CheckCircle size={10} /> Sent to printer
                   </span>
+                ) : isFailed ? (
+                  <div className="flex flex-col gap-1.5">
+                    <span className="flex items-center gap-1 text-xs font-medium px-2.5 py-1 rounded-full bg-red-50 text-red-700 whitespace-nowrap">
+                      <AlertCircle size={10} /> Print failed
+                    </span>
+                    {canSubmit && (
+                      <button
+                        onClick={(e) => handleSendOne(order.id, e)}
+                        disabled={isSending}
+                        className="flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-semibold
+                                   bg-red-50 text-red-700 border border-red-200
+                                   hover:bg-[#C4622D] hover:text-white hover:border-[#C4622D]
+                                   transition-all duration-200 disabled:opacity-60 whitespace-nowrap"
+                      >
+                        {isSending
+                          ? <div className="w-3 h-3 border border-current border-t-transparent rounded-full animate-spin" />
+                          : <RefreshCw size={10} />}
+                        Retry
+                      </button>
+                    )}
+                    {errorMsg && (
+                      <p className="text-[10px] text-red-600 max-w-[180px] leading-snug break-words">{errorMsg}</p>
+                    )}
+                  </div>
                 ) : canSubmit ? (
-                  <button
-                    onClick={(e) => handleSendOne(order.id, e)}
-                    disabled={isSending}
-                    className="flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-semibold
-                               bg-[#F5F0EA] text-[#5A4E46] border border-[#E4D8CC]
-                               hover:bg-[#C4622D] hover:text-white hover:border-[#C4622D]
-                               transition-all duration-200 disabled:opacity-60 whitespace-nowrap"
-                  >
-                    {isSending
-                      ? <div className="w-3 h-3 border border-current border-t-transparent rounded-full animate-spin" />
-                      : <Printer size={11} />}
-                    Send
-                  </button>
+                  <div className="flex flex-col gap-1">
+                    <button
+                      onClick={(e) => handleSendOne(order.id, e)}
+                      disabled={isSending}
+                      className="flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-semibold
+                                 bg-[#F5F0EA] text-[#5A4E46] border border-[#E4D8CC]
+                                 hover:bg-[#C4622D] hover:text-white hover:border-[#C4622D]
+                                 transition-all duration-200 disabled:opacity-60 whitespace-nowrap"
+                    >
+                      {isSending
+                        ? <div className="w-3 h-3 border border-current border-t-transparent rounded-full animate-spin" />
+                        : <Printer size={11} />}
+                      Send to print
+                    </button>
+                    {submitErrors[order.id] && (
+                      <p className="text-[10px] text-red-600 max-w-[180px] leading-snug break-words">{submitErrors[order.id]}</p>
+                    )}
+                  </div>
                 ) : (
                   <span className="text-xs text-[#C8BAB0]">—</span>
-                )}
-                {submitErrors[order.id] && (
-                  <p className="text-[10px] text-red-600 max-w-[160px] leading-tight">{submitErrors[order.id]}</p>
                 )}
               </div>
 

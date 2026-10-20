@@ -79,6 +79,11 @@ public class AdminOrdersController(
                     .OrderByDescending(p => p.CreatedAt)
                     .Select(p => p.Status)
                     .FirstOrDefault(),
+                printLastError = db.PrintOrders
+                    .Where(p => p.OrderId == o.Id)
+                    .OrderByDescending(p => p.CreatedAt)
+                    .Select(p => p.LastErrorMessage)
+                    .FirstOrDefault(),
             })
             .ToListAsync(ct);
 
@@ -93,6 +98,7 @@ public class AdminOrdersController(
             o.Currency,
             o.CreatedAt,
             o.printStatus,
+            o.printLastError,
         });
 
         return Ok(new { items, total, page, pageSize, revenue });
@@ -195,6 +201,12 @@ public class AdminOrdersController(
         if (order is null)
             return NotFound();
 
+        var latestPrint = await db.PrintOrders
+            .Where(p => p.OrderId == id)
+            .OrderByDescending(p => p.CreatedAt)
+            .Select(p => new { p.Status, p.LastErrorMessage, p.RetryCount })
+            .FirstOrDefaultAsync(ct);
+
         return Ok(new
         {
             order.Id,
@@ -212,6 +224,9 @@ public class AdminOrdersController(
             order.CreatedAt,
             order.UpdatedAt,
             discountCode         = order.DiscountCode?.Code,
+            printStatus          = latestPrint?.Status,
+            printLastError       = latestPrint?.LastErrorMessage,
+            printRetryCount      = latestPrint?.RetryCount ?? 0,
             items = order.Items.Select(i => new
             {
                 i.Id,
