@@ -20,15 +20,22 @@ const stepComponents = {
   4: Step4Cart,
 };
 
-// Reads ?template=slug and pre-selects the template when landing on step 1 directly
+// Reads ?template=slug and ?category=X from the URL.
+// Pre-selects the template (for FB ads links) or pre-sets the category filter.
 function TemplateAutoSelect() {
   const searchParams = useSearchParams();
-  const { selectedTemplate, selectTemplate, step } = useWizardStore();
+  const { selectedTemplate, selectTemplate, step, setPreferredCategory } = useWizardStore();
 
   useEffect(() => {
     // If we're already past step 1 (came from template detail page), don't touch state
     if (step > 1) return;
-    const slug = searchParams.get("template");
+
+    const slug     = searchParams.get("template");
+    const category = searchParams.get("category");
+
+    // Pre-select category filter (FB ads use case)
+    if (category) setPreferredCategory(category);
+
     if (!slug || selectedTemplate) return;
 
     getPublicTemplate(slug).then((t) => {

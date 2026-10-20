@@ -105,12 +105,14 @@ function TemplatePicker({
   templates,
   selected,
   onPick,
+  initialCategory,
 }: {
   templates: PublicTemplate[];
   selected: Template | null;
   onPick: (t: PublicTemplate) => void;
+  initialCategory?: string | null;
 }) {
-  const [activeCategory, setCategory] = useState("All");
+  const [activeCategory, setCategory] = useState(initialCategory && ALL_CATEGORIES.includes(initialCategory) ? initialCategory : "All");
   const [showAll, setShowAll]          = useState(false);
   const [open, setOpen]                = useState(!selected);
 
@@ -367,6 +369,7 @@ export function Step1SetupPortrait() {
   const {
     selectedTemplate, selectTemplate,
     uploadSlots, gdprConsent, setGdprConsent, next,
+    preferredCategory,
   } = useWizardStore();
 
   const [templates,        setTemplates]        = useState<PublicTemplate[]>([]);
@@ -444,6 +447,7 @@ export function Step1SetupPortrait() {
                     templates={templates}
                     selected={selectedTemplate}
                     onPick={pickTemplate}
+                    initialCategory={preferredCategory}
                   />
                 )}
               </AnimatePresence>

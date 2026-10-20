@@ -63,12 +63,14 @@ interface WizardState {
   selectedVariant: ProductVariant | null;
   selectedShipping: ShippingOption | null;
   cartItems: CartItem[];
+  preferredCategory: string | null;
 
   // Actions
   goTo: (step: WizardStep) => void;
   next: () => void;
   back: () => void;
   selectTemplate: (template: Template) => void;
+  setPreferredCategory: (category: string | null) => void;
   setUploadSlot: (slotName: string, file: File, previewUrl: string) => void;
   setGdprConsent: (v: boolean) => void;
   setGenerationStatus: (s: WizardState["generationStatus"]) => void;
@@ -98,6 +100,7 @@ const initialState = {
   selectedVariant: null,
   selectedShipping: null,
   cartItems: [] as CartItem[],
+  preferredCategory: null as string | null,
 };
 
 export const useWizardStore = create<WizardState>()(
@@ -106,6 +109,7 @@ export const useWizardStore = create<WizardState>()(
       ...initialState,
 
       goTo: (step) => set({ step }),
+      setPreferredCategory: (category) => set({ preferredCategory: category }),
       next: () => set((s) => ({ step: Math.min(4, s.step + 1) as WizardStep })),
       back: () => set((s) => ({ step: Math.max(1, s.step - 1) as WizardStep })),
 

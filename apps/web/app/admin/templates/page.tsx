@@ -6,6 +6,7 @@ import {
   Plus, Pencil, Trash2, ToggleLeft, ToggleRight, X, Save,
   Loader2, Sparkles, Upload, ImageIcon, RefreshCw, ChevronDown, ChevronUp,
   Layers, CheckCircle2, AlertCircle, StopCircle, Play,
+  Link2, Copy, Check, ExternalLink, Megaphone,
 } from "lucide-react";
 import { AdminGuard } from "@/components/admin/AdminGuard";
 import { AdminSidebar } from "@/components/admin/AdminSidebar";
@@ -780,6 +781,148 @@ function BulkGenerateModal({ onClose, onDone }: { onClose: () => void; onDone: (
   );
 }
 
+// ── Ads & Share Links Panel ────────────────────────────────────────────────────
+
+const AD_CATEGORIES = ["Families", "Couples", "Pets", "Solo", "Groups"];
+
+function useCopy() {
+  const [copied, setCopied] = useState<string | null>(null);
+  const copy = (text: string, key: string) => {
+    navigator.clipboard.writeText(text).then(() => {
+      setCopied(key);
+      setTimeout(() => setCopied(null), 1800);
+    });
+  };
+  return { copied, copy };
+}
+
+function AdsLinksPanel({ templates }: { templates: AdminTemplate[] }) {
+  const [open, setOpen] = useState(false);
+  const [siteUrl, setSiteUrl] = useState("");
+  const { copied, copy } = useCopy();
+
+  useEffect(() => {
+    if (typeof window !== "undefined") setSiteUrl(window.location.origin);
+  }, []);
+
+  const makeUrl = (path: string) => `${siteUrl}${path}`;
+
+  return (
+    <div className="bg-white border border-[#E4D8CC] rounded-2xl overflow-hidden mb-6">
+      <button
+        type="button"
+        onClick={() => setOpen(!open)}
+        className="w-full flex items-center justify-between px-6 py-4 hover:bg-[#FAF6F0] transition-colors"
+      >
+        <div className="flex items-center gap-3">
+          <div className="w-8 h-8 bg-[#C4622D]/10 rounded-xl flex items-center justify-center">
+            <Megaphone size={16} className="text-[#C4622D]" />
+          </div>
+          <div className="text-left">
+            <p className="text-sm font-semibold text-[#1A1714]">Ads & Share Links</p>
+            <p className="text-xs text-[#8C7B6B]">Generate shareable links for FB/IG ads that open the create page with a pre-selected template or category</p>
+          </div>
+        </div>
+        {open ? <ChevronUp size={16} className="text-[#8C7B6B] shrink-0" /> : <ChevronDown size={16} className="text-[#8C7B6B] shrink-0" />}
+      </button>
+
+      {open && (
+        <div className="border-t border-[#F2EAE0] px-6 py-5 space-y-6">
+          {/* Site URL override */}
+          <div>
+            <label className="text-xs font-medium text-[#8C7B6B] uppercase tracking-wider block mb-1.5">
+              Your site URL (used to build links)
+            </label>
+            <input
+              type="url"
+              value={siteUrl}
+              onChange={(e) => setSiteUrl(e.target.value.replace(/\/$/, ""))}
+              className="w-full max-w-sm bg-[#FAF6F0] border border-[#E4D8CC] rounded-xl px-4 py-2 text-sm text-[#1A1714] focus:outline-none focus:ring-2 focus:ring-[#C4622D]/30 focus:border-[#C4622D] transition-colors"
+              placeholder="https://tolif.com"
+            />
+          </div>
+
+          {/* Category links */}
+          <div>
+            <p className="text-xs font-semibold text-[#1A1714] mb-3 flex items-center gap-2">
+              <Link2 size={13} className="text-[#C4622D]" />
+              Category links — open create page with a pre-filtered category
+            </p>
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
+              {AD_CATEGORIES.map((cat) => {
+                const url  = makeUrl(`/create?category=${encodeURIComponent(cat)}`);
+                const key  = `cat-${cat}`;
+                const done = copied === key;
+                return (
+                  <div key={cat} className="flex items-center gap-2 bg-[#FAF6F0] border border-[#E4D8CC] rounded-xl px-3 py-2.5">
+                    <span className="flex-1 text-xs text-[#1A1714] font-medium truncate">{cat}</span>
+                    <a href={url} target="_blank" rel="noopener noreferrer"
+                      className="shrink-0 p-1 text-[#8C7B6B] hover:text-[#C4622D] transition-colors" title="Open">
+                      <ExternalLink size={12} />
+                    </a>
+                    <button onClick={() => copy(url, key)}
+                      className={`shrink-0 flex items-center gap-1 text-xs font-medium px-2 py-1 rounded-lg transition-colors ${done ? "bg-green-100 text-green-700" : "bg-white border border-[#E4D8CC] text-[#8C7B6B] hover:text-[#C4622D] hover:border-[#C4622D]/40"}`}
+                    >
+                      {done ? <Check size={11} /> : <Copy size={11} />}
+                      {done ? "Copied!" : "Copy"}
+                    </button>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+
+          {/* Per-template links */}
+          {templates.length > 0 && (
+            <div>
+              <p className="text-xs font-semibold text-[#1A1714] mb-3 flex items-center gap-2">
+                <Link2 size={13} className="text-[#C4622D]" />
+                Template links — open create page with a specific template pre-selected
+              </p>
+              <div className="divide-y divide-[#F2EAE0] border border-[#E4D8CC] rounded-xl overflow-hidden">
+                {templates.filter((t) => t.isActive).map((t) => {
+                  const url  = makeUrl(`/create?template=${encodeURIComponent(t.slug)}`);
+                  const key  = `tmpl-${t.id}`;
+                  const done = copied === key;
+                  return (
+                    <div key={t.id} className="flex items-center gap-3 px-4 py-3 bg-white hover:bg-[#FAF6F0] transition-colors">
+                      {/* Thumbnail */}
+                      <div className="w-8 h-8 rounded-lg bg-[#F2EAE0] overflow-hidden shrink-0">
+                        {t.templateImageKey && (
+                          <img
+                            src={`${process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:5000"}/api/storage/preview?key=${encodeURIComponent(t.templateImageKey)}`}
+                            alt={t.name}
+                            className="w-full h-full object-cover"
+                            onError={(e) => { (e.target as HTMLImageElement).style.display = "none"; }}
+                          />
+                        )}
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-xs font-semibold text-[#1A1714] truncate">{t.name}</p>
+                        <p className="text-[10px] text-[#8C7B6B] truncate font-mono">{url}</p>
+                      </div>
+                      <a href={url} target="_blank" rel="noopener noreferrer"
+                        className="shrink-0 p-1.5 text-[#8C7B6B] hover:text-[#C4622D] transition-colors" title="Open">
+                        <ExternalLink size={13} />
+                      </a>
+                      <button onClick={() => copy(url, key)}
+                        className={`shrink-0 flex items-center gap-1 text-xs font-medium px-2.5 py-1.5 rounded-lg transition-colors ${done ? "bg-green-100 text-green-700" : "bg-[#FAF6F0] border border-[#E4D8CC] text-[#8C7B6B] hover:text-[#C4622D] hover:border-[#C4622D]/40"}`}
+                      >
+                        {done ? <Check size={12} /> : <Copy size={12} />}
+                        {done ? "Copied!" : "Copy link"}
+                      </button>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ── Main Page ──────────────────────────────────────────────────────────────────
 
 function TemplatesContent() {
@@ -788,6 +931,9 @@ function TemplatesContent() {
   const [error, setError] = useState("");
   const [modal, setModal] = useState<Partial<AdminTemplate> | null>(null);
   const [bulkOpen, setBulkOpen] = useState(false);
+  const { copied: linkCopied, copy: copyLink } = useCopy();
+
+  const sorted = [...templates].sort((a, b) => a.sortOrder - b.sortOrder);
 
   const load = () =>
     getAdminTemplates()
@@ -811,6 +957,22 @@ function TemplatesContent() {
   const handleDelete = async (id: string) => {
     if (!confirm("Delete this template? This cannot be undone.")) return;
     await deleteTemplate(id);
+    await load();
+  };
+
+  // Swap sort orders between two adjacent templates
+  const handleMove = async (idx: number, dir: "up" | "down") => {
+    const swapIdx = dir === "up" ? idx - 1 : idx + 1;
+    if (swapIdx < 0 || swapIdx >= sorted.length) return;
+    const a = sorted[idx];
+    const b = sorted[swapIdx];
+    // Swap their sort orders (or use index-based values if equal)
+    const aNew = b.sortOrder === a.sortOrder ? (dir === "up" ? a.sortOrder - 1 : a.sortOrder + 1) : b.sortOrder;
+    const bNew = b.sortOrder === a.sortOrder ? b.sortOrder : a.sortOrder;
+    await Promise.all([
+      updateTemplate(a.id, { sortOrder: aNew }),
+      updateTemplate(b.id, { sortOrder: bNew }),
+    ]);
     await load();
   };
 
@@ -855,6 +1017,11 @@ function TemplatesContent() {
             </div>
           )}
 
+          {/* Ads & Share Links */}
+          {!loading && templates.length > 0 && (
+            <AdsLinksPanel templates={sorted} />
+          )}
+
           {/* How-it-works hint */}
           {!loading && templates.length === 0 && !error && (
             <div className="bg-gradient-to-br from-[#C4622D]/5 to-[#D4942A]/5 border border-[#C4622D]/20 rounded-2xl p-6 mb-6">
@@ -873,7 +1040,7 @@ function TemplatesContent() {
           )}
 
           <div className="bg-white rounded-2xl border border-[#E4D8CC] overflow-hidden">
-            {templates.length === 0 && !loading && (
+            {sorted.length === 0 && !loading && (
               <div className="text-center py-16 text-[#8C7B6B]">
                 <p className="text-sm">No templates yet.</p>
                 <button onClick={() => setModal(EMPTY)} className="mt-3 text-[#C4622D] text-sm font-medium hover:underline">
@@ -881,10 +1048,34 @@ function TemplatesContent() {
                 </button>
               </div>
             )}
-            {templates.map((t) => (
-              <div key={t.id} className="flex items-center gap-4 px-6 py-4 border-b border-[#F2EAE0] last:border-0 hover:bg-[#FAF6F0] transition-colors">
+            {sorted.map((t, idx) => {
+              const linkKey = `row-${t.id}`;
+              const linkDone = linkCopied === linkKey;
+              return (
+              <div key={t.id} className="flex items-center gap-3 px-4 py-3 border-b border-[#F2EAE0] last:border-0 hover:bg-[#FAF6F0] transition-colors">
+                {/* Sort order controls */}
+                <div className="flex flex-col gap-0.5 shrink-0">
+                  <button
+                    onClick={() => handleMove(idx, "up")}
+                    disabled={idx === 0}
+                    title="Move up"
+                    className="w-5 h-5 flex items-center justify-center rounded text-[#C8BAB0] hover:text-[#C4622D] hover:bg-[#F2EAE0] disabled:opacity-20 transition-colors"
+                  >
+                    <ChevronUp size={12} />
+                  </button>
+                  <span className="text-[10px] text-center text-[#C8BAB0] font-mono leading-none">{t.sortOrder}</span>
+                  <button
+                    onClick={() => handleMove(idx, "down")}
+                    disabled={idx === sorted.length - 1}
+                    title="Move down"
+                    className="w-5 h-5 flex items-center justify-center rounded text-[#C8BAB0] hover:text-[#C4622D] hover:bg-[#F2EAE0] disabled:opacity-20 transition-colors"
+                  >
+                    <ChevronDown size={12} />
+                  </button>
+                </div>
+
                 {/* Thumbnail */}
-                <div className="w-14 h-14 rounded-xl bg-[#F2EAE0] overflow-hidden shrink-0 flex items-center justify-center">
+                <div className="w-12 h-12 rounded-xl bg-[#F2EAE0] overflow-hidden shrink-0 flex items-center justify-center">
                   {t.templateImageKey ? (
                     <img
                       src={`${process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:5000"}/api/storage/preview?key=${encodeURIComponent(t.templateImageKey)}`}
@@ -893,23 +1084,33 @@ function TemplatesContent() {
                       onError={(e) => { (e.target as HTMLImageElement).style.display = "none"; }}
                     />
                   ) : (
-                    <ImageIcon size={20} className="text-[#C8BAB0]" />
+                    <ImageIcon size={18} className="text-[#C8BAB0]" />
                   )}
                 </div>
 
                 <div className="flex-1 min-w-0">
                   <p className="font-medium text-[#1A1714] text-sm truncate">{t.name}</p>
                   <p className="text-xs text-[#8C7B6B] mt-0.5">
-                    {t.category}{t.style ? ` · ${t.style}` : ""} · sort: {t.sortOrder}
+                    {t.category}{t.style ? ` · ${t.style}` : ""}
                   </p>
-                  {t.description && (
-                    <p className="text-xs text-[#8C7B6B] mt-0.5 truncate opacity-70">{t.description}</p>
-                  )}
                 </div>
 
                 <span className={`text-xs font-medium px-2.5 py-1 rounded-full shrink-0 ${t.isActive ? "bg-green-100 text-green-800" : "bg-gray-100 text-gray-500"}`}>
                   {t.isActive ? "Active" : "Inactive"}
                 </span>
+
+                {/* Copy link */}
+                <button
+                  onClick={() => {
+                    const base = typeof window !== "undefined" ? window.location.origin : "";
+                    copyLink(`${base}/create?template=${encodeURIComponent(t.slug)}`, linkKey);
+                  }}
+                  title="Copy FB ads link"
+                  className={`shrink-0 flex items-center gap-1 text-xs font-medium px-2.5 py-1.5 rounded-lg transition-colors ${linkDone ? "bg-green-100 text-green-700" : "border border-[#E4D8CC] text-[#8C7B6B] hover:text-[#C4622D] hover:border-[#C4622D]/40"}`}
+                >
+                  {linkDone ? <Check size={12} /> : <Link2 size={12} />}
+                  {linkDone ? "Copied!" : "Link"}
+                </button>
 
                 <div className="flex items-center gap-1 shrink-0">
                   <button onClick={() => handleToggle(t.id)} title={t.isActive ? "Deactivate" : "Activate"}
@@ -926,7 +1127,8 @@ function TemplatesContent() {
                   </button>
                 </div>
               </div>
-            ))}
+            );
+            })}
           </div>
         </div>
       </div>
