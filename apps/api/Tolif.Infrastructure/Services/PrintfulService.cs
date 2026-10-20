@@ -391,7 +391,7 @@ public sealed class PrintfulService(ISettingsService settings, IHttpClientFactor
         try
         {
             var res = await client.PostAsync(
-                $"/v2/orders/{printfulOrderId}/confirmation", JsonBody(new { }), ct);
+                $"/v2/orders/{printfulOrderId}/confirm", null, ct);
             await EnsureSuccessAsync(res, ct);
             var root    = JsonNode.Parse(await res.Content.ReadAsStringAsync(ct));
             var dashUrl = root?["data"]?["dashboard_url"]?.GetValue<string>();
