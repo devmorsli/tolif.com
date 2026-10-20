@@ -66,22 +66,27 @@ public sealed class PrintfulAdapterService(
             if (!draft.Success)
                 return new PrintOrderResult(false, null, draft.ErrorMessage);
 
-            // Confirm (submit to production) — Printful may need a moment to finish cost calculations,
-            // so retry a few times if we get the "cost calculations still running" error.
+            // Confirm (submit to production).
+            // Printful v2 needs time after draft creation to calculate costs and process the design.
+            // Retry up to 8 times with increasing delays (5s, 10s, 15s … 40s = ~2 min total).
             PrintfulDraftResult confirm = default!;
-            const int maxConfirmAttempts = 6;
+            const int maxConfirmAttempts = 8;
             for (int attempt = 1; attempt <= maxConfirmAttempts; attempt++)
             {
                 if (attempt > 1)
-                    await Task.Delay(TimeSpan.FromSeconds(attempt * 2), ct); // 2s, 4s, 6s, 8s, 10s
+                    await Task.Delay(TimeSpan.FromSeconds(attempt * 5), ct); // 5s, 10s, 15s, 20s, 25s, 30s, 35s
 
                 confirm = await printfulService.ConfirmOrderAsync(draft.PrintfulOrderId!, ct);
                 if (confirm.Success)
                     break;
 
-                bool costsPending = confirm.ErrorMessage?.Contains("cost calculations still running",
-                    StringComparison.OrdinalIgnoreCase) ?? false;
-                if (!costsPending || attempt == maxConfirmAttempts)
+                // Printful returns one of these while it is still processing
+                bool stillPending = confirm.ErrorMessage is { } msg && (
+                    msg.Contains("cost calculations still running", StringComparison.OrdinalIgnoreCase) ||
+                    msg.Contains("design is still processing",      StringComparison.OrdinalIgnoreCase) ||
+                    msg.Contains("still processing",                StringComparison.OrdinalIgnoreCase));
+
+                if (!stillPending || attempt == maxConfirmAttempts)
                     return new PrintOrderResult(false, draft.PrintfulOrderId, confirm.ErrorMessage);
             }
 
