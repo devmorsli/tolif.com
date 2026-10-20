@@ -242,6 +242,7 @@ public sealed class PrintfulService(ISettingsService settings, IHttpClientFactor
 
         var body = new
         {
+            source    = "api",
             recipient = new
             {
                 name         = request.RecipientName,
