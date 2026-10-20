@@ -46,6 +46,7 @@ function TemplateAutoSelect() {
         name: t.name,
         category: t.category,
         style: t.style,
+        templateImageKey: t.templateImageKey,
         uploadSlots: parseUploadSlots(t.uploadSlotsJson),
         extraPersonsAllowed: t.extraPersonsAllowed ?? 0,
         extraPetsAllowed: t.extraPetsAllowed ?? 0,

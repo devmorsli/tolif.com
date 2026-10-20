@@ -44,9 +44,7 @@ function SelectedTemplateCard({
   template: Template;
   onChangeTemplate: () => void;
 }) {
-  const imgUrl = templateImageUrl(
-    (template as unknown as { templateImageKey?: string }).templateImageKey ?? ""
-  );
+  const imgUrl = templateImageUrl(template.templateImageKey ?? "");
 
   return (
     <motion.div
@@ -113,28 +111,12 @@ function TemplatePicker({
   initialCategory?: string | null;
 }) {
   const [activeCategory, setCategory] = useState(initialCategory && ALL_CATEGORIES.includes(initialCategory) ? initialCategory : "All");
-  const [showAll, setShowAll]          = useState(false);
-  const [open, setOpen]                = useState(!selected);
-
-  // When template is picked, collapse
-  const handlePick = (t: PublicTemplate) => {
-    onPick(t);
-    setOpen(false);
-    setShowAll(false);
-  };
-
-  // Re-open when user clicks "select another"
-  useEffect(() => {
-    if (!selected) setOpen(true);
-  }, [selected]);
 
   const filtered = activeCategory === "All"
     ? templates
     : templates.filter((t) => t.category === activeCategory);
 
-  const visible = showAll ? filtered.slice(0, 60) : filtered.slice(0, 6);
-
-  if (!open) return null;
+  const visible = filtered.slice(0, 6);
 
   return (
     <motion.div
@@ -148,7 +130,7 @@ function TemplatePicker({
         {ALL_CATEGORIES.map((cat) => (
           <button
             key={cat}
-            onClick={() => { setCategory(cat); setShowAll(false); }}
+            onClick={() => setCategory(cat)}
             className={`px-3.5 py-1.5 rounded-full text-xs font-semibold transition-all duration-200 ${
               activeCategory === cat
                 ? "bg-[#1A1714] text-white"
@@ -173,7 +155,7 @@ function TemplatePicker({
               initial={{ opacity: 0, y: 14 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: i * 0.04, duration: 0.28 }}
-              onClick={() => handlePick(t)}
+              onClick={() => onPick(t)}
               className="group text-left focus:outline-none"
             >
               {/* Frame — same style as portraits page */}
@@ -234,20 +216,14 @@ function TemplatePicker({
         })}
       </div>
 
-      {/* Show all / browse all */}
-      {filtered.length > 6 && !showAll && (
-        <div className="mt-5 flex items-center gap-3">
-          <button
-            onClick={() => setShowAll(true)}
-            className="flex items-center gap-1.5 px-4 py-2 rounded-full border border-[#E4D8CC] bg-white text-xs font-semibold text-[#5A4E46] hover:border-[#1A1714] hover:text-[#1A1714] transition-all duration-200"
-          >
-            Show all {filtered.length} templates
-          </button>
+      {/* Browse all link */}
+      {filtered.length > 6 && (
+        <div className="mt-5">
           <a
             href="/portraits"
-            className="flex items-center gap-1 text-xs text-[#8C7B6B] hover:text-[#C4622D] transition-colors"
+            className="flex items-center gap-1 text-xs font-semibold text-[#8C7B6B] hover:text-[#C4622D] transition-colors"
           >
-            Browse full catalog <ExternalLink size={10} className="ml-0.5" />
+            Browse all {filtered.length} templates <ExternalLink size={10} className="ml-0.5" />
           </a>
         </div>
       )}
@@ -389,6 +365,7 @@ export function Step1SetupPortrait() {
     selectTemplate({
       id: t.id, slug: t.slug, name: t.name,
       category: t.category, style: t.style,
+      templateImageKey: t.templateImageKey,
       uploadSlots: parseUploadSlots(t.uploadSlotsJson),
       extraPersonsAllowed: t.extraPersonsAllowed ?? 0,
       extraPetsAllowed:    t.extraPetsAllowed    ?? 0,

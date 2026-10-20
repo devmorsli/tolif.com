@@ -18,6 +18,7 @@ export interface Template {
   name: string;
   category: string;
   style: string;
+  templateImageKey?: string;
   uploadSlots: UploadSlot[];
   extraPersonsAllowed: number;
   extraPetsAllowed: number;
