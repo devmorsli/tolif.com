@@ -48,10 +48,12 @@ export function Step3Generating() {
     selectedTemplate,
     uploadSlots,
     sessionId: existingSessionId,
+    customerEmail: storedEmail,
     setGenerationStatus,
     setPreviewUrl,
     setSessionId,
     setRegenerationsLeft,
+    setCustomerEmail,
     next,
     goTo,
     regenerationsLeft,
@@ -61,14 +63,32 @@ export function Step3Generating() {
   const [error, setError] = useState<string | null>(null);
   const started = useRef(false);
 
+  // Email capture state
+  const [emailInput, setEmailInput] = useState(storedEmail ?? "");
+  const [emailSubmitted, setEmailSubmitted] = useState(!!storedEmail);
+  const [emailSaving, setEmailSaving] = useState(false);
+  // After generation starts, we have a sessionId to PATCH
+  const pendingSessionId = useRef<string | null>(existingSessionId);
+
   useEffect(() => {
-    // Cycle through reassurance messages while generating
     const msgTimer = setInterval(
       () => setMsgIndex((i) => (i + 1) % messages.length),
       2200
     );
     return () => clearInterval(msgTimer);
   }, []);
+
+  // If user already gave email in a previous session, auto-save it when sessionId is known
+  const trySaveEmail = async (sessionId: string, email: string) => {
+    if (!email || !email.includes("@")) return;
+    try {
+      await fetch(`${API_BASE}/api/portraits/${sessionId}/email`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email }),
+      });
+    } catch { /* non-critical — ignore */ }
+  };
 
   useEffect(() => {
     if (started.current) return;
@@ -103,7 +123,6 @@ export function Step3Generating() {
           const data = await res.json();
           sessionId  = existingSessionId;
           previewKey = data.previewKey;
-          // Sync remaining count from the server (source of truth)
           if (typeof data.regenLeft === "number") {
             setRegenerationsLeft(data.regenLeft);
           }
@@ -116,6 +135,8 @@ export function Step3Generating() {
 
           const form = new FormData();
           form.append("templateId", selectedTemplate.id);
+          // Include email if already available (e.g. rehydrated from storage)
+          if (storedEmail) form.append("customerEmail", storedEmail);
 
           let hasFiles = false;
           for (const slot of uploadSlots) {
@@ -133,7 +154,6 @@ export function Step3Generating() {
           const res = await fetch(`${API_BASE}/api/portraits/start`, {
             method: "POST",
             body: form,
-            // No Content-Type header — browser sets it with boundary for multipart
           });
 
           if (!res.ok) {
@@ -144,15 +164,18 @@ export function Step3Generating() {
           const data = await res.json();
           sessionId  = data.sessionId;
           previewKey = data.previewKey;
-          // Server tells us how many regens this session is entitled to
           if (typeof data.regenLimit === "number") {
             setRegenerationsLeft(data.regenLimit);
           }
+
+          // If user had already entered email while waiting, save it now
+          pendingSessionId.current = sessionId;
+          if (emailInput && emailInput.includes("@") && !storedEmail) {
+            void trySaveEmail(sessionId, emailInput);
+          }
         }
 
-        // Poll until the preview image is actually available in storage.
-        // The API marks generation complete before the file is fully flushed,
-        // causing a blank image on the next step if we advance immediately.
+        // Poll until the preview image is available in storage
         const previewUrl = `${API_BASE}/api/portraits/${sessionId}/preview`;
         for (let attempt = 0; attempt < 90; attempt++) {
           try {
@@ -174,6 +197,24 @@ export function Step3Generating() {
     })();
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  const handleEmailSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const trimmed = emailInput.trim();
+    if (!trimmed || !trimmed.includes("@")) return;
+
+    setCustomerEmail(trimmed);
+    setEmailSubmitted(true);
+
+    // If sessionId already exists, save immediately
+    const sid = pendingSessionId.current;
+    if (sid) {
+      setEmailSaving(true);
+      await trySaveEmail(sid, trimmed);
+      setEmailSaving(false);
+    }
+    // else: will be saved when generation returns (handled in the useEffect above)
+  };
 
   if (error) {
     return (
@@ -212,8 +253,8 @@ export function Step3Generating() {
   }
 
   return (
-    <div className="flex flex-col items-center justify-center min-h-[420px] gap-10 text-center">
-      <div className="flex flex-col items-center gap-8">
+    <div className="flex flex-col items-center justify-center min-h-[420px] gap-8 text-center">
+      <div className="flex flex-col items-center gap-6">
         <PortraitLoader />
 
         <div>
@@ -249,6 +290,59 @@ export function Step3Generating() {
           Usually takes 1–3 minutes
         </p>
       </div>
+
+      {/* Email capture — shown while generation runs */}
+      <AnimatePresence mode="wait">
+        {!emailSubmitted ? (
+          <motion.div
+            key="email-form"
+            initial={{ opacity: 0, y: 12 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -8 }}
+            transition={{ duration: 0.4 }}
+            className="w-full max-w-sm bg-[#FAF6F0] border border-[#E4D8CC] rounded-2xl p-5"
+          >
+            <p className="text-sm font-medium text-[#1A1714] mb-1">
+              Get notified when it&apos;s ready
+            </p>
+            <p className="text-xs text-[#8C7B6B] mb-4">
+              Enter your email and we&apos;ll send you the result — no spam, ever.
+            </p>
+            <form onSubmit={handleEmailSubmit} className="flex gap-2">
+              <input
+                type="email"
+                value={emailInput}
+                onChange={(e) => setEmailInput(e.target.value)}
+                placeholder="your@email.com"
+                className="flex-1 min-w-0 bg-white border border-[#E4D8CC] rounded-xl px-3 py-2 text-sm text-[#1A1714] placeholder:text-[#C8BAB0] focus:outline-none focus:ring-2 focus:ring-[#C4622D]/30 focus:border-[#C4622D] transition-colors"
+              />
+              <button
+                type="submit"
+                disabled={!emailInput.includes("@")}
+                className="shrink-0 bg-[#C4622D] disabled:bg-[#E4D8CC] disabled:text-[#8C7B6B] text-white text-sm font-medium px-4 py-2 rounded-xl hover:bg-[#9E4A1E] disabled:cursor-not-allowed transition-colors"
+              >
+                Notify me
+              </button>
+            </form>
+          </motion.div>
+        ) : (
+          <motion.div
+            key="email-saved"
+            initial={{ opacity: 0, scale: 0.95 }}
+            animate={{ opacity: 1, scale: 1 }}
+            className="flex items-center gap-2 text-sm text-[#2D4A3E] bg-green-50 border border-green-200 rounded-xl px-4 py-2.5"
+          >
+            {emailSaving ? (
+              <span className="text-xs text-[#8C7B6B]">Saving…</span>
+            ) : (
+              <>
+                <span className="text-green-600">✓</span>
+                <span>We&apos;ll notify you at <strong>{emailInput}</strong></span>
+              </>
+            )}
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       <div className="flex items-center gap-6 text-xs text-[#8C7B6B]">
         <span>🔒 Photos processed securely</span>

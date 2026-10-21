@@ -440,6 +440,10 @@ namespace Tolif.Infrastructure.Persistence.Migrations
                         .HasMaxLength(45)
                         .HasColumnType("character varying(45)");
 
+                    b.Property<string>("CustomerEmail")
+                        .HasMaxLength(254)
+                        .HasColumnType("character varying(254)");
+
                     b.Property<DateTime?>("PhotosDeletedAt")
                         .HasColumnType("timestamp with time zone");
 

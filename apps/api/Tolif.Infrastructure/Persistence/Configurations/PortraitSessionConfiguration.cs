@@ -11,6 +11,7 @@ public class PortraitSessionConfiguration : IEntityTypeConfiguration<PortraitSes
         builder.HasKey(p => p.Id);
         builder.Property(p => p.UploadedFilesJson).HasColumnType("jsonb").HasDefaultValue("{}");
         builder.Property(p => p.IpAddress).HasMaxLength(45);
+        builder.Property(p => p.CustomerEmail).HasMaxLength(254);
         builder.HasOne(p => p.Template).WithMany(t => t.PortraitSessions)
             .HasForeignKey(p => p.TemplateId).OnDelete(DeleteBehavior.Restrict);
     }

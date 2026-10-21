@@ -66,36 +66,52 @@ public class GeminiImageGenerationProvider(
                 petCount    = 0;
             }
 
-            int totalSubjects = personCount + petCount;
-            var subjectParts  = new List<string>();
+            int uploadedCount = personCount + petCount;
+            int expectedCount = request.ExpectedSubjectCount > 0 ? request.ExpectedSubjectCount : uploadedCount;
+            int targetCount   = Math.Max(uploadedCount, expectedCount); // use the larger to avoid losing subjects
+
+            var subjectParts = new List<string>();
             if (personCount > 0) subjectParts.Add($"{personCount} {(personCount == 1 ? "person" : "people")}");
             if (petCount    > 0) subjectParts.Add($"{petCount} {(petCount == 1 ? "pet" : "pets")}");
-            var subjectSummary = subjectParts.Count > 0 ? string.Join(" and ", subjectParts) : $"{totalSubjects} subject(s)";
+            var uploadedSummary = subjectParts.Count > 0 ? string.Join(" and ", subjectParts) : $"{uploadedCount} subject(s)";
+
+            // Build the multi-photo hint only when fewer photos were uploaded than expected
+            var multiSubjectHint = "";
+            if (expectedCount > uploadedCount)
+            {
+                multiSubjectHint = $"""
+
+                    ⚠ IMPORTANT — FEWER PHOTOS THAN EXPECTED:
+                    The template is designed for {expectedCount} subject(s), but only {uploadedCount} photo(s) were provided.
+                    Carefully examine each provided photo: if a single photo contains multiple distinct people or pets, treat
+                    each visible individual as a separate subject. Extract all {expectedCount} subject(s) needed by scanning
+                    across all provided images. If you can only find {uploadedCount} distinct subject(s) total, paint exactly
+                    those {uploadedCount} — never invent or clone subjects to fill the count.
+                    """;
+            }
 
             var instruction = $"""
                 You are an AI portrait artist. You will receive two types of images:
 
-                IMAGE 1 — STYLE REFERENCE ONLY (the template image):
-                This image defines ONLY the art style, medium, colour palette, lighting, composition layout, and mood.
-                The people/pets visible in this image are anonymous PLACEHOLDERS. Their faces and identities must be
-                completely discarded. Do NOT copy, blend, or carry over any face, likeness, or identity from this image
-                into the final portrait under any circumstances.
+                IMAGE 1 — STYLE REFERENCE ONLY (the template):
+                Defines ONLY the art style, medium, colour palette, lighting, and composition.
+                The people/pets shown are anonymous PLACEHOLDERS — discard their faces entirely.
+                Never copy, blend, or carry over any identity from this image.
 
-                IMAGES 2 to {totalSubjects + 1} — THE ACTUAL SUBJECTS (customer photos):
-                These are the real people/pets that must appear in the portrait.
-                The customer has provided exactly {totalSubjects} subject(s): {subjectSummary}.
+                IMAGES 2+ — CUSTOMER PHOTOS (the actual subjects):
+                The customer uploaded {uploadedCount} photo(s) showing: {uploadedSummary}.
+                These are the ONLY real faces/likenesses to use.{multiSubjectHint}
 
-                ══ STRICT RULES ══
-                1. SUBJECT COUNT IS EXACTLY {totalSubjects}. Paint ONLY the {totalSubjects} subject(s) from the customer photos.
-                   - If the style-reference image shows MORE people/pets: remove the extras entirely — do not fill the gap with anyone from the template.
-                   - If the style-reference image shows FEWER people/pets: add the extra subjects naturally to the composition.
-                2. Every subject's face and likeness must come EXCLUSIVELY from the customer photos provided. Never invent or borrow faces.
-                3. Preserve the art style, medium, colour palette, lighting, and composition feel of the style reference exactly.
-                4. Adjust the composition layout naturally so that exactly {totalSubjects} subject(s) fill the scene — no empty chairs, no cropped-out ghosts, no phantom silhouettes.
-                5. Produce a seamless, high-quality result that looks professionally made in that art style.
+                ══ RULES ══
+                1. Paint exactly {targetCount} subject(s) in the final portrait — no more, no fewer.
+                   • If the style-reference shows MORE: remove the extras completely.
+                   • If the style-reference shows FEWER: add the extra subjects naturally.
+                2. Every face/likeness must come EXCLUSIVELY from the customer photos.
+                3. Preserve the art style, colour palette, lighting, and composition of the style reference.
+                4. Adjust the layout so all {targetCount} subject(s) fill the scene naturally — no empty chairs, no ghost silhouettes.
+                5. Deliver a seamless, high-quality result that looks professionally hand-crafted in that art style.
 
-                Additional template context:
-                {request.Prompt}
+                Template context: {request.Prompt}
 
                 Generate the final portrait now.
                 """;

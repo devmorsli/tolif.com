@@ -50,14 +50,40 @@ public class AdminTemplateAiController(
               "description": "One-sentence description shown in the listing card (max 100 chars)",
               "seoTitle": "SEO page title max 60 chars — include | Tolif at end",
               "seoDescription": "Meta description max 155 chars, compelling, keyword-rich",
-              "uploadSlotsJson": "JSON array string of upload slots e.g. [{\"name\":\"person\",\"label\":\"Your photo\",\"type\":\"person\",\"required\":true}]",
-              "extraPersonsAllowed": 10,
-              "extraPetsAllowed": 10
+              "uploadSlotsJson": "<see rules below>",
+              "extraPersonsAllowed": 0,
+              "extraPetsAllowed": 0
             }
-            For uploadSlotsJson: type must be "person" or "pet". Make slots match the portrait type.
-            For extraPersonsAllowed and extraPetsAllowed: set to the maximum extra subjects a customer can add beyond the fixed slots.
-            Use 10 as default unless the template is clearly fixed (e.g. "Solo portrait" → extraPersonsAllowed: 0, extraPetsAllowed: 0).
-            A family template should allow extra persons (10). A pet-only template should allow extra pets (10). A couple template could allow extra persons (10).
+
+            ══ uploadSlotsJson RULES (CRITICAL — read carefully) ══
+            This is a JSON ARRAY STRING of upload slot objects. Each slot = one photo the customer must provide.
+            Slot object shape: {"name":"<id>","label":"<human label>","type":"person"|"pet","required":true}
+
+            COUNT RULES — the number of slots must exactly match the subject count in the prompt:
+            • "solo portrait" / "single person" / "one person"      → 1 person slot
+            • "couple" / "two people" / "partners" / "duo"           → 2 person slots
+            • "family" (unspecified count)                           → 2 person slots (parents default)
+            • "family of 3" / "parents and child"                   → 3 person slots
+            • "family of 4" / "two parents and two kids"            → 4 person slots
+            • "dog owner" / "person with pet" / "owner and pet"     → 1 person slot + 1 pet slot
+            • "two dogs" / "pet duo"                                → 2 pet slots
+            • "group of N"                                          → N person slots
+
+            NAMING: use descriptive names — "person_1", "person_2", "pet_1", etc.
+            LABELS: human-friendly — "Your photo", "Partner's photo", "Child's photo", "Your pet's photo", etc.
+
+            ══ extraPersonsAllowed / extraPetsAllowed RULES ══
+            These control how many ADDITIONAL optional photos customers can add beyond the fixed slots above.
+            • Solo portrait → 0 / 0
+            • Couple        → 0 / 0  (fixed 2-person composition)
+            • Family        → 4 / 0  (allow up to 4 more family members)
+            • Pet template  → 0 / 3  (allow more pets)
+            • Mixed (person + pet) → 2 / 2
+            • Groups        → 6 / 0
+
+            Example for "A romantic oil painting portrait of a couple on a Parisian balcony":
+            uploadSlotsJson = "[{\"name\":\"person_1\",\"label\":\"Your photo\",\"type\":\"person\",\"required\":true},{\"name\":\"person_2\",\"label\":\"Partner's photo\",\"type\":\"person\",\"required\":true}]"
+            extraPersonsAllowed = 0, extraPetsAllowed = 0
             """;
 
         var userText = $"Generate metadata for this portrait template:\n\n{req.Prompt}";

@@ -25,6 +25,9 @@ public class PortraitSession : BaseEntity
     /// <summary>IP address of the session initiator (for rate limiting).</summary>
     public string? IpAddress { get; set; }
 
+    /// <summary>Customer email collected during generation for lead capture.</summary>
+    public string? CustomerEmail { get; set; }
+
     public DateTime? PhotosDeletedAt { get; set; }
     public DateTime? AbandonedAt { get; set; }
 

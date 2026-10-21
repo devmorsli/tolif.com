@@ -50,15 +50,25 @@ public class PortraitsController(
         // Read regen limit from settings (default 5)
         var regenLimit = await settingsService.GetAsync<int>("regen.maxPerSession", ct) ?? 5;
 
+        // Validate email if provided
+        string? customerEmail = null;
+        if (!string.IsNullOrWhiteSpace(req.CustomerEmail))
+        {
+            var emailTrimmed = req.CustomerEmail.Trim();
+            if (emailTrimmed.Length <= 254 && emailTrimmed.Contains('@'))
+                customerEmail = emailTrimmed;
+        }
+
         // Create session
         var session = new PortraitSession
         {
-            Id          = Guid.NewGuid(),
-            TemplateId  = templateId,
-            Status      = PortraitSessionStatus.Uploading,
-            IpAddress   = HttpContext.Connection.RemoteIpAddress?.ToString(),
-            CreatedAt   = DateTime.UtcNow,
-            UpdatedAt   = DateTime.UtcNow,
+            Id            = Guid.NewGuid(),
+            TemplateId    = templateId,
+            Status        = PortraitSessionStatus.Uploading,
+            IpAddress     = HttpContext.Connection.RemoteIpAddress?.ToString(),
+            CustomerEmail = customerEmail,
+            CreatedAt     = DateTime.UtcNow,
+            UpdatedAt     = DateTime.UtcNow,
         };
         db.PortraitSessions.Add(session);
         await db.SaveChangesAsync(ct);
@@ -90,12 +100,13 @@ public class PortraitsController(
         // Build subject slot metadata for the AI prompt
         // Base slots come from the template definition; extras are named extra_person_N / extra_pet_N
         var baseSlotTypes = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+        List<SlotDefinition>? templateSlotDefs = null;
         try
         {
-            var slotDefs = System.Text.Json.JsonSerializer
+            templateSlotDefs = System.Text.Json.JsonSerializer
                 .Deserialize<List<SlotDefinition>>(template.UploadSlotsJson ?? "[]");
-            if (slotDefs is not null)
-                foreach (var sd in slotDefs) baseSlotTypes[sd.name] = sd.type;
+            if (templateSlotDefs is not null)
+                foreach (var sd in templateSlotDefs) baseSlotTypes[sd.name] = sd.type;
         }
         catch { /* ignore parse errors — slots will fall back to "person" */ }
 
@@ -106,13 +117,17 @@ public class PortraitsController(
             return new SubjectSlot(slotName, "person");
         }).ToList();
 
+        // How many subjects the template was designed for (used by AI to handle fewer uploaded photos)
+        var expectedSubjectCount = templateSlotDefs?.Count ?? subjectSlots.Count;
+
         // Run AI generation
         var genRequest = new GenerationRequest(
-            SessionId:        session.Id,
-            TemplateImageKey: template.TemplateImageKey,
-            Prompt:           template.Prompt ?? template.Name,
-            UploadedImageKeys: uploadedKeysList,
-            SubjectSlots:     subjectSlots);
+            SessionId:            session.Id,
+            TemplateImageKey:     template.TemplateImageKey,
+            Prompt:               template.Prompt ?? template.Name,
+            UploadedImageKeys:    uploadedKeysList,
+            SubjectSlots:         subjectSlots,
+            ExpectedSubjectCount: expectedSubjectCount);
 
         var result = await imageGenerationProvider.GenerateAsync(genRequest, ct);
 
@@ -210,12 +225,13 @@ public class PortraitsController(
 
         // Re-run AI generation with the stored photos
         var regenBaseSlots = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+        List<SlotDefinition>? regenSlotDefs = null;
         try
         {
-            var slotDefs = System.Text.Json.JsonSerializer
+            regenSlotDefs = System.Text.Json.JsonSerializer
                 .Deserialize<List<SlotDefinition>>(session.Template.UploadSlotsJson ?? "[]");
-            if (slotDefs is not null)
-                foreach (var sd in slotDefs) regenBaseSlots[sd.name] = sd.type;
+            if (regenSlotDefs is not null)
+                foreach (var sd in regenSlotDefs) regenBaseSlots[sd.name] = sd.type;
         }
         catch { }
 
@@ -226,12 +242,15 @@ public class PortraitsController(
             return new SubjectSlot(slotName, "person");
         }).ToList();
 
+        var regenExpectedCount = regenSlotDefs?.Count ?? regenSubjectSlots.Count;
+
         var genRequest = new GenerationRequest(
-            SessionId:        session.Id,
-            TemplateImageKey: session.Template.TemplateImageKey,
-            Prompt:           session.Template.Prompt ?? session.Template.Name,
-            UploadedImageKeys: [.. uploadedKeys.Values],
-            SubjectSlots:     regenSubjectSlots);
+            SessionId:            session.Id,
+            TemplateImageKey:     session.Template.TemplateImageKey,
+            Prompt:               session.Template.Prompt ?? session.Template.Name,
+            UploadedImageKeys:    [.. uploadedKeys.Values],
+            SubjectSlots:         regenSubjectSlots,
+            ExpectedSubjectCount: regenExpectedCount);
 
         var result = await imageGenerationProvider.GenerateAsync(genRequest, ct);
 
@@ -281,6 +300,30 @@ public class PortraitsController(
         });
     }
 
+    // ── PATCH /api/portraits/{sessionId}/email ────────────────────────────────
+    /// <summary>
+    /// Stores the customer's email address on an existing session.
+    /// Called from the frontend while generation is in progress (lead capture).
+    /// </summary>
+    [HttpPatch("{sessionId}/email")]
+    public async Task<IActionResult> SetEmail(Guid sessionId, [FromBody] SetEmailRequest req, CancellationToken ct)
+    {
+        if (string.IsNullOrWhiteSpace(req.Email) || !req.Email.Contains('@') || req.Email.Length > 254)
+            return BadRequest(new { message = "Invalid email address." });
+
+        var session = await db.PortraitSessions
+            .FirstOrDefaultAsync(s => s.Id == sessionId, ct);
+
+        if (session is null)
+            return NotFound(new { message = "Session not found." });
+
+        session.CustomerEmail = req.Email.Trim();
+        session.UpdatedAt     = DateTime.UtcNow;
+        await db.SaveChangesAsync(ct);
+
+        return Ok(new { saved = true });
+    }
+
     // ── GET /api/portraits/{sessionId}/preview ────────────────────────────────
     // HEAD is used by the frontend poller to check readiness without downloading bytes.
     /// <summary>Streams the watermarked preview image for the given session.</summary>
@@ -316,7 +359,8 @@ public class PortraitsController(
     }
 }
 
-public record StartPortraitRequest(string TemplateId);
+public record StartPortraitRequest(string TemplateId, string? CustomerEmail = null);
+public record SetEmailRequest(string Email);
 
 // Used to parse template.UploadSlotsJson
 internal record SlotDefinition(string name, string label, string type, bool required);

@@ -65,6 +65,7 @@ interface WizardState {
   selectedShipping: ShippingOption | null;
   cartItems: CartItem[];
   preferredCategory: string | null;
+  customerEmail: string | null;
 
   // Actions
   goTo: (step: WizardStep) => void;
@@ -87,6 +88,7 @@ interface WizardState {
   removeExtraSlot: (slotName: string) => void;
   clearCart: () => void;
   reset: () => void;
+  setCustomerEmail: (email: string) => void;
 }
 
 const initialState = {
@@ -102,6 +104,7 @@ const initialState = {
   selectedShipping: null,
   cartItems: [] as CartItem[],
   preferredCategory: null as string | null,
+  customerEmail: null as string | null,
 };
 
 export const useWizardStore = create<WizardState>()(
@@ -167,6 +170,7 @@ export const useWizardStore = create<WizardState>()(
         })),
       clearCart: () => set({ selectedVariant: null, selectedShipping: null }),
       reset: () => set(initialState),
+      setCustomerEmail: (email) => set({ customerEmail: email }),
     }),
     {
       name: "tolif-wizard",
@@ -184,6 +188,7 @@ export const useWizardStore = create<WizardState>()(
         gdprConsent:      state.gdprConsent,
         generationStatus: state.generationStatus,
         cartItems:        state.cartItems,
+        customerEmail:    state.customerEmail,
       }),
       // After rehydration, restore uploadSlots from selectedTemplate
       // (they were excluded because File objects aren't JSON-serialisable,
