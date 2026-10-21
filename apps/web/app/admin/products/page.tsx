@@ -9,8 +9,8 @@ import {
 import { AdminGuard } from "@/components/admin/AdminGuard";
 import { AdminSidebar } from "@/components/admin/AdminSidebar";
 import {
-  getAdminProducts, toggleProduct, updateVariant,
-  addVariant, deleteVariant,
+  getAdminProducts, toggleProduct, updateProduct, deleteProduct,
+  updateVariant, addVariant, deleteVariant,
   type AdminProduct, type AdminProductVariant,
 } from "@/lib/admin-api";
 
@@ -183,13 +183,32 @@ function AddVariantForm({ productId, onAdded }: { productId: string; onAdded: ()
 // ── Product card ───────────────────────────────────────────────────────────────
 
 function ProductCard({ product, onRefresh }: { product: AdminProduct; onRefresh: () => void }) {
-  const [expanded, setExpanded] = useState(true);
-  const [toggling, setToggling] = useState(false);
+  const [expanded, setExpanded]     = useState(true);
+  const [toggling, setToggling]     = useState(false);
+  const [editingName, setEditingName] = useState(false);
+  const [name, setName]             = useState(product.name);
+  const [savingName, setSavingName] = useState(false);
+  const [deleting, setDeleting]     = useState(false);
 
   const handleToggle = async () => {
     setToggling(true);
     try { await toggleProduct(product.id); onRefresh(); }
     finally { setToggling(false); }
+  };
+
+  const handleSaveName = async () => {
+    if (!name.trim()) return;
+    setSavingName(true);
+    try { await updateProduct(product.id, name.trim()); onRefresh(); setEditingName(false); }
+    catch (e: unknown) { alert(e instanceof Error ? e.message : "Save failed."); }
+    finally { setSavingName(false); }
+  };
+
+  const handleDelete = async () => {
+    if (!confirm(`Delete "${product.name}"? This cannot be undone.`)) return;
+    setDeleting(true);
+    try { await deleteProduct(product.id); onRefresh(); }
+    catch (e: unknown) { alert(e instanceof Error ? e.message : "Delete failed."); setDeleting(false); }
   };
 
   const handleVariantSave = async (id: string, price: number, currency: string, isActive: boolean) => {
@@ -206,27 +225,59 @@ function ProductCard({ product, onRefresh }: { product: AdminProduct; onRefresh:
     <div className={`rounded-2xl border-2 transition-colors ${product.isActive ? "border-[#E4D8CC] bg-white" : "border-[#EDE8E0] bg-[#F8F4F0]"}`}>
       {/* Header */}
       <div className="flex items-center gap-3 px-5 py-4">
-        <div className="flex-1">
-          <div className="flex items-center gap-2">
-            <h3 className="font-semibold text-[#1A1714]">{product.name}</h3>
-            <span className="text-[10px] font-semibold uppercase tracking-wider px-2 py-0.5 rounded-full bg-[#F2EAE0] text-[#8C7B6B]">
-              {TYPE_LABELS[product.type] ?? product.type}
-            </span>
-            {!product.isActive && (
-              <span className="text-[10px] font-semibold uppercase tracking-wider px-2 py-0.5 rounded-full bg-red-50 text-red-400">
-                Hidden
+        <div className="flex-1 min-w-0">
+          {editingName ? (
+            <div className="flex items-center gap-2">
+              <input
+                autoFocus
+                value={name}
+                onChange={e => setName(e.target.value)}
+                onKeyDown={e => { if (e.key === "Enter") handleSaveName(); if (e.key === "Escape") { setName(product.name); setEditingName(false); } }}
+                className="flex-1 text-sm font-semibold border border-[#C4622D]/40 rounded-lg px-2.5 py-1 focus:outline-none focus:ring-2 focus:ring-[#C4622D]/30"
+              />
+              <button onClick={handleSaveName} disabled={savingName}
+                className="w-7 h-7 flex items-center justify-center rounded-lg bg-[#2D4A3E] text-white hover:bg-[#1E3329] disabled:opacity-50 transition-colors">
+                {savingName ? <Loader2 size={12} className="animate-spin" /> : <Check size={12} />}
+              </button>
+              <button onClick={() => { setName(product.name); setEditingName(false); }}
+                className="w-7 h-7 flex items-center justify-center rounded-lg bg-[#EDE8E0] text-[#8C7B6B] hover:bg-[#E4D8CC] transition-colors">
+                <X size={12} />
+              </button>
+            </div>
+          ) : (
+            <div className="flex items-center gap-2 flex-wrap">
+              <h3 className="font-semibold text-[#1A1714]">{product.name}</h3>
+              <span className="text-[10px] font-semibold uppercase tracking-wider px-2 py-0.5 rounded-full bg-[#F2EAE0] text-[#8C7B6B]">
+                {TYPE_LABELS[product.type] ?? product.type}
               </span>
-            )}
-          </div>
+              {!product.isActive && (
+                <span className="text-[10px] font-semibold uppercase tracking-wider px-2 py-0.5 rounded-full bg-red-50 text-red-400">
+                  Hidden
+                </span>
+              )}
+            </div>
+          )}
           <p className="text-xs text-[#8C7B6B] mt-0.5">{product.variants.length} size{product.variants.length !== 1 ? "s" : ""}</p>
         </div>
 
+        {!editingName && (
+          <button onClick={() => setEditingName(true)} title="Rename product"
+            className="w-8 h-8 flex items-center justify-center rounded-lg text-[#8C7B6B] hover:bg-[#F2EAE0] hover:text-[#C4622D] transition-colors shrink-0">
+            <Pencil size={14} />
+          </button>
+        )}
+
+        <button onClick={handleDelete} disabled={deleting} title="Delete product"
+          className="w-8 h-8 flex items-center justify-center rounded-lg text-[#8C7B6B] hover:bg-red-50 hover:text-red-500 transition-colors disabled:opacity-50 shrink-0">
+          {deleting ? <Loader2 size={14} className="animate-spin" /> : <Trash2 size={14} />}
+        </button>
+
         <button onClick={handleToggle} disabled={toggling}
-          className="text-[#8C7B6B] hover:text-[#1A1714] disabled:opacity-50 transition-colors" title={product.isActive ? "Hide from store" : "Show in store"}>
+          className="text-[#8C7B6B] hover:text-[#1A1714] disabled:opacity-50 transition-colors shrink-0" title={product.isActive ? "Hide from store" : "Show in store"}>
           {toggling ? <Loader2 size={20} className="animate-spin" /> : product.isActive ? <ToggleRight size={22} className="text-[#2D4A3E]" /> : <ToggleLeft size={22} />}
         </button>
 
-        <button onClick={() => setExpanded(v => !v)} className="text-[#8C7B6B] hover:text-[#1A1714] transition-colors">
+        <button onClick={() => setExpanded(v => !v)} className="text-[#8C7B6B] hover:text-[#1A1714] transition-colors shrink-0">
           {expanded ? <ChevronUp size={18} /> : <ChevronDown size={18} />}
         </button>
       </div>

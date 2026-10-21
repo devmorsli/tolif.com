@@ -518,6 +518,17 @@ export async function toggleProduct(id: string) {
   return apiFetch<AdminProduct>(`/api/admin/products/${id}/toggle`, { method: "PUT" });
 }
 
+export async function updateProduct(id: string, name: string) {
+  return apiFetch<AdminProduct>(`/api/admin/products/${id}`, {
+    method: "PUT",
+    body: JSON.stringify({ name }),
+  });
+}
+
+export async function deleteProduct(id: string) {
+  return apiFetch<void>(`/api/admin/products/${id}`, { method: "DELETE" });
+}
+
 export async function updateVariant(id: string, price: number, currency: string, isActive: boolean) {
   return apiFetch<AdminProductVariant>(`/api/admin/products/variants/${id}`, {
     method: "PUT",

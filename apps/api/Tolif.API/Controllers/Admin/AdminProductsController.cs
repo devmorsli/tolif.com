@@ -24,6 +24,42 @@ public class AdminProductsController(IApplicationDbContext db) : ControllerBase
         return Ok(products.Select(Map));
     }
 
+    // ── PUT /api/admin/products/{id} ─────────────────────────────────────────
+    [HttpPut("{id:guid}")]
+    public async Task<IActionResult> Update(Guid id, [FromBody] UpdateProductRequest req, CancellationToken ct)
+    {
+        var product = await db.Products.FindAsync([id], ct);
+        if (product is null) return NotFound();
+
+        if (!string.IsNullOrWhiteSpace(req.Name))
+            product.Name = req.Name.Trim();
+
+        product.UpdatedAt = DateTime.UtcNow;
+        await db.SaveChangesAsync(ct);
+        return Ok(Map(product));
+    }
+
+    // ── DELETE /api/admin/products/{id} ──────────────────────────────────────
+    [HttpDelete("{id:guid}")]
+    public async Task<IActionResult> Delete(Guid id, CancellationToken ct)
+    {
+        var product = await db.Products
+            .Include(p => p.Variants)
+            .FirstOrDefaultAsync(p => p.Id == id, ct);
+        if (product is null) return NotFound();
+
+        // Block deletion if any variant is referenced in order items
+        var variantIds = product.Variants.Select(v => v.Id).ToList();
+        var inUse = variantIds.Any() &&
+                    await db.OrderItems.AnyAsync(i => variantIds.Contains(i.ProductVariantId), ct);
+        if (inUse)
+            return BadRequest(new { message = "Cannot delete a product that has been ordered. Deactivate it instead." });
+
+        db.Products.Remove(product);
+        await db.SaveChangesAsync(ct);
+        return NoContent();
+    }
+
     // ── PUT /api/admin/products/{id}/toggle ───────────────────────────────────
     [HttpPut("{id:guid}/toggle")]
     public async Task<IActionResult> Toggle(Guid id, CancellationToken ct)
@@ -125,5 +161,6 @@ public class AdminProductsController(IApplicationDbContext db) : ControllerBase
     };
 }
 
+public record UpdateProductRequest(string Name);
 public record UpdateVariantRequest(decimal Price, string Currency, bool IsActive);
 public record AddVariantRequest(string Size, decimal Price, string Currency);

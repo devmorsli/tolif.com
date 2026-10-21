@@ -17,6 +17,7 @@ import {
   setPrintfulVariantId,
   getPrintfulMappings,
   addProductSizeFromPrintful,
+  deleteVariant,
   type PrintfulProduct,
   type PrintfulVariant,
   type PrintfulWebhook,
@@ -39,6 +40,7 @@ import {
   Search,
   X,
   Plus,
+  Trash2,
 } from "lucide-react";
 
 type Tab = "catalog" | "mappings" | "webhooks";
@@ -588,6 +590,7 @@ function PrintfulPage() {
   const [syncedAt, setSyncedAt]           = useState<string | null>(null);
   const [dbVariants, setDbVariants]       = useState<VariantMapping[]>([]);
   const [savingVariant, setSavingVariant] = useState<string | null>(null);
+  const [deletingVariant, setDeletingVariant] = useState<string | null>(null);
   const [webhooks, setWebhooks]           = useState<PrintfulWebhook[]>([]);
   const [webhookUrl, setWebhookUrl]       = useState("");
   const [registeringWh, setRegisteringWh] = useState(false);
@@ -812,6 +815,7 @@ function PrintfulPage() {
                         <th className="text-left px-4 py-3 text-white/40 font-medium text-xs">Product &amp; size</th>
                         <th className="text-left px-4 py-3 text-white/40 font-medium text-xs">Printful variant ID</th>
                         <th className="text-left px-4 py-3 text-white/40 font-medium text-xs">Status</th>
+                        <th className="px-4 py-3" />
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-white/5">
@@ -861,6 +865,28 @@ function PrintfulPage() {
                                 Not mapped
                               </span>
                             )}
+                          </td>
+                          <td className="px-4 py-3">
+                            <button
+                              onClick={async () => {
+                                if (!confirm(`Delete "${dv.productName} · ${dv.size}"?`)) return;
+                                setDeletingVariant(dv.id);
+                                try {
+                                  await deleteVariant(dv.id);
+                                  setDbVariants(prev => prev.filter(v => v.id !== dv.id));
+                                  showToast(`Deleted: ${dv.productName} · ${dv.size}`);
+                                } catch (err: unknown) {
+                                  showToast(`Failed: ${err instanceof Error ? err.message : String(err)}`);
+                                } finally { setDeletingVariant(null); }
+                              }}
+                              disabled={deletingVariant === dv.id}
+                              className="w-7 h-7 flex items-center justify-center rounded-lg text-white/30 hover:text-red-400 hover:bg-red-400/10 disabled:opacity-40 transition-colors"
+                              title="Delete variant"
+                            >
+                              {deletingVariant === dv.id
+                                ? <Loader2 size={12} className="animate-spin" />
+                                : <Trash2 size={12} />}
+                            </button>
                           </td>
                         </tr>
                       ))}
