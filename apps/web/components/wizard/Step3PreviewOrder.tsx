@@ -57,19 +57,28 @@ function PortraitPlaceholder({ absolute = true }: { absolute?: boolean }) {
   );
 }
 
+// ── Per-size aperture coordinates (pixel-measured from each PNG) ───────────────
+// PNGs are all 600×600. Values are percentages of the container size.
+const FRAME_APERTURE: Record<"12x16" | "18x24" | "24x36", { top: string; left: string; width: string; height: string }> = {
+  "12x16": { top: "16.5%", left: "25.2%", width: "49.8%", height: "67%" },
+  "18x24": { top: "10.8%", left: "20.8%", width: "58.2%", height: "77.8%" },
+  "24x36": { top: "10.3%", left: "23.7%", width: "52.3%", height: "79%" },
+};
+
 // ── Framed mockup ──────────────────────────────────────────────────────────────
 function FramedMockup({ url, frame, sizeKey }: { url: string | null; frame: "black" | "red-oak" | "white"; sizeKey: "12x16" | "18x24" | "24x36" }) {
-  const color = frame === "red-oak" ? "redoak" : frame;
+  const color   = frame === "red-oak" ? "redoak" : frame;
+  const ap      = FRAME_APERTURE[sizeKey];
   return (
     <div style={{ filter: "drop-shadow(4px 10px 28px rgba(0,0,0,0.48))" }}>
-      {/* overflow-hidden on both levels: outer clips any bleed during AnimatePresence transitions,
-          inner aperture div clips the portrait to the exact frame opening */}
       <div className="relative w-full overflow-hidden" style={{ aspectRatio: "1 / 1" }}>
-        <div className="absolute overflow-hidden" style={{ top: "11.67%", left: "21.67%", width: "57.5%", height: "77.5%", zIndex: 0 }}>
+        {/* Portrait sits inside the exact frame opening measured from the PNG */}
+        <div className="absolute overflow-hidden" style={{ ...ap, zIndex: 0 }}>
           {url
             ? <img src={url} alt="Portrait preview" className="absolute inset-0 w-full h-full object-cover block" draggable={false} />  // eslint-disable-line @next/next/no-img-element
             : <PortraitPlaceholder absolute={false} />}
         </div>
+        {/* Frame PNG overlays — transparent center shows portrait, opaque border clips it */}
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img src={`/mockups/frame-${color}-${sizeKey}.png`} alt={`${frame} frame`}
           className="absolute inset-0 w-full h-full pointer-events-none select-none block"
@@ -84,7 +93,8 @@ function CanvasMockup({ url }: { url: string | null }) {
   return (
     <div style={{ filter: "drop-shadow(4px 10px 24px rgba(0,0,0,0.38))" }}>
       <div className="relative w-full overflow-hidden" style={{ aspectRatio: "1 / 1" }}>
-        <div className="absolute overflow-hidden" style={{ top: "10.83%", left: "24.17%", width: "52.5%", height: "79.17%", zIndex: 0 }}>
+        {/* Pixel-measured canvas face: top=10%, left=23.3%, width=53.2%, height=79.8% */}
+        <div className="absolute overflow-hidden" style={{ top: "10%", left: "23.3%", width: "53.2%", height: "79.8%", zIndex: 0 }}>
           {url
             ? <img src={url} alt="Portrait preview" className="absolute inset-0 w-full h-full object-cover block" draggable={false} />  // eslint-disable-line @next/next/no-img-element
             : <PortraitPlaceholder absolute={false} />}
