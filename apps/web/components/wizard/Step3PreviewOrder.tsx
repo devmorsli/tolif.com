@@ -152,14 +152,14 @@ function ProductMockup({ url, format, frame, sizeCm, digitalOnly }: {
   const key = `${format}-${frame}-${sizeCm}-${digitalOnly}`;
 
   return (
-    <div className="w-full flex items-center justify-center rounded-2xl py-6 px-6" style={{ background: bg, minHeight: 500 }}>
+    <div className="w-full flex items-center justify-center rounded-2xl py-8 px-4" style={{ background: bg, minHeight: 500 }}>
       <AnimatePresence mode="wait">
         <motion.div key={key}
           initial={{ opacity: 0, scale: 0.91, y: 14 }}
           animate={{ opacity: 1, scale: 1, y: 0 }}
           exit={{ opacity: 0, scale: 0.95, y: -8 }}
           transition={{ duration: 0.34, ease: [0.22, 1, 0.36, 1] }}
-          className="w-full" style={{ maxWidth: 380 }}>
+          className="w-full" style={{ maxWidth: 480 }}>
           {digitalOnly ? <DigitalMockup url={url} />
             : format === "canvas" ? <CanvasMockup url={url} />
             : frame === "none" ? <PlainPosterMockup url={url} />
