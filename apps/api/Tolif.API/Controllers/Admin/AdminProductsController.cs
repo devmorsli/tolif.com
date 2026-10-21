@@ -87,6 +87,8 @@ public class AdminProductsController(IApplicationDbContext db) : ControllerBase
         if (req.Price <= 0)
             return BadRequest(new { message = "Price must be greater than 0." });
 
+        if (!string.IsNullOrWhiteSpace(req.Size))
+            variant.Size = req.Size.Trim();
         variant.Price     = req.Price;
         variant.Currency  = req.Currency.ToUpperInvariant();
         variant.IsActive  = req.IsActive;
@@ -162,5 +164,5 @@ public class AdminProductsController(IApplicationDbContext db) : ControllerBase
 }
 
 public record UpdateProductRequest(string Name);
-public record UpdateVariantRequest(decimal Price, string Currency, bool IsActive);
+public record UpdateVariantRequest(string Size, decimal Price, string Currency, bool IsActive);
 public record AddVariantRequest(string Size, decimal Price, string Currency);

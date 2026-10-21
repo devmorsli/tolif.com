@@ -31,10 +31,11 @@ function VariantRow({
   onDelete,
 }: {
   variant: AdminProductVariant;
-  onSave: (id: string, price: number, currency: string, isActive: boolean) => Promise<void>;
+  onSave: (id: string, size: string, price: number, currency: string, isActive: boolean) => Promise<void>;
   onDelete: (id: string) => Promise<void>;
 }) {
   const [editing, setEditing]   = useState(false);
+  const [size, setSize]         = useState(variant.size);
   const [price, setPrice]       = useState(String(variant.price));
   const [currency, setCurrency] = useState(variant.currency);
   const [active, setActive]     = useState(variant.isActive);
@@ -43,11 +44,12 @@ function VariantRow({
   const [error, setError]       = useState("");
 
   const handleSave = async () => {
+    if (!size.trim()) { setError("Enter a size label."); return; }
     const p = parseFloat(price);
     if (isNaN(p) || p <= 0) { setError("Enter a valid price."); return; }
     setSaving(true); setError("");
     try {
-      await onSave(variant.id, p, currency, active);
+      await onSave(variant.id, size.trim(), p, currency, active);
       setEditing(false);
     } catch (e: unknown) {
       setError(e instanceof Error ? e.message : "Save failed.");
@@ -68,7 +70,12 @@ function VariantRow({
       {editing ? (
         <>
           <div className="flex-1 flex items-center gap-2 flex-wrap">
-            <span className="text-sm font-medium text-[#1A1714] w-28 shrink-0">{variant.size}</span>
+            <input
+              value={size}
+              onChange={e => setSize(e.target.value)}
+              placeholder="e.g. 30×40 cm"
+              className="w-28 shrink-0 text-sm border border-[#E4D8CC] rounded-lg px-2.5 py-1.5 focus:outline-none focus:ring-2 focus:ring-[#C4622D]/30"
+            />
             <div className="flex items-center gap-1.5">
               <select
                 value={currency}
@@ -211,8 +218,8 @@ function ProductCard({ product, onRefresh }: { product: AdminProduct; onRefresh:
     catch (e: unknown) { alert(e instanceof Error ? e.message : "Delete failed."); setDeleting(false); }
   };
 
-  const handleVariantSave = async (id: string, price: number, currency: string, isActive: boolean) => {
-    await updateVariant(id, price, currency, isActive);
+  const handleVariantSave = async (id: string, size: string, price: number, currency: string, isActive: boolean) => {
+    await updateVariant(id, size, price, currency, isActive);
     onRefresh();
   };
 

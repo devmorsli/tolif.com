@@ -529,10 +529,10 @@ export async function deleteProduct(id: string) {
   return apiFetch<void>(`/api/admin/products/${id}`, { method: "DELETE" });
 }
 
-export async function updateVariant(id: string, price: number, currency: string, isActive: boolean) {
+export async function updateVariant(id: string, size: string, price: number, currency: string, isActive: boolean) {
   return apiFetch<AdminProductVariant>(`/api/admin/products/variants/${id}`, {
     method: "PUT",
-    body: JSON.stringify({ price, currency, isActive }),
+    body: JSON.stringify({ size, price, currency, isActive }),
   });
 }
 
