@@ -18,6 +18,7 @@ import {
   Clock,
   AlertCircle,
   Plus,
+  Pencil,
 } from "lucide-react";
 import Link from "next/link";
 import { useWizardStore, type CartItem } from "@/store/wizardStore";
@@ -194,6 +195,8 @@ export function Step4Cart() {
     selectedVariant,
     selectedShipping,
     cartItems,
+    customerEmail,
+    customerName,
     setShipping,
     addCartItem,
     removeCartItem,
@@ -204,7 +207,8 @@ export function Step4Cart() {
 
   const [shippingOptions, setShippingOptions] = useState<ShippingOption[]>([]);
   const [loadingShipping, setLoadingShipping] = useState(true);
-  const [email, setEmail] = useState("");
+  const [email, setEmail] = useState(customerEmail ?? "");
+  const [editingEmail, setEditingEmail] = useState(!customerEmail);
   const [checkoutLoading, setCheckoutLoading] = useState(false);
   const [checkoutError, setCheckoutError] = useState<string | null>(null);
 
@@ -502,13 +506,39 @@ export function Step4Cart() {
             <label className="text-[10px] font-semibold tracking-[0.18em] uppercase text-[#8C7B6B] block mb-2">
               Email for receipt & {isDigital ? "download link" : "order updates"}
             </label>
-            <input
-              type="email"
-              placeholder="you@example.com"
-              value={email}
-              onChange={(e) => { setEmail(e.target.value); setCheckoutError(null); }}
-              className="w-full rounded-xl border border-[#E4D8CC] bg-[#FAF6F0] px-4 py-3 text-sm text-[#1A1714] placeholder:text-[#C0B5A8] focus:outline-none focus:border-[#C4622D] focus:ring-2 focus:ring-[#C4622D]/15 transition-all"
-            />
+
+            {/* If email already captured and not editing — show confirmed state */}
+            {!editingEmail && email ? (
+              <div className="flex items-center justify-between rounded-xl border border-[#D4EAD0] bg-[#F4FAF4] px-4 py-3">
+                <div className="flex items-center gap-2.5 min-w-0">
+                  <div className="w-5 h-5 rounded-full bg-[#2D7A4A] flex items-center justify-center shrink-0">
+                    <Check size={11} className="text-white" />
+                  </div>
+                  <div className="min-w-0">
+                    <p className="text-sm font-medium text-[#1A1714] truncate">{email}</p>
+                    {customerName && (
+                      <p className="text-[11px] text-[#8C7B6B]">{customerName}</p>
+                    )}
+                  </div>
+                </div>
+                <button
+                  onClick={() => setEditingEmail(true)}
+                  className="shrink-0 flex items-center gap-1 text-xs text-[#8C7B6B] hover:text-[#C4622D] transition-colors ml-3"
+                >
+                  <Pencil size={11} /> Change
+                </button>
+              </div>
+            ) : (
+              <input
+                type="email"
+                placeholder="you@example.com"
+                value={email}
+                autoFocus={editingEmail && !!customerEmail}
+                onChange={(e) => { setEmail(e.target.value); setCheckoutError(null); }}
+                onBlur={() => { if (email && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) setEditingEmail(false); }}
+                className="w-full rounded-xl border border-[#E4D8CC] bg-[#FAF6F0] px-4 py-3 text-sm text-[#1A1714] placeholder:text-[#C0B5A8] focus:outline-none focus:border-[#C4622D] focus:ring-2 focus:ring-[#C4622D]/15 transition-all"
+              />
+            )}
           </div>
 
           {checkoutError && (
