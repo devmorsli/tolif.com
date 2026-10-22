@@ -104,7 +104,7 @@ public class OrdersController(IApplicationDbContext db, IStorageService storage)
         // Pull tracking info from the most recent print order that has a tracking number
         var printOrder = order.PrintOrders
             .Where(p => !string.IsNullOrEmpty(p.TrackingNumber))
-            .OrderByDescending(p => p.UpdatedAt ?? p.CreatedAt)
+            .OrderByDescending(p => p.UpdatedAt)
             .FirstOrDefault();
 
         return Ok(new
