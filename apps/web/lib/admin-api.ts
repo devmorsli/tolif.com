@@ -28,6 +28,14 @@ async function apiFetch<T>(path: string, init?: RequestInit): Promise<T> {
     },
     credentials: "include",
   });
+  if (res.status === 401) {
+    // Token expired or invalid — clear it and redirect to login
+    clearToken();
+    if (typeof window !== "undefined") {
+      window.location.href = "/admin/login";
+    }
+    throw new Error("Session expired. Please log in again.");
+  }
   if (!res.ok) {
     const text = await res.text().catch(() => "");
     // Extract user-friendly message from JSON error responses
