@@ -941,7 +941,7 @@ function PrintfulPage() {
                                 } catch (err: unknown) {
                                   const msg = err instanceof Error ? err.message : String(err);
                                   setDeletingVariant(null);
-                                  if (msg.toLowerCase().includes("cannot delete") || msg.toLowerCase().includes("used in existing orders")) {
+                                  if (msg.toLowerCase().includes("existing order") || msg.toLowerCase().includes("cannot delete") || msg.toLowerCase().includes("deactivate")) {
                                     if (confirm(`This variant is used in existing orders and cannot be deleted.\n\nDeactivate it instead? (hides it from the store)`)) {
                                       setDeletingVariant(dv.id);
                                       try {

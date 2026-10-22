@@ -64,7 +64,7 @@ function VariantRow({
     } catch (e: unknown) {
       const msg = e instanceof Error ? e.message : "Delete failed.";
       setDeleting(false);
-      if (msg.toLowerCase().includes("cannot delete") || msg.toLowerCase().includes("used in existing orders")) {
+      if (msg.toLowerCase().includes("existing order") || msg.toLowerCase().includes("cannot delete") || msg.toLowerCase().includes("deactivate")) {
         if (confirm("This variant is used in existing orders and cannot be deleted.\n\nDeactivate it instead? (hides it from the store without deleting)")) {
           setSaving(true);
           try {
