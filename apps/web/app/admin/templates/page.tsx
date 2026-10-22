@@ -6,7 +6,7 @@ import {
   Plus, Pencil, Trash2, ToggleLeft, ToggleRight, X, Save,
   Loader2, Sparkles, Upload, ImageIcon, RefreshCw, ChevronDown, ChevronUp,
   Layers, CheckCircle2, AlertCircle, StopCircle, Play,
-  Link2, Copy, Check, ExternalLink, Megaphone,
+  Link2, Copy, Check, ExternalLink, Megaphone, Search, SlidersHorizontal,
 } from "lucide-react";
 import { AdminGuard } from "@/components/admin/AdminGuard";
 import { AdminSidebar } from "@/components/admin/AdminSidebar";
@@ -925,6 +925,9 @@ function AdsLinksPanel({ templates }: { templates: AdminTemplate[] }) {
 
 // ── Main Page ──────────────────────────────────────────────────────────────────
 
+type SortMode = "order" | "az" | "za" | "newest" | "oldest";
+type StatusFilter = "all" | "active" | "inactive";
+
 function TemplatesContent() {
   const [templates, setTemplates] = useState<AdminTemplate[]>([]);
   const [loading, setLoading] = useState(true);
@@ -932,8 +935,39 @@ function TemplatesContent() {
   const [modal, setModal] = useState<Partial<AdminTemplate> | null>(null);
   const [bulkOpen, setBulkOpen] = useState(false);
   const { copied: linkCopied, copy: copyLink } = useCopy();
+  const [search,       setSearch]       = useState("");
+  const [sortMode,     setSortMode]     = useState<SortMode>("order");
+  const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
+  const [categoryFilter, setCategoryFilter] = useState("all");
 
-  const sorted = [...templates].sort((a, b) => a.sortOrder - b.sortOrder);
+  const byOrder = [...templates].sort((a, b) => a.sortOrder - b.sortOrder);
+
+  // Apply search + filters + sort
+  const sorted = (() => {
+    let result = [...templates];
+    if (search.trim()) {
+      const q = search.toLowerCase();
+      result = result.filter((t) =>
+        t.name.toLowerCase().includes(q) ||
+        t.category.toLowerCase().includes(q) ||
+        t.style?.toLowerCase().includes(q) ||
+        t.slug.toLowerCase().includes(q)
+      );
+    }
+    if (statusFilter === "active")   result = result.filter((t) =>  t.isActive);
+    if (statusFilter === "inactive") result = result.filter((t) => !t.isActive);
+    if (categoryFilter !== "all")    result = result.filter((t) => t.category === categoryFilter);
+
+    switch (sortMode) {
+      case "az":     return result.sort((a, b) => a.name.localeCompare(b.name));
+      case "za":     return result.sort((a, b) => b.name.localeCompare(a.name));
+      case "newest": return result.sort((a, b) => b.id.localeCompare(a.id));
+      case "oldest": return result.sort((a, b) => a.id.localeCompare(b.id));
+      default:       return result.sort((a, b) => a.sortOrder - b.sortOrder);
+    }
+  })();
+
+  const availableCategories = Array.from(new Set(templates.map((t) => t.category).filter(Boolean))).sort();
 
   const load = () =>
     getAdminTemplates()
@@ -963,9 +997,9 @@ function TemplatesContent() {
   // Swap sort orders between two adjacent templates
   const handleMove = async (idx: number, dir: "up" | "down") => {
     const swapIdx = dir === "up" ? idx - 1 : idx + 1;
-    if (swapIdx < 0 || swapIdx >= sorted.length) return;
-    const a = sorted[idx];
-    const b = sorted[swapIdx];
+    if (swapIdx < 0 || swapIdx >= byOrder.length) return;
+    const a = byOrder[idx];
+    const b = byOrder[swapIdx];
     // Swap their sort orders (or use index-based values if equal)
     const aNew = b.sortOrder === a.sortOrder ? (dir === "up" ? a.sortOrder - 1 : a.sortOrder + 1) : b.sortOrder;
     const bNew = b.sortOrder === a.sortOrder ? b.sortOrder : a.sortOrder;
@@ -1017,9 +1051,87 @@ function TemplatesContent() {
             </div>
           )}
 
+          {/* Search + Sort + Filter toolbar */}
+          {!loading && templates.length > 0 && (
+            <div className="bg-white border border-[#E4D8CC] rounded-2xl px-4 py-3 mb-4 flex flex-col sm:flex-row gap-3 items-start sm:items-center">
+              {/* Search */}
+              <div className="relative flex-1 min-w-0">
+                <Search size={13} className="absolute left-3 top-1/2 -translate-y-1/2 text-[#B0A090] pointer-events-none" />
+                <input
+                  type="text"
+                  value={search}
+                  onChange={(e) => setSearch(e.target.value)}
+                  placeholder="Search by name, category, style…"
+                  className="w-full pl-8 pr-8 py-2 border border-[#E4D8CC] rounded-xl text-sm text-[#1A1714] placeholder:text-[#C8BAB0] focus:outline-none focus:ring-2 focus:ring-[#C4622D]/30 focus:border-[#C4622D]"
+                />
+                {search && (
+                  <button onClick={() => setSearch("")} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-[#B0A090] hover:text-[#1A1714]">
+                    <X size={13} />
+                  </button>
+                )}
+              </div>
+
+              {/* Sort */}
+              <div className="flex items-center gap-2 shrink-0">
+                <SlidersHorizontal size={13} className="text-[#8C7B6B]" />
+                <select
+                  value={sortMode}
+                  onChange={(e) => setSortMode(e.target.value as SortMode)}
+                  className="text-sm border border-[#E4D8CC] rounded-xl px-3 py-2 bg-white text-[#1A1714] focus:outline-none focus:ring-2 focus:ring-[#C4622D]/30 cursor-pointer"
+                >
+                  <option value="order">Sort order</option>
+                  <option value="az">A → Z</option>
+                  <option value="za">Z → A</option>
+                  <option value="newest">Newest first</option>
+                  <option value="oldest">Oldest first</option>
+                </select>
+              </div>
+
+              {/* Status filter */}
+              <div className="flex items-center gap-1 bg-[#F5F0E8] rounded-xl p-1 shrink-0">
+                {(["all", "active", "inactive"] as StatusFilter[]).map((s) => (
+                  <button
+                    key={s}
+                    onClick={() => setStatusFilter(s)}
+                    className={`text-xs font-semibold px-3 py-1.5 rounded-lg capitalize transition-colors ${
+                      statusFilter === s ? "bg-white text-[#C4622D] shadow-sm" : "text-[#8C7B6B] hover:text-[#1A1714]"
+                    }`}
+                  >
+                    {s}
+                  </button>
+                ))}
+              </div>
+
+              {/* Category filter */}
+              {availableCategories.length > 0 && (
+                <select
+                  value={categoryFilter}
+                  onChange={(e) => setCategoryFilter(e.target.value)}
+                  className="text-sm border border-[#E4D8CC] rounded-xl px-3 py-2 bg-white text-[#1A1714] focus:outline-none focus:ring-2 focus:ring-[#C4622D]/30 cursor-pointer shrink-0"
+                >
+                  <option value="all">All categories</option>
+                  {availableCategories.map((c) => <option key={c} value={c}>{c}</option>)}
+                </select>
+              )}
+            </div>
+          )}
+
+          {/* Results count */}
+          {!loading && templates.length > 0 && (
+            <p className="text-xs text-[#8C7B6B] mb-3">
+              {sorted.length} of {templates.length} templates
+              {(search || statusFilter !== "all" || categoryFilter !== "all") && (
+                <button
+                  onClick={() => { setSearch(""); setStatusFilter("all"); setCategoryFilter("all"); setSortMode("order"); }}
+                  className="ml-2 text-[#C4622D] hover:underline"
+                >Clear filters</button>
+              )}
+            </p>
+          )}
+
           {/* Ads & Share Links */}
           {!loading && templates.length > 0 && (
-            <AdsLinksPanel templates={sorted} />
+            <AdsLinksPanel templates={byOrder} />
           )}
 
           {/* How-it-works hint */}
@@ -1051,28 +1163,33 @@ function TemplatesContent() {
             {sorted.map((t, idx) => {
               const linkKey = `row-${t.id}`;
               const linkDone = linkCopied === linkKey;
+              const byOrderIdx = byOrder.findIndex((x) => x.id === t.id);
               return (
               <div key={t.id} className="flex items-center gap-3 px-4 py-3 border-b border-[#F2EAE0] last:border-0 hover:bg-[#FAF6F0] transition-colors">
-                {/* Sort order controls */}
-                <div className="flex flex-col gap-0.5 shrink-0">
-                  <button
-                    onClick={() => handleMove(idx, "up")}
-                    disabled={idx === 0}
-                    title="Move up"
-                    className="w-5 h-5 flex items-center justify-center rounded text-[#C8BAB0] hover:text-[#C4622D] hover:bg-[#F2EAE0] disabled:opacity-20 transition-colors"
-                  >
-                    <ChevronUp size={12} />
-                  </button>
-                  <span className="text-[10px] text-center text-[#C8BAB0] font-mono leading-none">{t.sortOrder}</span>
-                  <button
-                    onClick={() => handleMove(idx, "down")}
-                    disabled={idx === sorted.length - 1}
-                    title="Move down"
-                    className="w-5 h-5 flex items-center justify-center rounded text-[#C8BAB0] hover:text-[#C4622D] hover:bg-[#F2EAE0] disabled:opacity-20 transition-colors"
-                  >
-                    <ChevronDown size={12} />
-                  </button>
-                </div>
+                {/* Sort order controls — only shown when sort = "order" */}
+                {sortMode === "order" ? (
+                  <div className="flex flex-col gap-0.5 shrink-0">
+                    <button
+                      onClick={() => handleMove(byOrderIdx, "up")}
+                      disabled={byOrderIdx === 0}
+                      title="Move up"
+                      className="w-5 h-5 flex items-center justify-center rounded text-[#C8BAB0] hover:text-[#C4622D] hover:bg-[#F2EAE0] disabled:opacity-20 transition-colors"
+                    >
+                      <ChevronUp size={12} />
+                    </button>
+                    <span className="text-[10px] text-center text-[#C8BAB0] font-mono leading-none">{t.sortOrder}</span>
+                    <button
+                      onClick={() => handleMove(byOrderIdx, "down")}
+                      disabled={byOrderIdx === byOrder.length - 1}
+                      title="Move down"
+                      className="w-5 h-5 flex items-center justify-center rounded text-[#C8BAB0] hover:text-[#C4622D] hover:bg-[#F2EAE0] disabled:opacity-20 transition-colors"
+                    >
+                      <ChevronDown size={12} />
+                    </button>
+                  </div>
+                ) : (
+                  <div className="w-5 shrink-0" />
+                )}
 
                 {/* Thumbnail */}
                 <div className="w-12 h-12 rounded-xl bg-[#F2EAE0] overflow-hidden shrink-0 flex items-center justify-center">
