@@ -113,7 +113,7 @@ function TemplatePicker({
   onPick: (t: PublicTemplate) => void;
   initialCategory?: string | null;
 }) {
-  const [activeCategory, setCategory] = useState(initialCategory && ALL_CATEGORIES.includes(initialCategory) ? initialCategory : "All");
+  const [activeCategory, setCategory] = useState(initialCategory && ALL_CATEGORIES.includes(initialCategory as typeof ALL_CATEGORIES[number]) ? initialCategory : "All");
 
   const filtered = activeCategory === "All"
     ? templates

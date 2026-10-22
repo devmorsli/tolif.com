@@ -307,7 +307,7 @@ export default function PortraitsPage() {
 
               <select
                 value={sort}
-                onChange={(e) => setSort(e.target.value)}
+                onChange={(e) => setSort(e.target.value as TemplateDefaultSort)}
                 className="px-4 py-3 rounded-xl border border-[#E4D8CC] bg-white
                            text-sm font-medium text-[#5A4E46]
                            focus:outline-none focus:ring-2 focus:ring-[#C4622D]/25 focus:border-[#C4622D]/60

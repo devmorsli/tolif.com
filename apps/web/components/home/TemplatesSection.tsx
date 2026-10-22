@@ -11,6 +11,7 @@ import {
   categoryGradient,
   TEMPLATE_CATEGORIES,
   type PublicTemplate,
+  type TemplateDefaultSort,
 } from "@/lib/public-api";
 
 const HOME_LIMIT = 8;
