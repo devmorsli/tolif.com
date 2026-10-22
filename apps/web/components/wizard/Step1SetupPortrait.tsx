@@ -111,11 +111,18 @@ function TemplatePicker({
 }) {
   const [activeCategory, setCategory] = useState(initialCategory && ALL_CATEGORIES.includes(initialCategory as typeof ALL_CATEGORIES[number]) ? initialCategory : "All");
 
+  // Only show category pills that have at least one template
+  const usedCategories = ["All", ...ALL_CATEGORIES.filter(
+    (cat) => cat !== "All" && templates.some((t) => t.category === cat)
+  )];
+
   const filtered = activeCategory === "All"
     ? templates
     : templates.filter((t) => t.category === activeCategory);
 
-  const visible = filtered.slice(0, 6);
+  // If currently selected category has no templates, fall back to All
+  const visibleFiltered = filtered.length === 0 ? templates : filtered;
+  const visible = visibleFiltered.slice(0, 6);
 
   return (
     <motion.div
@@ -124,9 +131,9 @@ function TemplatePicker({
       exit={{ opacity: 0, height: 0 }}
       transition={{ duration: 0.32, ease: "easeInOut" }}
     >
-      {/* Category filter pills */}
+      {/* Category filter pills — only categories with templates */}
       <div className="flex flex-wrap gap-2 mb-4">
-        {ALL_CATEGORIES.map((cat) => (
+        {usedCategories.map((cat) => (
           <button
             key={cat}
             onClick={() => setCategory(cat)}

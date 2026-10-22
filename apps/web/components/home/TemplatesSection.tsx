@@ -149,7 +149,9 @@ export function TemplatesSection() {
           transition={{ delay: 0.2, duration: 0.5 }}
           className="flex gap-2 flex-wrap mb-10"
         >
-          {TEMPLATE_CATEGORIES.map((cat) => (
+          {TEMPLATE_CATEGORIES.filter((cat) =>
+            cat === "All" || templates.some((t) => t.category === cat)
+          ).map((cat) => (
             <button
               key={cat}
               onClick={() => handleFilter(cat)}

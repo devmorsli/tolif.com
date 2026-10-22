@@ -337,7 +337,9 @@ export default function PortraitsPage() {
                   <div>
                     <p className="text-[10px] font-bold tracking-[3px] uppercase text-[#A89080] mb-3">Category</p>
                     <div className="flex flex-wrap gap-2">
-                      {CATEGORIES.map((cat) => (
+                      {CATEGORIES.filter((cat) =>
+                        cat === "All" || templates.some((t) => t.category === cat)
+                      ).map((cat) => (
                         <button
                           key={cat}
                           onClick={() => setCategory(cat)}
