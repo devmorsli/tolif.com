@@ -14,6 +14,46 @@ namespace Tolif.API.Controllers;
 [Route("api/orders")]
 public class OrdersController(IApplicationDbContext db, IStorageService storage) : ControllerBase
 {
+    // ── POST /api/orders/lookup ───────────────────────────────────────────────
+    /// <summary>
+    /// Lets a customer look up their order access token using their order number
+    /// and email address. Returns the token so the frontend can redirect them to
+    /// /order/{token}.
+    /// </summary>
+    [HttpPost("lookup")]
+    public async Task<IActionResult> Lookup([FromBody] LookupRequest req, CancellationToken ct)
+    {
+        if (string.IsNullOrWhiteSpace(req.OrderNumber) || string.IsNullOrWhiteSpace(req.Email))
+            return BadRequest(new { message = "Order number and email are required." });
+
+        var order = await db.Orders
+            .AsNoTracking()
+            .FirstOrDefaultAsync(
+                o => o.CustomerEmail.ToLower() == req.Email.Trim().ToLower() &&
+                     (o.Id.ToString() == req.OrderNumber.Trim() ||
+                      // Match formatted order number like TOL-001
+                      EF.Functions.Like(req.OrderNumber.Trim().ToUpper(), "%")),
+                ct);
+
+        // Use the OrderHelper to find by formatted number
+        if (order is null)
+        {
+            var allOrders = await db.Orders.AsNoTracking()
+                .Where(o => o.CustomerEmail.ToLower() == req.Email.Trim().ToLower())
+                .ToListAsync(ct);
+            order = allOrders.FirstOrDefault(o =>
+                string.Equals(OrderHelper.FormatNumber(o), req.OrderNumber.Trim(), StringComparison.OrdinalIgnoreCase));
+        }
+
+        if (order is null)
+            // Use a vague message to avoid leaking whether the email exists
+            return NotFound(new { message = "No order found with that order number and email address." });
+
+        return Ok(new { accessToken = order.AccessToken, orderNumber = OrderHelper.FormatNumber(order) });
+    }
+
+    public record LookupRequest(string OrderNumber, string Email);
+
     // ── GET /api/orders/{accessToken} ─────────────────────────────────────────
     /// <summary>
     /// Returns order details for the customer-facing thank-you / download page.
@@ -31,6 +71,7 @@ public class OrdersController(IApplicationDbContext db, IStorageService storage)
                     .ThenInclude(v => v!.Product)
             .Include(o => o.Items)
                 .ThenInclude(i => i.PortraitSession)
+            .Include(o => o.PrintOrders)
             .AsNoTracking()
             .FirstOrDefaultAsync(o => o.AccessToken == accessToken, ct);
 
@@ -60,6 +101,12 @@ public class OrdersController(IApplicationDbContext db, IStorageService storage)
             hasFinalImage = i.PortraitSession?.FinalImageKey != null,
         }).ToList();
 
+        // Pull tracking info from the most recent print order that has a tracking number
+        var printOrder = order.PrintOrders
+            .Where(p => !string.IsNullOrEmpty(p.TrackingNumber))
+            .OrderByDescending(p => p.UpdatedAt ?? p.CreatedAt)
+            .FirstOrDefault();
+
         return Ok(new
         {
             orderNumber     = OrderHelper.FormatNumber(order),
@@ -75,6 +122,8 @@ public class OrdersController(IApplicationDbContext db, IStorageService storage)
             hasDigital      = order.Items.Any(i =>
                 i.ProductVariant?.Product?.Type == Domain.Enums.ProductType.Digital
                 || i.ProductVariant?.Product?.Name?.Contains("Digital", StringComparison.OrdinalIgnoreCase) == true),
+            trackingNumber  = printOrder?.TrackingNumber,
+            trackingUrl     = printOrder?.TrackingUrl,
         });
     }
 

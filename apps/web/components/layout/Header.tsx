@@ -8,8 +8,9 @@ import { ShoppingBag, Menu, X } from "lucide-react";
 import { useWizardStore } from "@/store/wizardStore";
 
 const navLinks = [
-  { href: "/portraits", label: "Templates" },
+  { href: "/portraits",    label: "Templates" },
   { href: "/how-it-works", label: "How It Works" },
+  { href: "/track",        label: "Track Order" },
 ];
 
 export function Header() {

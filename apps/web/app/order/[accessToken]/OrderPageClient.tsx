@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { motion } from "framer-motion";
 import Link from "next/link";
 import { useWizardStore } from "@/store/wizardStore";
-import { Download, Package, CheckCircle, Clock, Truck, Star, ArrowLeft } from "lucide-react";
+import { Download, Package, CheckCircle, Clock, Truck, Star, ArrowLeft, Copy, Check, ExternalLink } from "lucide-react";
 
 // ── Types ──────────────────────────────────────────────────────────────────────
 interface OrderItem {
@@ -31,15 +31,17 @@ interface Order {
   currency: string;
   shippingAddress: Record<string, string> | null;
   hasDigital: boolean;
+  trackingNumber?: string | null;
+  trackingUrl?: string | null;
 }
 
 // ── Status timeline config ─────────────────────────────────────────────────────
 const STATUSES = [
-  { key: "Pending",              label: "Confirmed",  icon: CheckCircle },
-  { key: "Paid",                 label: "Paid",        icon: CheckCircle },
-  { key: "GeneratingHighRes",    label: "Processing",  icon: Clock },
+  { key: "Pending",              label: "Received",    icon: CheckCircle },
+  { key: "Paid",                 label: "Confirmed",   icon: CheckCircle },
+  { key: "GeneratingHighRes",    label: "Artwork",     icon: Clock },
   { key: "Ready",                label: "Ready",       icon: Star },
-  { key: "SubmittedToPrinter",   label: "Printing",    icon: Package },
+  { key: "SubmittedToPrinter",   label: "Production",  icon: Package },
   { key: "Shipped",              label: "Shipped",     icon: Truck },
 ] as const;
 
@@ -205,6 +207,15 @@ export function OrderPageClient({
     year: "numeric",
   });
 
+  const [copied, setCopied] = useState(false);
+  const copyTracking = () => {
+    if (!order.trackingNumber) return;
+    navigator.clipboard.writeText(order.trackingNumber).then(() => {
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    });
+  };
+
   const isPaid   = ["Paid", "GeneratingHighRes", "Ready", "SubmittedToPrinter", "Shipped"].includes(order.status);
   const isShipped = order.status === "Shipped";
 
@@ -291,6 +302,44 @@ export function OrderPageClient({
           </p>
           <StatusTimeline status={order.status} />
         </motion.div>
+
+        {/* ── Tracking number (when shipped) ──────────────────────────────── */}
+        {isShipped && order.trackingNumber && (
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.55, duration: 0.5 }}
+            className="bg-[#2D4A3E] rounded-2xl p-5 mb-5 flex items-center gap-4"
+            style={{ boxShadow: "0 4px 20px rgba(45,74,62,0.25)" }}
+          >
+            <div className="w-10 h-10 rounded-xl bg-white/10 flex items-center justify-center shrink-0">
+              <Truck size={18} className="text-white" />
+            </div>
+            <div className="flex-1 min-w-0">
+              <p className="text-xs font-semibold text-white/60 uppercase tracking-widest mb-0.5">Tracking number</p>
+              <p className="font-mono text-white font-semibold text-sm truncate">{order.trackingNumber}</p>
+            </div>
+            <div className="flex items-center gap-2 shrink-0">
+              <button
+                onClick={copyTracking}
+                className="w-8 h-8 rounded-lg bg-white/10 hover:bg-white/20 flex items-center justify-center transition-colors"
+                title="Copy tracking number"
+              >
+                {copied ? <Check size={14} className="text-white" /> : <Copy size={14} className="text-white" />}
+              </button>
+              {order.trackingUrl && (
+                <a
+                  href={order.trackingUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="flex items-center gap-1.5 bg-white text-[#2D4A3E] hover:bg-white/90 text-xs font-semibold px-3 py-1.5 rounded-lg transition-colors"
+                >
+                  Track shipment <ExternalLink size={11} />
+                </a>
+              )}
+            </div>
+          </motion.div>
+        )}
 
         {/* ── Portrait + order items ───────────────────────────────────────── */}
         <motion.div
@@ -427,8 +476,9 @@ export function OrderPageClient({
                     {isPaid ? "Your print is being prepared" : "Print production"}
                   </p>
                   <p className="text-xs text-[#8C7B6B] mt-0.5 leading-relaxed">
-                    Your portrait will be printed on premium materials and shipped within
-                    5–7 business days. You'll receive a tracking number by email.
+                    Your portrait will be carefully printed on premium archival materials.
+                    Production takes 2–5 business days, followed by tracked delivery.
+                    You&apos;ll receive your tracking number by email once it ships.
                   </p>
                 </div>
               </div>
