@@ -4,12 +4,13 @@ import { useEffect, useState } from "react";
 import {
   ChevronLeft, Mail, Package, MapPin, CreditCard, RefreshCw,
   CheckCircle, AlertCircle, Clock, XCircle, Loader2, Image as ImageIcon, Printer,
+  ChevronDown,
 } from "lucide-react";
 import Link from "next/link";
 import { use } from "react";
 import { AdminGuard } from "@/components/admin/AdminGuard";
 import { AdminSidebar } from "@/components/admin/AdminSidebar";
-import { getOrder, resendOrderEmail, submitOrderToPrintful, storagePreviewUrl, type OrderDetail, type OrderDetailItem } from "@/lib/admin-api";
+import { getOrder, resendOrderEmail, submitOrderToPrintful, updateOrderStatus, storagePreviewUrl, type OrderDetail, type OrderDetailItem } from "@/lib/admin-api";
 
 // ── Status helpers ────────────────────────────────────────────────────────────
 
@@ -120,6 +121,8 @@ function OrderDetailContent({ id }: { id: string }) {
   const [printSending, setPrintSending] = useState(false);
   const [printSuccess, setPrintSuccess] = useState(false);
   const [printError, setPrintError]     = useState("");
+  const [statusChanging, setStatusChanging] = useState(false);
+  const [statusDropdownOpen, setStatusDropdownOpen] = useState(false);
 
   useEffect(() => {
     getOrder(id)
@@ -155,9 +158,32 @@ function OrderDetailContent({ id }: { id: string }) {
       const updated = await getOrder(id).catch(() => null);
       if (updated) setOrder(updated);
     } catch (e: unknown) {
-      setPrintError(e instanceof Error ? e.message : "Failed to submit.");
+      const msg = e instanceof Error ? e.message : "Failed to submit.";
+      // "Last status: done" means the job finished successfully but the polling
+      // timed out waiting — treat as success, not an error.
+      if (msg.includes("Last status: done")) {
+        setPrintSuccess(true);
+        const updated = await getOrder(id).catch(() => null);
+        if (updated) setOrder(updated);
+      } else {
+        setPrintError(msg);
+      }
     } finally {
       setPrintSending(false);
+    }
+  };
+
+  const handleStatusChange = async (newStatus: string) => {
+    if (!order || newStatus === order.status) { setStatusDropdownOpen(false); return; }
+    setStatusChanging(true);
+    setStatusDropdownOpen(false);
+    try {
+      const updated = await updateOrderStatus(id, newStatus);
+      setOrder(updated);
+    } catch (e: unknown) {
+      alert(e instanceof Error ? e.message : "Failed to update status.");
+    } finally {
+      setStatusChanging(false);
     }
   };
 
@@ -200,9 +226,33 @@ function OrderDetailContent({ id }: { id: string }) {
                     <h1 className="text-2xl font-mono font-semibold text-[#1A1714]">{order.orderNumber}</h1>
                   </div>
                   {statusCfg && (
-                    <span className={`flex items-center gap-1.5 text-xs font-medium px-3 py-1.5 rounded-full border ${statusCfg.color}`}>
-                      {statusCfg.icon} {statusCfg.label}
-                    </span>
+                    <div className="relative">
+                      <button
+                        onClick={() => setStatusDropdownOpen(o => !o)}
+                        disabled={statusChanging}
+                        className={`flex items-center gap-1.5 text-xs font-medium px-3 py-1.5 rounded-full border transition-opacity disabled:opacity-50 ${statusCfg.color}`}
+                      >
+                        {statusChanging ? <Loader2 size={13} className="animate-spin" /> : statusCfg.icon}
+                        {statusCfg.label}
+                        <ChevronDown size={11} className="ml-0.5" />
+                      </button>
+                      {statusDropdownOpen && (
+                        <>
+                          <div className="fixed inset-0 z-10" onClick={() => setStatusDropdownOpen(false)} />
+                          <div className="absolute right-0 top-full mt-1.5 z-20 bg-white border border-[#E4D8CC] rounded-xl shadow-lg overflow-hidden min-w-[160px]">
+                            {Object.entries(STATUS_CONFIG).map(([key, cfg]) => (
+                              <button
+                                key={key}
+                                onClick={() => handleStatusChange(key)}
+                                className={`w-full flex items-center gap-2 px-4 py-2.5 text-xs font-medium hover:bg-[#F5F0EA] transition-colors ${order.status === key ? "bg-[#F5F0EA] text-[#C4622D]" : "text-[#1A1714]"}`}
+                              >
+                                {cfg.icon} {cfg.label}
+                              </button>
+                            ))}
+                          </div>
+                        </>
+                      )}
+                    </div>
                   )}
                 </div>
 

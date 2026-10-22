@@ -18,6 +18,7 @@ import {
   getPrintfulMappings,
   addProductSizeFromPrintful,
   deleteVariant,
+  updateVariant,
   type PrintfulProduct,
   type PrintfulVariant,
   type PrintfulWebhook,
@@ -94,10 +95,25 @@ function AddSizeModal({
   const [category, setCategory] = useState<ProductCategory>("poster");
   const [frameColor, setFrameColor] = useState<FrameColor>("black");
   const [sizeCm, setSizeCm] = useState(cmEquiv);
+  const [sizeUnit, setSizeUnit] = useState<"cm" | "in">("cm");
+  const [inchW, setInchW] = useState("");
+  const [inchH, setInchH] = useState("");
   const [price, setPrice] = useState("");
   const [currency, setCurrency] = useState("EUR");
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  const handleInchChange = (w: string, h: string) => {
+    setInchW(w);
+    setInchH(h);
+    const wn = parseFloat(w);
+    const hn = parseFloat(h);
+    if (!isNaN(wn) && !isNaN(hn) && wn > 0 && hn > 0) {
+      const wcm = Math.round(wn * 2.54);
+      const hcm = Math.round(hn * 2.54);
+      setSizeCm(`${wcm} × ${hcm} cm`);
+    }
+  };
 
   // Close on Escape
   useEffect(() => {
@@ -207,17 +223,63 @@ function AddSizeModal({
 
           {/* Size */}
           <div>
-            <label className="text-xs font-semibold text-white/50 uppercase tracking-wider block mb-2">
-              Size label <span className="text-white/25 font-normal normal-case tracking-normal">(must match checkout format)</span>
-            </label>
-            <input
-              type="text"
-              value={sizeCm}
-              onChange={(e) => setSizeCm(e.target.value)}
-              placeholder="e.g. 30 × 40 cm"
-              className="w-full bg-white/8 border border-white/12 text-white text-sm rounded-lg px-3 py-2.5 focus:outline-none focus:border-[#C4622D] placeholder:text-white/25"
-            />
-            <p className="text-[10px] text-white/25 mt-1">Use the format: "30 × 40 cm", "45 × 60 cm", "60 × 90 cm"</p>
+            <div className="flex items-center justify-between mb-2">
+              <label className="text-xs font-semibold text-white/50 uppercase tracking-wider">
+                Size label <span className="text-white/25 font-normal normal-case tracking-normal">(must match checkout format)</span>
+              </label>
+              <div className="flex items-center gap-0.5 bg-white/8 border border-white/12 rounded-lg p-0.5">
+                <button
+                  type="button"
+                  onClick={() => setSizeUnit("cm")}
+                  className={`text-[10px] font-semibold px-2 py-1 rounded-md transition-colors ${sizeUnit === "cm" ? "bg-[#C4622D] text-white" : "text-white/40 hover:text-white/70"}`}
+                >cm</button>
+                <button
+                  type="button"
+                  onClick={() => setSizeUnit("in")}
+                  className={`text-[10px] font-semibold px-2 py-1 rounded-md transition-colors ${sizeUnit === "in" ? "bg-[#C4622D] text-white" : "text-white/40 hover:text-white/70"}`}
+                >in</button>
+              </div>
+            </div>
+            {sizeUnit === "cm" ? (
+              <>
+                <input
+                  type="text"
+                  value={sizeCm}
+                  onChange={(e) => setSizeCm(e.target.value)}
+                  placeholder="e.g. 30 × 40 cm"
+                  className="w-full bg-white/8 border border-white/12 text-white text-sm rounded-lg px-3 py-2.5 focus:outline-none focus:border-[#C4622D] placeholder:text-white/25"
+                />
+                <p className="text-[10px] text-white/25 mt-1">Format: "30 × 40 cm", "45 × 60 cm", "60 × 90 cm"</p>
+              </>
+            ) : (
+              <>
+                <div className="flex items-center gap-2">
+                  <input
+                    type="number"
+                    step="0.1"
+                    min="0.1"
+                    value={inchW}
+                    onChange={(e) => handleInchChange(e.target.value, inchH)}
+                    placeholder="W"
+                    className="flex-1 bg-white/8 border border-white/12 text-white text-sm rounded-lg px-3 py-2.5 focus:outline-none focus:border-[#C4622D] placeholder:text-white/25"
+                  />
+                  <span className="text-white/40 text-sm font-medium">×</span>
+                  <input
+                    type="number"
+                    step="0.1"
+                    min="0.1"
+                    value={inchH}
+                    onChange={(e) => handleInchChange(inchW, e.target.value)}
+                    placeholder="H"
+                    className="flex-1 bg-white/8 border border-white/12 text-white text-sm rounded-lg px-3 py-2.5 focus:outline-none focus:border-[#C4622D] placeholder:text-white/25"
+                  />
+                  <span className="text-white/40 text-xs">in</span>
+                </div>
+                {sizeCm && (
+                  <p className="text-[10px] text-[#C4622D]/70 mt-1">≈ {sizeCm}</p>
+                )}
+              </>
+            )}
           </div>
 
           {/* Price */}
@@ -875,9 +937,25 @@ function PrintfulPage() {
                                   await deleteVariant(dv.id);
                                   setDbVariants(prev => prev.filter(v => v.id !== dv.id));
                                   showToast(`Deleted: ${dv.productName} · ${dv.size}`);
+                                  setDeletingVariant(null);
                                 } catch (err: unknown) {
-                                  showToast(`Failed: ${err instanceof Error ? err.message : String(err)}`);
-                                } finally { setDeletingVariant(null); }
+                                  const msg = err instanceof Error ? err.message : String(err);
+                                  setDeletingVariant(null);
+                                  if (msg.toLowerCase().includes("cannot delete") || msg.toLowerCase().includes("used in existing orders")) {
+                                    if (confirm(`This variant is used in existing orders and cannot be deleted.\n\nDeactivate it instead? (hides it from the store)`)) {
+                                      setDeletingVariant(dv.id);
+                                      try {
+                                        await updateVariant(dv.id, dv.size, dv.price, dv.currency, false);
+                                        showToast(`Deactivated: ${dv.productName} · ${dv.size}`);
+                                        await loadDbVariants();
+                                      } catch (e2: unknown) {
+                                        showToast(`Failed: ${e2 instanceof Error ? e2.message : String(e2)}`);
+                                      } finally { setDeletingVariant(null); }
+                                    }
+                                  } else {
+                                    showToast(`Failed: ${msg}`);
+                                  }
+                                }
                               }}
                               disabled={deletingVariant === dv.id}
                               className="w-7 h-7 flex items-center justify-center rounded-lg text-white/30 hover:text-red-400 hover:bg-red-400/10 disabled:opacity-40 transition-colors"

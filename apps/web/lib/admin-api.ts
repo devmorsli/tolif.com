@@ -311,6 +311,13 @@ export async function submitOrderToPrintful(id: string) {
   });
 }
 
+export async function updateOrderStatus(id: string, status: string) {
+  return apiFetch<OrderDetail>(`/api/admin/orders/${id}/status`, {
+    method: "PATCH",
+    body: JSON.stringify({ status }),
+  });
+}
+
 export async function bulkSubmitOrdersToPrintful(ids: string[]) {
   return apiFetch<{ queued: number }>("/api/admin/orders/submit-bulk", {
     method: "POST",

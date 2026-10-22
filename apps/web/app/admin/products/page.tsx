@@ -59,8 +59,26 @@ function VariantRow({
   const handleDelete = async () => {
     if (!confirm("Delete this variant? This cannot be undone.")) return;
     setDeleting(true);
-    try { await onDelete(variant.id); }
-    catch (e: unknown) { alert(e instanceof Error ? e.message : "Delete failed."); setDeleting(false); }
+    try {
+      await onDelete(variant.id);
+    } catch (e: unknown) {
+      const msg = e instanceof Error ? e.message : "Delete failed.";
+      setDeleting(false);
+      if (msg.toLowerCase().includes("cannot delete") || msg.toLowerCase().includes("used in existing orders")) {
+        if (confirm("This variant is used in existing orders and cannot be deleted.\n\nDeactivate it instead? (hides it from the store without deleting)")) {
+          setSaving(true);
+          try {
+            await onSave(variant.id, variant.size, variant.price, variant.currency, false);
+          } catch (e2: unknown) {
+            alert(e2 instanceof Error ? e2.message : "Deactivate failed.");
+          } finally {
+            setSaving(false);
+          }
+        }
+      } else {
+        alert(msg);
+      }
+    }
   };
 
   const symbol = currency === "EUR" ? "€" : currency === "GBP" ? "£" : "$";

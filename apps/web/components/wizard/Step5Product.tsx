@@ -11,6 +11,18 @@ import {
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:5000";
 
+function cmToInches(sizeCm: string): string {
+  const match = sizeCm.match(/(\d+(?:\.\d+)?)\s*[×x]\s*(\d+(?:\.\d+)?)/);
+  if (!match) return sizeCm;
+  const w = (parseFloat(match[1]) / 2.54).toFixed(1);
+  const h = (parseFloat(match[2]) / 2.54).toFixed(1);
+  return `${w} × ${h} in`;
+}
+
+function displaySize(size: string, unit: "cm" | "in"): string {
+  return unit === "in" ? cmToInches(size) : size;
+}
+
 type WizardType = ProductVariant["type"];
 
 const TYPE_MAP: Record<string, WizardType> = {
@@ -60,6 +72,7 @@ export function Step5Product() {
   const [products, setProducts]     = useState<ProductVariant[]>([]);
   const [loading, setLoading]       = useState(true);
   const [activeFormat, setFormat]   = useState<WizardType>("digital");
+  const [sizeUnit, setSizeUnit]     = useState<"cm" | "in">("cm");
 
   useEffect(() => {
     fetch(`${API_BASE}/api/products`)
@@ -291,9 +304,23 @@ export function Step5Product() {
                 transition={{ duration: 0.28, ease: "easeOut" }}
                 className="mb-6"
               >
-                <p className="text-[11px] font-semibold text-[#8C7B6B] uppercase tracking-widest mb-3 px-0.5">
-                  Pick a size
-                </p>
+                <div className="flex items-center justify-between mb-3 px-0.5">
+                  <p className="text-[11px] font-semibold text-[#8C7B6B] uppercase tracking-widest">
+                    Pick a size
+                  </p>
+                  <div className="flex items-center gap-0.5 bg-[#F2EAE0] border border-[#E4D8CC] rounded-lg p-0.5">
+                    <button
+                      type="button"
+                      onClick={() => setSizeUnit("cm")}
+                      className={`text-[10px] font-semibold px-2 py-1 rounded-md transition-colors ${sizeUnit === "cm" ? "bg-white text-[#C4622D] shadow-sm" : "text-[#B0A090] hover:text-[#8C7B6B]"}`}
+                    >cm</button>
+                    <button
+                      type="button"
+                      onClick={() => setSizeUnit("in")}
+                      className={`text-[10px] font-semibold px-2 py-1 rounded-md transition-colors ${sizeUnit === "in" ? "bg-white text-[#C4622D] shadow-sm" : "text-[#B0A090] hover:text-[#8C7B6B]"}`}
+                    >in</button>
+                  </div>
+                </div>
 
                 {sizeOptions.length === 0 ? (
                   <div className="text-center py-10 text-sm text-[#8C7B6B] bg-white rounded-2xl border border-[#E4D8CC]">
@@ -340,7 +367,7 @@ export function Step5Product() {
                           {/* Info */}
                           <div className="flex-1 min-w-0">
                             <p className={`font-semibold text-sm leading-tight transition-colors ${selected ? "text-[#C4622D]" : "text-[#1A1714]"}`}>
-                              {product.size}
+                              {displaySize(product.size, sizeUnit)}
                             </p>
                             <p className="text-[11px] text-[#8C7B6B] mt-0.5 leading-snug">
                               {PHYSICAL_DESCS[product.type]}
@@ -427,7 +454,7 @@ export function Step5Product() {
           {selectedVariant
             ? isDigital
               ? `Download — $${selectedVariant.price.toFixed(2)}`
-              : `Order — €${selectedVariant.price.toFixed(2)}`
+              : `Order ${displaySize(selectedVariant.size, sizeUnit)} — €${selectedVariant.price.toFixed(2)}`
             : "Select a format first"}
         </motion.button>
       </div>
