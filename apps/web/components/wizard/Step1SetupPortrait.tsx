@@ -55,47 +55,43 @@ function SelectedTemplateCard({
       animate={{ opacity: 1, y: 0 }}
       className="mb-6"
     >
-      <div className="flex items-center gap-2 mb-3">
-        <div className="w-6 h-6 rounded-full bg-[#2D4A3E] flex items-center justify-center shrink-0">
-          <Check size={13} className="text-white" />
-        </div>
-        <p className="text-sm font-semibold text-[#1A1714]">Portrait style selected</p>
-      </div>
-
-      {/* Card — same frame style as portraits page */}
-      <div className="flex gap-4 bg-white border border-[#E4D8CC] rounded-2xl p-4">
-        {/* Framed portrait thumbnail */}
+      {/* Large framed portrait preview */}
+      <div className="flex justify-center mb-4">
         <div
-          className="shrink-0"
           style={{
-            width: 80,
+            width: "min(220px, 100%)",
             aspectRatio: "3/4",
             background: "linear-gradient(160deg,#D8BC96 0%,#C4A47C 30%,#B08858 55%,#CAA87A 80%,#D4B488 100%)",
-            padding: "5px",
-            boxShadow: "0 4px 12px rgba(26,23,20,0.22)",
+            padding: "10px",
+            boxShadow: "0 12px 40px rgba(26,23,20,0.28), inset 0 1px 0 rgba(255,255,255,0.28)",
           }}
         >
-          <div style={{ width: "100%", height: "100%", background: "#F7F2EA", padding: "5px" }}>
+          <div style={{ width: "100%", height: "100%", background: "#F7F2EA", padding: "10px" }}>
             <div style={{ width: "100%", height: "100%", overflow: "hidden" }}>
               <TemplateImg imgUrl={imgUrl} name={template.name} category={template.category} />
             </div>
           </div>
         </div>
+      </div>
 
-        {/* Info */}
-        <div className="flex-1 min-w-0 flex flex-col justify-between">
-          <div>
-            <p className="font-semibold text-[#1A1714] text-sm leading-tight">{template.name}</p>
-            <p className="text-xs text-[#8C7B6B] mt-0.5">{template.category}{template.style ? ` · ${template.style}` : ""}</p>
-          </div>
-          <button
-            onClick={onChangeTemplate}
-            className="mt-3 self-start flex items-center gap-1.5 text-xs font-semibold text-[#C4622D] hover:text-[#9E4A1E] transition-colors border border-[#C4622D]/30 hover:border-[#C4622D]/60 px-3 py-1.5 rounded-full"
-          >
-            <RefreshCw size={11} />
-            Select another template
-          </button>
+      {/* Name + category */}
+      <div className="text-center mb-3">
+        <div className="inline-flex items-center gap-1.5 bg-[#2D4A3E]/10 text-[#2D4A3E] text-[10px] font-bold uppercase tracking-widest px-2.5 py-1 rounded-full mb-2">
+          <Check size={10} /> Selected
         </div>
+        <p className="font-semibold text-[#1A1714] text-base">{template.name}</p>
+        <p className="text-xs text-[#8C7B6B] mt-0.5">{template.category}{template.style ? ` · ${template.style}` : ""}</p>
+      </div>
+
+      {/* Change button */}
+      <div className="flex justify-center">
+        <button
+          onClick={onChangeTemplate}
+          className="flex items-center gap-1.5 text-xs font-semibold text-[#C4622D] hover:text-[#9E4A1E] transition-colors border border-[#C4622D]/30 hover:border-[#C4622D]/60 hover:bg-[#FFF5F0] px-4 py-2 rounded-full"
+        >
+          <RefreshCw size={11} />
+          Choose a different style
+        </button>
       </div>
     </motion.div>
   );
@@ -490,21 +486,57 @@ export function Step1SetupPortrait() {
 
       {/* GDPR + Generate */}
       <div className="mt-8 pt-6 border-t border-[#E4D8CC]">
-        <label className="flex items-start gap-3 mb-5 cursor-pointer">
-          <input type="checkbox" checked={gdprConsent} onChange={(e) => setGdprConsent(e.target.checked)}
-            className="mt-0.5 w-4 h-4 accent-[#C4622D] cursor-pointer shrink-0" />
-          <span className="text-xs text-[#8C7B6B] leading-relaxed">
-            I consent to Tolif processing my uploaded photos to generate my portrait. Photos are
-            automatically deleted after 30 days and never used to train AI models.{" "}
-            <a href="/privacy" className="text-[#C4622D] underline underline-offset-2">Privacy Policy</a>
-          </span>
+
+        {/* Privacy consent card */}
+        <label
+          className={`flex items-start gap-4 mb-5 cursor-pointer rounded-2xl border-2 p-4 transition-all duration-200 ${
+            gdprConsent
+              ? "border-[#2D4A3E] bg-[#2D4A3E]/5"
+              : "border-[#E4D8CC] bg-white hover:border-[#C4622D]/40 hover:bg-[#FFF9F6]"
+          }`}
+        >
+          {/* Custom checkbox */}
+          <div className={`mt-0.5 w-5 h-5 rounded-md border-2 flex items-center justify-center shrink-0 transition-all duration-200 ${
+            gdprConsent ? "bg-[#2D4A3E] border-[#2D4A3E]" : "border-[#D4C8BE] bg-white"
+          }`}>
+            <input
+              type="checkbox"
+              checked={gdprConsent}
+              onChange={(e) => setGdprConsent(e.target.checked)}
+              className="sr-only"
+            />
+            {gdprConsent && <Check size={12} className="text-white" strokeWidth={3} />}
+          </div>
+
+          <div className="flex-1 min-w-0">
+            <p className={`text-sm font-semibold mb-1 transition-colors ${gdprConsent ? "text-[#2D4A3E]" : "text-[#1A1714]"}`}>
+              I agree to photo processing
+            </p>
+            <p className="text-xs text-[#8C7B6B] leading-relaxed">
+              Your photos are used only to generate your portrait and{" "}
+              <strong className="text-[#1A1714] font-semibold">deleted automatically after 30 days</strong>.
+              They are{" "}
+              <strong className="text-[#1A1714] font-semibold">never used to train AI models</strong>.{" "}
+              <a href="/privacy" target="_blank" rel="noopener noreferrer" onClick={(e) => e.stopPropagation()} className="text-[#C4622D] underline underline-offset-2 hover:text-[#9E4A1E]">
+                Privacy Policy ↗
+              </a>
+            </p>
+            <div className="flex gap-3 mt-2">
+              <span className="flex items-center gap-1 text-[10px] text-[#8C7B6B] font-medium">
+                <span className="text-[#2D4A3E]">✓</span> Auto-deleted in 30 days
+              </span>
+              <span className="flex items-center gap-1 text-[10px] text-[#8C7B6B] font-medium">
+                <span className="text-[#2D4A3E]">✓</span> Never used for AI training
+              </span>
+            </div>
+          </div>
         </label>
 
         <div className="flex items-center justify-between gap-4">
           <div className="text-xs text-[#8C7B6B] hidden sm:block">
             {!selectedTemplate && "← Choose a portrait style to get started"}
             {selectedTemplate && !allRequired && `Upload ${uploadSlots.filter((s) => s.required && !s.file).length} more required photo${uploadSlots.filter((s) => s.required && !s.file).length !== 1 ? "s" : ""}`}
-            {selectedTemplate && allRequired && !gdprConsent && "Tick the consent box to continue"}
+            {selectedTemplate && allRequired && !gdprConsent && "Tick the consent box above to continue"}
             {canGenerate && "Everything's ready — let's paint your portrait!"}
           </div>
 
