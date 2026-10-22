@@ -161,6 +161,7 @@ export default function PortraitsPage() {
   const [search,    setSearch]    = useState("");
   const [filtersOpen, setFiltersOpen] = useState(false);
   const [visibleCount, setVisibleCount] = useState(PAGE_SIZE);
+  const [gridOpacity, setGridOpacity] = useState(1);
 
   useEffect(() => {
     getPublicTemplates().then((data) => {
@@ -169,9 +170,14 @@ export default function PortraitsPage() {
     });
   }, []);
 
-  // Reset pagination when filters change
+  // Reset pagination + fade grid when filters change
   useEffect(() => {
-    setVisibleCount(PAGE_SIZE);
+    setGridOpacity(0);
+    const t = setTimeout(() => {
+      setVisibleCount(PAGE_SIZE);
+      setGridOpacity(1);
+    }, 100);
+    return () => clearTimeout(t);
   }, [category, style, sort, search]);
 
   // Derived styles from actual data
@@ -425,7 +431,10 @@ export default function PortraitsPage() {
             <EmptyState query={search} />
           ) : (
             <>
-              <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-5">
+              <div
+                className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-5"
+                style={{ opacity: gridOpacity, transition: "opacity 0.15s ease" }}
+              >
                 {filtered.slice(0, visibleCount).map((template) => (
                   <TemplateCard key={template.id} template={template} />
                 ))}

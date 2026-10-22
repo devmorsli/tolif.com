@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useRef, useEffect } from "react";
-import { motion, AnimatePresence, useInView } from "framer-motion";
+import { motion, useInView } from "framer-motion";
 import Link from "next/link";
 import { ArrowRight, ImageIcon } from "lucide-react";
 import {
@@ -12,80 +12,64 @@ import {
 } from "@/lib/public-api";
 
 const categories = ["All", "Families", "Couples", "Solo", "Pets", "Groups"];
+const HOME_LIMIT = 8;
 
-function TemplateCard({
-  template,
-  index,
-  inView,
-}: {
-  template: PublicTemplate;
-  index: number;
-  inView: boolean;
-}) {
+function TemplateCard({ template }: { template: PublicTemplate }) {
   const [imgError, setImgError] = useState(false);
   const imgUrl = templateImageUrl(template.templateImageKey);
 
   return (
-    <motion.div
-      initial={{ opacity: 0, y: 28 }}
-      animate={inView ? { opacity: 1, y: 0 } : {}}
-      exit={{ opacity: 0, scale: 0.95 }}
-      transition={{ delay: 0.05 + index * 0.07, duration: 0.55, ease: [0.25, 0.46, 0.45, 0.94] }}
-      layout
-    >
-      <Link href={`/portraits/${template.slug}`} className="group block">
-        {/* CSS picture frame */}
+    <Link href={`/portraits/${template.slug}`} className="group block">
+      {/* CSS picture frame */}
+      <div style={{
+        position: "relative",
+        aspectRatio: "3/4",
+        background: "linear-gradient(160deg, #D8BC96 0%, #C4A47C 30%, #B08858 55%, #CAA87A 80%, #D4B488 100%)",
+        padding: "8px",
+        boxShadow: "0 8px 24px rgba(0,0,0,0.22), inset 0 1px 0 rgba(255,255,255,0.28), inset 0 -1px 0 rgba(0,0,0,0.18)",
+      }}>
+        {/* Mat board */}
         <div style={{
-          position: "relative",
-          aspectRatio: "3/4",
-          background: "linear-gradient(160deg, #D8BC96 0%, #C4A47C 30%, #B08858 55%, #CAA87A 80%, #D4B488 100%)",
-          padding: "8px",
-          boxShadow: "0 8px 24px rgba(0,0,0,0.22), inset 0 1px 0 rgba(255,255,255,0.28), inset 0 -1px 0 rgba(0,0,0,0.18)",
+          width: "100%",
+          height: "100%",
+          background: "#F7F2EA",
+          padding: "12px",
+          boxShadow: "inset 0 2px 8px rgba(0,0,0,0.10)",
+          display: "flex",
         }}>
-          {/* Mat board */}
-          <div style={{
-            width: "100%",
-            height: "100%",
-            background: "#F7F2EA",
-            padding: "12px",
-            boxShadow: "inset 0 2px 8px rgba(0,0,0,0.10)",
-            display: "flex",
-          }}>
-            {/* Portrait image — fills the mat opening, overflow hidden for hover scale */}
-            <div style={{ flex: 1, overflow: "hidden" }}>
-              {imgUrl && !imgError ? (
-                // eslint-disable-next-line @next/next/no-img-element
-                <img
-                  src={imgUrl}
-                  alt={template.name}
-                  loading="lazy"
-                  decoding="async"
-                  onError={() => setImgError(true)}
-                  style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }}
-                  className="transition-transform duration-700 ease-out group-hover:scale-105"
-                />
-              ) : (
-                <div className={`w-full h-full bg-gradient-to-br ${categoryGradient(template.category)} flex items-center justify-center`}>
-                  <ImageIcon size={28} className="text-[#C4622D]/40" />
-                </div>
-              )}
-            </div>
+          <div style={{ flex: 1, overflow: "hidden" }}>
+            {imgUrl && !imgError ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img
+                src={imgUrl}
+                alt={template.name}
+                loading="lazy"
+                decoding="async"
+                onError={() => setImgError(true)}
+                style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }}
+                className="transition-transform duration-700 ease-out group-hover:scale-105"
+              />
+            ) : (
+              <div className={`w-full h-full bg-gradient-to-br ${categoryGradient(template.category)} flex items-center justify-center`}>
+                <ImageIcon size={28} className="text-[#C4622D]/40" />
+              </div>
+            )}
           </div>
+        </div>
 
-          {/* Hover CTA */}
-          <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity duration-300" style={{ zIndex: 20 }}>
-            <span className="flex items-center gap-1.5 bg-[#C4622D] text-white text-xs font-semibold px-4 py-2 rounded-full translate-y-2 group-hover:translate-y-0 transition-transform duration-300 shadow-lg">
-              Choose style <ArrowRight size={11} />
-            </span>
-          </div>
+        {/* Hover CTA */}
+        <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity duration-300" style={{ zIndex: 20 }}>
+          <span className="flex items-center gap-1.5 bg-[#C4622D] text-white text-xs font-semibold px-4 py-2 rounded-full translate-y-2 group-hover:translate-y-0 transition-transform duration-300 shadow-lg">
+            Choose style <ArrowRight size={11} />
+          </span>
         </div>
-        {/* Name below frame */}
-        <div className="mt-2 px-0.5">
-          <p className="font-semibold text-[#1A1714] text-sm truncate group-hover:text-[#C4622D] transition-colors duration-200">{template.name}</p>
-          <p className="text-[11px] text-[#8C7B6B] mt-0.5">{template.category}{template.style ? ` · ${template.style}` : ""}</p>
-        </div>
-      </Link>
-    </motion.div>
+      </div>
+      {/* Name below frame */}
+      <div className="mt-2 px-0.5">
+        <p className="font-semibold text-[#1A1714] text-sm truncate group-hover:text-[#C4622D] transition-colors duration-200">{template.name}</p>
+        <p className="text-[11px] text-[#8C7B6B] mt-0.5">{template.category}{template.style ? ` · ${template.style}` : ""}</p>
+      </div>
+    </Link>
   );
 }
 
@@ -93,6 +77,7 @@ export function TemplatesSection() {
   const [active, setActive] = useState("All");
   const [templates, setTemplates] = useState<PublicTemplate[]>([]);
   const [loading, setLoading] = useState(true);
+  const [fading, setFading] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
   const inView = useInView(ref, { once: true, margin: "-60px" });
 
@@ -105,6 +90,17 @@ export function TemplatesSection() {
 
   const filtered =
     active === "All" ? templates : templates.filter((t) => t.category === active);
+
+  const visible = filtered.slice(0, HOME_LIMIT);
+
+  const handleFilter = (cat: string) => {
+    if (cat === active) return;
+    setFading(true);
+    setTimeout(() => {
+      setActive(cat);
+      setFading(false);
+    }, 120);
+  };
 
   return (
     <section ref={ref} className="py-28 bg-[#FAF6F0]">
@@ -146,7 +142,7 @@ export function TemplatesSection() {
           {categories.map((cat) => (
             <button
               key={cat}
-              onClick={() => setActive(cat)}
+              onClick={() => handleFilter(cat)}
               className={`px-4 py-1.5 rounded-full text-sm font-medium transition-all duration-200 ${
                 active === cat
                   ? "bg-[#1A1714] text-white"
@@ -168,24 +164,36 @@ export function TemplatesSection() {
         {/* Empty */}
         {!loading && filtered.length === 0 && (
           <div className="text-center py-20 text-[#8C7B6B]">
-            <p className="text-sm">No templates available yet. Check back soon.</p>
+            <p className="text-sm">No templates in this category yet.</p>
           </div>
         )}
 
-        {/* Gallery grid — 4 columns */}
-        {!loading && filtered.length > 0 && (
-          <motion.div layout className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4">
-            <AnimatePresence mode="popLayout">
-              {filtered.map((template, i) => (
-                <TemplateCard
-                  key={template.id}
-                  template={template}
-                  index={i}
-                  inView={inView}
-                />
+        {/* Gallery grid */}
+        {!loading && visible.length > 0 && (
+          <>
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={inView ? { opacity: 1 } : {}}
+              transition={{ delay: 0.15, duration: 0.5 }}
+              style={{ opacity: fading ? 0 : 1, transition: "opacity 0.12s ease" }}
+              className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4"
+            >
+              {visible.map((template) => (
+                <TemplateCard key={template.id} template={template} />
               ))}
-            </AnimatePresence>
-          </motion.div>
+            </motion.div>
+
+            {filtered.length > HOME_LIMIT && (
+              <div className="flex justify-center mt-8">
+                <Link
+                  href={`/portraits${active !== "All" ? `?category=${active}` : ""}`}
+                  className="flex items-center gap-2 px-6 py-3 rounded-full border border-[#E4D8CC] bg-white text-sm font-semibold text-[#5A4E46] hover:border-[#C4622D] hover:text-[#C4622D] transition-all duration-200"
+                >
+                  See all {filtered.length} templates <ArrowRight size={13} />
+                </Link>
+              </div>
+            )}
+          </>
         )}
       </div>
     </section>

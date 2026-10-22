@@ -5,6 +5,13 @@ import { motion, AnimatePresence } from "framer-motion";
 import { useWizardStore } from "@/store/wizardStore";
 import { ArrowRight, Lock, Mail, User } from "lucide-react";
 
+const STEPS = [
+  { label: "Uploading photos",      duration: 15  },
+  { label: "Analysing faces",       duration: 25  },
+  { label: "Painting your portrait",duration: 60  },
+  { label: "Adding finishing touches", duration: 30 },
+];
+
 const messages = [
   "Studying your faces with care…",
   "Recreating the portrait style…",
@@ -137,11 +144,41 @@ function GeneratingPhase({
   onBack: () => void;
 }) {
   const [msgIndex, setMsgIndex] = useState(0);
+  const [elapsed, setElapsed] = useState(0);
 
   useEffect(() => {
     const t = setInterval(() => setMsgIndex((i) => (i + 1) % messages.length), 2200);
     return () => clearInterval(t);
   }, []);
+
+  useEffect(() => {
+    const t = setInterval(() => setElapsed((s) => s + 1), 1000);
+    return () => clearInterval(t);
+  }, []);
+
+  // Derive current step from elapsed time
+  const totalDuration = STEPS.reduce((a, s) => a + s.duration, 0);
+  let stepElapsed = elapsed;
+  let currentStep = STEPS.length - 1;
+  let stepProgress = 1;
+  let cumulativeTime = 0;
+  for (let i = 0; i < STEPS.length; i++) {
+    if (stepElapsed <= STEPS[i].duration) {
+      currentStep = i;
+      stepProgress = Math.min(stepElapsed / STEPS[i].duration, 1);
+      break;
+    }
+    stepElapsed -= STEPS[i].duration;
+    cumulativeTime += STEPS[i].duration;
+  }
+  void cumulativeTime;
+
+  const overallProgress = Math.min(elapsed / totalDuration, 0.95);
+  const elapsedMin = Math.floor(elapsed / 60);
+  const elapsedSec = elapsed % 60;
+  const elapsedStr = elapsedMin > 0
+    ? `${elapsedMin}:${String(elapsedSec).padStart(2, "0")}`
+    : `${elapsedSec}s`;
 
   if (error) {
     return (
@@ -184,9 +221,9 @@ function GeneratingPhase({
       animate={{ opacity: 1, y: 0 }}
       exit={{ opacity: 0 }}
       transition={{ duration: 0.35, ease: "easeOut" }}
-      className="flex flex-col items-center justify-center min-h-[520px] gap-8 text-center"
+      className="flex flex-col items-center justify-center min-h-[520px] gap-7 text-center"
     >
-      <div className="flex flex-col items-center gap-6">
+      <div className="flex flex-col items-center gap-5">
         <PortraitLoader />
         <div>
           <h2 className="text-3xl font-display font-light text-[#1A1714] mb-1">
@@ -207,21 +244,61 @@ function GeneratingPhase({
         </div>
       </div>
 
-      {/* Progress bar */}
-      <div className="w-full max-w-xs">
+      {/* Step indicators */}
+      <div className="w-full max-w-sm space-y-2">
+        {STEPS.map((step, i) => {
+          const isDone    = i < currentStep;
+          const isActive  = i === currentStep;
+          const progress  = isDone ? 1 : isActive ? stepProgress : 0;
+          return (
+            <div key={step.label} className="flex items-center gap-3">
+              <div className={`w-5 h-5 rounded-full flex items-center justify-center shrink-0 transition-colors duration-300 ${
+                isDone ? "bg-[#2D7A4A]" : isActive ? "bg-[#C4622D]" : "bg-[#E4D8CC]"
+              }`}>
+                {isDone ? (
+                  <svg width="9" height="9" viewBox="0 0 9 9" fill="none">
+                    <path d="M1.5 4.5L3.5 6.5L7.5 2.5" stroke="white" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+                  </svg>
+                ) : isActive ? (
+                  <div className="w-2 h-2 rounded-full bg-white animate-pulse" />
+                ) : null}
+              </div>
+              <div className="flex-1 text-left">
+                <p className={`text-xs font-medium ${isDone ? "text-[#2D7A4A]" : isActive ? "text-[#1A1714]" : "text-[#C8BAB0]"}`}>
+                  {step.label}
+                </p>
+                {isActive && (
+                  <div className="mt-1 h-1 bg-[#E4D8CC] rounded-full overflow-hidden">
+                    <motion.div
+                      className="h-full bg-[#C4622D] rounded-full"
+                      style={{ width: `${Math.round(progress * 100)}%` }}
+                      transition={{ duration: 0.5 }}
+                    />
+                  </div>
+                )}
+              </div>
+            </div>
+          );
+        })}
+      </div>
+
+      {/* Overall progress + timer */}
+      <div className="w-full max-w-sm">
+        <div className="flex justify-between text-xs text-[#8C7B6B] mb-1.5">
+          <span>{Math.round(overallProgress * 100)}% complete</span>
+          <span>{elapsedStr} elapsed</span>
+        </div>
         <div className="h-1.5 bg-[#E4D8CC] rounded-full overflow-hidden">
           <motion.div
             className="h-full bg-[#C4622D] rounded-full"
-            animate={{ x: ["-100%", "200%"] }}
-            transition={{ duration: 1.8, repeat: Infinity, ease: "easeInOut" }}
-            style={{ width: "50%" }}
+            style={{ width: `${Math.round(overallProgress * 100)}%` }}
+            transition={{ duration: 0.8, ease: "easeOut" }}
           />
         </div>
-        <p className="text-xs text-[#8C7B6B] mt-2 text-center">Usually takes 1–3 minutes</p>
       </div>
 
       <div className="flex items-center gap-6 text-xs text-[#8C7B6B]">
-        <span>🔒 Photos processed securely</span>
+        <span>🔒 Processed securely</span>
         <span>👁 Free watermarked preview</span>
         <span>🔄 {regenerationsLeft} tries remaining</span>
       </div>
