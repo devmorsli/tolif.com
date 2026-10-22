@@ -480,8 +480,16 @@ public sealed class PrintfulService(
         if (data is JsonObject obj)
         {
             // Root-level url + events array
-            url   = obj["url"]?.GetValue<string>() ?? "";
-            id    = obj["id"]?.GetValue<long>() ?? 0;
+            url = obj["url"]?.GetValue<string>() ?? "";
+            id  = obj["id"]?.GetValue<long>() ?? 0;
+
+            // Printful v2 may store the url inside each event object rather than at root
+            if (string.IsNullOrEmpty(url) && obj["events"] is JsonArray evFallback)
+            {
+                var firstEv = evFallback.OfType<JsonObject>().FirstOrDefault();
+                url = firstEv?["url"]?.GetValue<string>() ?? "";
+            }
+
             types = obj["events"] is JsonArray arr
                         ? arr.OfType<JsonObject>()
                              .Select(e => e["type"]?.GetValue<string>() ?? "")
