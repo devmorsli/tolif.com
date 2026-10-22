@@ -717,7 +717,11 @@ function PrintfulPage() {
     if (!webhookUrl) { setWhError("Enter your public base URL first"); return; }
     setRegisteringWh(true); setWhError(null);
     try {
-      setWebhooks(await registerPrintfulWebhooks(webhookUrl));
+      await registerPrintfulWebhooks(webhookUrl);
+      // Re-fetch from the GET endpoint — register response may be empty or
+      // differently shaped depending on the Printful API version
+      const fresh = await getPrintfulWebhooks().catch(() => []);
+      setWebhooks(fresh);
       showToast("Webhooks registered");
     } catch (e: unknown) {
       setWhError(e instanceof Error ? e.message : String(e));
