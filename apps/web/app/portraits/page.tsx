@@ -15,6 +15,8 @@ import {
 
 // ── Constants ──────────────────────────────────────────────────────────────────
 
+const PAGE_SIZE = 12;
+
 const CATEGORIES = ["All", "Families", "Couples", "Solo", "Pets", "Groups"];
 
 const STYLES = [
@@ -37,18 +39,12 @@ const SORT_OPTIONS = [
 
 // ── Template card ──────────────────────────────────────────────────────────────
 
-function TemplateCard({ template, index }: { template: PublicTemplate; index: number }) {
+function TemplateCard({ template }: { template: PublicTemplate }) {
   const [imgError, setImgError] = useState(false);
   const imgUrl = templateImageUrl(template.templateImageKey);
 
   return (
-    <motion.div
-      initial={{ opacity: 0, y: 24 }}
-      animate={{ opacity: 1, y: 0 }}
-      exit={{ opacity: 0, scale: 0.95 }}
-      transition={{ delay: index * 0.04, duration: 0.42, ease: [0.25, 0.46, 0.45, 0.94] }}
-      layout
-    >
+    <div>
       <Link href={`/portraits/${template.slug}`} className="group block">
 
         {/* CSS picture frame */}
@@ -108,7 +104,7 @@ function TemplateCard({ template, index }: { template: PublicTemplate; index: nu
         </div>
 
       </Link>
-    </motion.div>
+    </div>
   );
 }
 
@@ -164,6 +160,7 @@ export default function PortraitsPage() {
   const [sort,      setSort]      = useState("default");
   const [search,    setSearch]    = useState("");
   const [filtersOpen, setFiltersOpen] = useState(false);
+  const [visibleCount, setVisibleCount] = useState(PAGE_SIZE);
 
   useEffect(() => {
     getPublicTemplates().then((data) => {
@@ -171,6 +168,11 @@ export default function PortraitsPage() {
       setLoading(false);
     });
   }, []);
+
+  // Reset pagination when filters change
+  useEffect(() => {
+    setVisibleCount(PAGE_SIZE);
+  }, [category, style, sort, search]);
 
   // Derived styles from actual data
   const availableStyles = useMemo(() => {
@@ -419,18 +421,30 @@ export default function PortraitsPage() {
           {/* ── Grid ─────────────────────────────────────────────────────────── */}
           {loading ? (
             <SkeletonGrid />
+          ) : filtered.length === 0 ? (
+            <EmptyState query={search} />
           ) : (
-            <motion.div layout className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-5">
-              <AnimatePresence mode="popLayout">
-                {filtered.length === 0 ? (
-                  <EmptyState key="empty" query={search} />
-                ) : (
-                  filtered.map((template, i) => (
-                    <TemplateCard key={template.id} template={template} index={i} />
-                  ))
-                )}
-              </AnimatePresence>
-            </motion.div>
+            <>
+              <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-5">
+                {filtered.slice(0, visibleCount).map((template) => (
+                  <TemplateCard key={template.id} template={template} />
+                ))}
+              </div>
+
+              {visibleCount < filtered.length && (
+                <div className="flex justify-center mt-10">
+                  <button
+                    onClick={() => setVisibleCount((v) => v + PAGE_SIZE)}
+                    className="flex items-center gap-2 px-8 py-3.5 rounded-full border border-[#E4D8CC] bg-white text-sm font-semibold text-[#5A4E46] hover:border-[#C4622D] hover:text-[#C4622D] transition-all duration-200"
+                  >
+                    Load more
+                    <span className="text-xs text-[#B0A090]">
+                      ({filtered.length - visibleCount} remaining)
+                    </span>
+                  </button>
+                </div>
+              )}
+            </>
           )}
 
           {/* ── Bottom CTA ───────────────────────────────────────────────────── */}
