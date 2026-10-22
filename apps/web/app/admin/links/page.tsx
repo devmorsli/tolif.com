@@ -38,6 +38,8 @@ function buildUrl(base: string, link: CampaignLink): string {
 }
 
 // ── Create Link Modal ──────────────────────────────────────────────────────────
+const LINK_CATEGORIES = ["All", "Families", "Couples", "Solo", "Kids", "Pets", "Groups", "Maternity", "Newborn", "Wedding", "Anniversary", "Friends", "Seniors", "Corporate"];
+
 function CreateLinkModal({
   templates,
   onSave,
@@ -53,12 +55,14 @@ function CreateLinkModal({
   const [utmMedium,   setUtmMedium]   = useState("");
   const [utmCampaign, setUtmCampaign] = useState("");
   const [search,      setSearch]      = useState("");
+  const [catFilter,   setCatFilter]   = useState("All");
 
   const activeTemplates = templates.filter((t) => t.isActive);
-  const filtered = activeTemplates.filter((t) =>
-    !search || t.name.toLowerCase().includes(search.toLowerCase()) ||
-    t.category.toLowerCase().includes(search.toLowerCase())
-  );
+  const filtered = activeTemplates.filter((t) => {
+    const matchesCat = catFilter === "All" || t.category === catFilter;
+    const matchesSearch = !search || t.name.toLowerCase().includes(search.toLowerCase()) || t.category.toLowerCase().includes(search.toLowerCase());
+    return matchesCat && matchesSearch;
+  });
   const selected = templates.find((t) => t.id === templateId);
 
   useEffect(() => {
@@ -134,6 +138,24 @@ function CreateLinkModal({
                 placeholder="Search templates…"
                 className="w-full pl-8 pr-3 py-2 text-sm border border-[#E4D8CC] rounded-xl focus:outline-none focus:ring-2 focus:ring-[#C4622D]/30 focus:border-[#C4622D] placeholder:text-[#C8BAB0]"
               />
+            </div>
+
+            {/* Category filter pills */}
+            <div className="flex gap-1.5 flex-wrap mb-2">
+              {LINK_CATEGORIES.filter((cat) => cat === "All" || activeTemplates.some((t) => t.category === cat)).map((cat) => (
+                <button
+                  key={cat}
+                  type="button"
+                  onClick={() => setCatFilter(cat)}
+                  className={`px-2.5 py-1 rounded-full text-[11px] font-medium transition-colors ${
+                    catFilter === cat
+                      ? "bg-[#1A1714] text-white"
+                      : "bg-[#F5F0E8] text-[#5A4E46] hover:bg-[#EDE5D8]"
+                  }`}
+                >
+                  {cat}
+                </button>
+              ))}
             </div>
 
             <div className="max-h-52 overflow-y-auto border border-[#E4D8CC] rounded-xl divide-y divide-[#F2EAE0]">

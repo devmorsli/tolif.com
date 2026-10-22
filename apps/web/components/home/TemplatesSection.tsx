@@ -6,13 +6,22 @@ import Link from "next/link";
 import { ArrowRight, ImageIcon } from "lucide-react";
 import {
   getPublicTemplates,
+  getUiSettings,
   templateImageUrl,
   categoryGradient,
+  TEMPLATE_CATEGORIES,
   type PublicTemplate,
 } from "@/lib/public-api";
 
-const categories = ["All", "Families", "Couples", "Solo", "Pets", "Groups"];
 const HOME_LIMIT = 8;
+
+function applySortOrder(templates: PublicTemplate[], sort: TemplateDefaultSort): PublicTemplate[] {
+  if (sort === "az") return [...templates].sort((a, b) => a.name.localeCompare(b.name));
+  if (sort === "za") return [...templates].sort((a, b) => b.name.localeCompare(a.name));
+  if (sort === "newest") return [...templates].sort((a, b) => new Date(b.createdAt ?? 0).getTime() - new Date(a.createdAt ?? 0).getTime());
+  if (sort === "oldest") return [...templates].sort((a, b) => new Date(a.createdAt ?? 0).getTime() - new Date(b.createdAt ?? 0).getTime());
+  return templates; // "order" = API sort order (default)
+}
 
 function TemplateCard({ template }: { template: PublicTemplate }) {
   const [imgError, setImgError] = useState(false);
@@ -82,8 +91,8 @@ export function TemplatesSection() {
   const inView = useInView(ref, { once: true, margin: "-60px" });
 
   useEffect(() => {
-    getPublicTemplates().then((data) => {
-      setTemplates(data);
+    Promise.all([getPublicTemplates(), getUiSettings()]).then(([data, ui]) => {
+      setTemplates(applySortOrder(data, ui.templatesDefaultSort));
       setLoading(false);
     });
   }, []);
@@ -139,7 +148,7 @@ export function TemplatesSection() {
           transition={{ delay: 0.2, duration: 0.5 }}
           className="flex gap-2 flex-wrap mb-10"
         >
-          {categories.map((cat) => (
+          {TEMPLATE_CATEGORIES.map((cat) => (
             <button
               key={cat}
               onClick={() => handleFilter(cat)}

@@ -16,7 +16,7 @@ import {
   aiGenerateImage, uploadTemplateImage, type AdminTemplate,
 } from "@/lib/admin-api";
 
-const CATEGORIES = ["Families", "Couples", "Solo", "Pets", "Groups"];
+const CATEGORIES = ["Families", "Couples", "Solo", "Kids", "Pets", "Groups", "Maternity", "Newborn", "Wedding", "Anniversary", "Friends", "Seniors", "Corporate"];
 const AI_PROVIDERS = ["", "gemini", "falai", "openai"];
 
 const EMPTY: Partial<AdminTemplate> = {
@@ -783,7 +783,7 @@ function BulkGenerateModal({ onClose, onDone }: { onClose: () => void; onDone: (
 
 // ── Ads & Share Links Panel ────────────────────────────────────────────────────
 
-const AD_CATEGORIES = ["Families", "Couples", "Pets", "Solo", "Groups"];
+const AD_CATEGORIES = ["Families", "Couples", "Solo", "Kids", "Pets", "Groups", "Maternity", "Newborn", "Wedding", "Anniversary", "Friends", "Seniors", "Corporate"];
 
 function useCopy() {
   const [copied, setCopied] = useState<string | null>(null);

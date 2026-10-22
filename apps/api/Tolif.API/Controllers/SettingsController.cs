@@ -52,6 +52,14 @@ public class SettingsController(ISettingsService settingsService) : ControllerBa
 
     public record UnlockRequest(string Password);
 
+    // GET /api/settings/ui — non-sensitive UI/display settings safe to expose publicly
+    [HttpGet("ui")]
+    public async Task<IActionResult> GetUi(CancellationToken ct)
+    {
+        var defaultSort = await settingsService.GetAsync("templates.defaultSort", ct) ?? "newest";
+        return Ok(new { templatesDefaultSort = defaultSort });
+    }
+
     // GET /api/settings/tracking
     [HttpGet("tracking")]
     public async Task<IActionResult> GetTracking(CancellationToken ct)

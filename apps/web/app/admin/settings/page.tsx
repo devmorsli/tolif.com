@@ -9,6 +9,20 @@ import { getSettings, saveSetting, type Setting } from "@/lib/admin-api";
 // All known settings grouped for the UI
 const SETTING_GROUPS = [
   {
+    title: "Templates & Display",
+    description: "How templates are shown to customers",
+    icon: "🖼️",
+    settings: [
+      {
+        key: "templates.defaultSort",
+        label: "Default Template Sort Order",
+        type: "select",
+        options: ["newest", "oldest", "az", "za", "order"],
+        hint: "newest = latest added first · oldest = oldest first · az/za = alphabetical · order = manual sort order set in Templates admin",
+      },
+    ],
+  },
+  {
     title: "General",
     description: "Core business settings",
     icon: "⚙️",

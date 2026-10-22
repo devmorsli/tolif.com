@@ -5,10 +5,13 @@ import { motion, AnimatePresence } from "framer-motion";
 import { useWizardStore, type Template } from "@/store/wizardStore";
 import {
   getPublicTemplates,
+  getUiSettings,
   parseUploadSlots,
   templateImageUrl,
   categoryGradient,
+  TEMPLATE_CATEGORIES,
   type PublicTemplate,
+  type TemplateDefaultSort,
 } from "@/lib/public-api";
 import {
   Check, ImageIcon, Upload, X, User, PawPrint,
@@ -34,7 +37,7 @@ const PHOTO_TIPS = [
   "For pets: full body or head-and-shoulders, in focus",
 ];
 
-const ALL_CATEGORIES = ["All", "Families", "Couples", "Pets", "Solo", "Groups"];
+const ALL_CATEGORIES = TEMPLATE_CATEGORIES;
 
 // ── Selected template card ─────────────────────────────────────────────────────
 function SelectedTemplateCard({
@@ -364,7 +367,16 @@ export function Step1SetupPortrait() {
   }, [selectedTemplate]);
 
   useEffect(() => {
-    getPublicTemplates().then((data) => { setTemplates(data); setLoadingTemplates(false); });
+    Promise.all([getPublicTemplates(), getUiSettings()]).then(([data, ui]) => {
+      const sort = ui.templatesDefaultSort as TemplateDefaultSort;
+      let sorted = data;
+      if (sort === "az")     sorted = [...data].sort((a, b) => a.name.localeCompare(b.name));
+      if (sort === "za")     sorted = [...data].sort((a, b) => b.name.localeCompare(a.name));
+      if (sort === "newest") sorted = [...data].sort((a, b) => new Date(b.createdAt ?? 0).getTime() - new Date(a.createdAt ?? 0).getTime());
+      if (sort === "oldest") sorted = [...data].sort((a, b) => new Date(a.createdAt ?? 0).getTime() - new Date(b.createdAt ?? 0).getTime());
+      setTemplates(sorted);
+      setLoadingTemplates(false);
+    });
   }, []);
 
   const pickTemplate = (t: PublicTemplate) => {

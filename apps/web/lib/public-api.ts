@@ -9,6 +9,26 @@ function getApiBase(): string {
   return process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:5000";
 }
 
+// All template categories — single source of truth shared across pages
+export const TEMPLATE_CATEGORIES = [
+  "All",
+  "Families",
+  "Couples",
+  "Solo",
+  "Kids",
+  "Pets",
+  "Groups",
+  "Maternity",
+  "Newborn",
+  "Wedding",
+  "Anniversary",
+  "Friends",
+  "Seniors",
+  "Corporate",
+] as const;
+
+export type TemplateCategory = typeof TEMPLATE_CATEGORIES[number];
+
 export interface PublicTemplate {
   id: string;
   slug: string;
@@ -22,6 +42,7 @@ export interface PublicTemplate {
   seoDescription: string;
   extraPersonsAllowed: number;
   extraPetsAllowed: number;
+  createdAt?: string;
 }
 
 export interface UploadSlot {
@@ -42,11 +63,32 @@ export function parseUploadSlots(json: string): UploadSlot[] {
 // Category → fallback gradient (used when no template image is set)
 export function categoryGradient(category: string): string {
   switch (category) {
-    case "Families":  return "from-[#C4622D]/20 via-[#E8A838]/10 to-[#FAF6F0]";
-    case "Couples":   return "from-[#D4942A]/25 via-[#C4622D]/10 to-[#FAF6F0]";
-    case "Pets":      return "from-[#8C7B6B]/15 via-[#C4622D]/10 to-[#FAF6F0]";
-    case "Groups":    return "from-[#F0D5C0]/50 via-[#C4622D]/8 to-[#FAF6F0]";
-    default:          return "from-[#2D4A3E]/25 via-[#D4942A]/10 to-[#FAF6F0]";
+    case "Families":    return "from-[#C4622D]/20 via-[#E8A838]/10 to-[#FAF6F0]";
+    case "Couples":     return "from-[#D4942A]/25 via-[#C4622D]/10 to-[#FAF6F0]";
+    case "Pets":        return "from-[#8C7B6B]/15 via-[#C4622D]/10 to-[#FAF6F0]";
+    case "Groups":      return "from-[#F0D5C0]/50 via-[#C4622D]/8 to-[#FAF6F0]";
+    case "Kids":        return "from-[#E8A838]/20 via-[#F0D5C0]/30 to-[#FAF6F0]";
+    case "Maternity":   return "from-[#D4B0C8]/30 via-[#E8A8B0]/15 to-[#FAF6F0]";
+    case "Newborn":     return "from-[#C8D8F0]/30 via-[#D4B0C8]/15 to-[#FAF6F0]";
+    case "Wedding":     return "from-[#F0E8C0]/40 via-[#E8D4A0]/20 to-[#FAF6F0]";
+    case "Anniversary": return "from-[#D4A870]/25 via-[#C4622D]/12 to-[#FAF6F0]";
+    case "Friends":     return "from-[#A8C8A0]/20 via-[#C8E0B8]/15 to-[#FAF6F0]";
+    case "Seniors":     return "from-[#B8A890]/25 via-[#D4C4A8]/15 to-[#FAF6F0]";
+    case "Corporate":   return "from-[#2D4A3E]/20 via-[#4A6858]/10 to-[#FAF6F0]";
+    default:            return "from-[#2D4A3E]/25 via-[#D4942A]/10 to-[#FAF6F0]";
+  }
+}
+
+// ── UI / display settings ──────────────────────────────────────────────────────
+export type TemplateDefaultSort = "newest" | "oldest" | "az" | "za" | "order";
+
+export async function getUiSettings(): Promise<{ templatesDefaultSort: TemplateDefaultSort }> {
+  try {
+    const res = await fetch(`${getApiBase()}/api/settings/ui`, { next: { revalidate: 300 } });
+    if (!res.ok) return { templatesDefaultSort: "newest" };
+    return await res.json();
+  } catch {
+    return { templatesDefaultSort: "newest" };
   }
 }
 
@@ -65,6 +107,7 @@ function staticFallback(): PublicTemplate[] {
     seoDescription: t.seoDescription,
     extraPersonsAllowed: 10,
     extraPetsAllowed: 10,
+    createdAt: new Date(0).toISOString(),
   }));
 }
 

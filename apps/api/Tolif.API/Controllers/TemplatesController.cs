@@ -27,7 +27,8 @@ public class TemplatesController(IApplicationDbContext db) : ControllerBase
                 t.SeoTitle ?? "",
                 t.SeoDescription ?? "",
                 t.ExtraPersonsAllowed,
-                t.ExtraPetsAllowed))
+                t.ExtraPetsAllowed,
+                t.CreatedAt))
             .ToListAsync(ct);
 
         return Ok(templates);
@@ -55,7 +56,8 @@ public class TemplatesController(IApplicationDbContext db) : ControllerBase
             t.SeoTitle ?? "",
             t.SeoDescription ?? "",
             t.ExtraPersonsAllowed,
-            t.ExtraPetsAllowed));
+            t.ExtraPetsAllowed,
+            t.CreatedAt));
     }
 }
 
@@ -71,5 +73,6 @@ public record PublicTemplateDto(
     string SeoTitle,
     string SeoDescription,
     int ExtraPersonsAllowed,
-    int ExtraPetsAllowed
+    int ExtraPetsAllowed,
+    DateTime CreatedAt
 );

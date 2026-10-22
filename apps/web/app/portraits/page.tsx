@@ -8,16 +8,19 @@ import { Footer } from "@/components/layout/Footer";
 import { ImageIcon, ArrowRight, Search, X, SlidersHorizontal, Sparkles } from "lucide-react";
 import {
   getPublicTemplates,
+  getUiSettings,
   templateImageUrl,
   categoryGradient,
+  TEMPLATE_CATEGORIES,
   type PublicTemplate,
+  type TemplateDefaultSort,
 } from "@/lib/public-api";
 
 // ── Constants ──────────────────────────────────────────────────────────────────
 
 const PAGE_SIZE = 12;
 
-const CATEGORIES = ["All", "Families", "Couples", "Solo", "Pets", "Groups"];
+const CATEGORIES = TEMPLATE_CATEGORIES;
 
 const STYLES = [
   "All styles",
@@ -31,10 +34,12 @@ const STYLES = [
   "Romantic",
 ];
 
-const SORT_OPTIONS = [
-  { value: "default", label: "Featured" },
-  { value: "az",      label: "A → Z" },
-  { value: "za",      label: "Z → A" },
+const SORT_OPTIONS: { value: TemplateDefaultSort; label: string }[] = [
+  { value: "newest", label: "Newest first" },
+  { value: "oldest", label: "Oldest first" },
+  { value: "az",     label: "A → Z" },
+  { value: "za",     label: "Z → A" },
+  { value: "order",  label: "Featured" },
 ];
 
 // ── Template card ──────────────────────────────────────────────────────────────
@@ -157,15 +162,16 @@ export default function PortraitsPage() {
   const [loading,   setLoading]   = useState(true);
   const [category,  setCategory]  = useState("All");
   const [style,     setStyle]     = useState("All styles");
-  const [sort,      setSort]      = useState("default");
+  const [sort,      setSort]      = useState<TemplateDefaultSort>("newest");
   const [search,    setSearch]    = useState("");
   const [filtersOpen, setFiltersOpen] = useState(false);
   const [visibleCount, setVisibleCount] = useState(PAGE_SIZE);
   const [gridOpacity, setGridOpacity] = useState(1);
 
   useEffect(() => {
-    getPublicTemplates().then((data) => {
+    Promise.all([getPublicTemplates(), getUiSettings()]).then(([data, ui]) => {
       setTemplates(data);
+      setSort(ui.templatesDefaultSort);
       setLoading(false);
     });
   }, []);
@@ -207,8 +213,10 @@ export default function PortraitsPage() {
       );
     }
 
-    if (sort === "az") result = [...result].sort((a, b) => a.name.localeCompare(b.name));
-    if (sort === "za") result = [...result].sort((a, b) => b.name.localeCompare(a.name));
+    if (sort === "az")     result = [...result].sort((a, b) => a.name.localeCompare(b.name));
+    if (sort === "za")     result = [...result].sort((a, b) => b.name.localeCompare(a.name));
+    if (sort === "newest") result = [...result].sort((a, b) => new Date(b.createdAt ?? 0).getTime() - new Date(a.createdAt ?? 0).getTime());
+    if (sort === "oldest") result = [...result].sort((a, b) => new Date(a.createdAt ?? 0).getTime() - new Date(b.createdAt ?? 0).getTime());
 
     return result;
   }, [templates, category, style, sort, search]);
@@ -219,7 +227,6 @@ export default function PortraitsPage() {
     setCategory("All");
     setStyle("All styles");
     setSearch("");
-    setSort("default");
   }
 
   // Counts for category pills
