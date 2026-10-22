@@ -157,6 +157,12 @@ function TemplatePicker({
               transition={{ delay: i * 0.04, duration: 0.28 }}
               onClick={() => onPick(t)}
               className="group text-left focus:outline-none"
+              style={{
+                transform: isSelected ? "scale(1.08)" : "scale(1)",
+                zIndex: isSelected ? 10 : 1,
+                transition: "transform 0.25s cubic-bezier(0.34,1.56,0.64,1)",
+                position: "relative",
+              }}
             >
               {/* Frame — same style as portraits page */}
               <div
@@ -166,9 +172,9 @@ function TemplatePicker({
                   background: "linear-gradient(160deg,#D8BC96 0%,#C4A47C 30%,#B08858 55%,#CAA87A 80%,#D4B488 100%)",
                   padding: "8px",
                   boxShadow: isSelected
-                    ? "0 0 0 3px #C4622D, 0 8px 24px rgba(196,98,45,0.3)"
+                    ? "0 0 0 3px #C4622D, 0 16px 40px rgba(196,98,45,0.35)"
                     : "0 6px 20px rgba(0,0,0,0.20)",
-                  transition: "box-shadow 0.2s",
+                  transition: "box-shadow 0.25s",
                 }}
               >
                 {/* Mat board */}
