@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { motion } from "framer-motion";
 import Link from "next/link";
 import { useWizardStore } from "@/store/wizardStore";
+import { trackPurchase } from "@/lib/fbpixel";
 import { Download, Package, CheckCircle, Clock, Truck, Star, ArrowLeft, Copy, Check, ExternalLink } from "lucide-react";
 
 // ── Types ──────────────────────────────────────────────────────────────────────
@@ -182,6 +183,19 @@ export function OrderPageClient({
   // Clear the wizard + multi-portrait cart once the customer lands on the
   // success page so the next portrait starts fresh.
   useEffect(() => { reset(); }, [reset]);
+
+  // Fire Purchase event once for paid orders
+  useEffect(() => {
+    const isPaid = ["Paid", "GeneratingHighRes", "Ready", "SubmittedToPrinter", "Shipped"].includes(initialOrder.status);
+    if (!isPaid) return;
+    trackPurchase({
+      order_id: initialOrder.orderNumber,
+      value: initialOrder.totalAmount,
+      currency: initialOrder.currency,
+      num_items: initialOrder.items.length,
+    });
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   // Poll every 5 s while the order is paid but the high-res image isn't ready.
   // Stops automatically once any item has a final image.

@@ -16,6 +16,7 @@ import {
   getPublicReviews, type PublicTemplate, type PublicReview,
 } from "@/lib/public-api";
 import { useWizardStore } from "@/store/wizardStore";
+import { trackViewContent } from "@/lib/fbpixel";
 
 // ── Small component to handle image load errors gracefully ────────────────────
 // eslint-disable-next-line @next/next/no-img-element
@@ -186,6 +187,15 @@ export function TemplateDetailClient({
   useEffect(() => {
     getPublicReviews().then(setReviews);
   }, []);
+
+  useEffect(() => {
+    trackViewContent({
+      content_name: template.name,
+      content_category: template.category,
+      content_ids: [template.id],
+    });
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [template.id]);
 
   useEffect(() => {
     const cur = useWizardStore.getState().selectedTemplate;

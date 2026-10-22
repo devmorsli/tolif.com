@@ -23,6 +23,7 @@ import {
 import Link from "next/link";
 import { useWizardStore, type CartItem } from "@/store/wizardStore";
 import { getShippingOptions, type ShippingOption } from "@/lib/public-api";
+import { trackInitiateCheckout } from "@/lib/fbpixel";
 
 function getApiBase(): string {
   return process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:5000";
@@ -291,6 +292,12 @@ export function Step4Cart() {
     }
     setCheckoutLoading(true);
     setCheckoutError(null);
+
+    trackInitiateCheckout({
+      num_items: allItems.length,
+      value: orderTotal,
+      currency: allItems[0]?.variant.currency ?? "USD",
+    });
 
     try {
       const checkoutItems = allItems.map((i) => ({

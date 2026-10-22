@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useWizardStore, type ProductVariant } from "@/store/wizardStore";
+import { trackAddToCart } from "@/lib/fbpixel";
 import {
   Download, Frame, ImageIcon, ChevronLeft, ShoppingCart,
   Check, Smartphone, Loader2, Zap, Shield, Package,
@@ -130,7 +131,13 @@ export function Step5Product() {
 
   const handleCheckout = () => {
     if (!selectedVariant) return;
-    alert(`Checkout coming soon! Selected: ${selectedVariant.productName} ${selectedVariant.size}`);
+    trackAddToCart({
+      content_name: `${selectedVariant.productName} ${selectedVariant.size}`,
+      content_ids: [selectedVariant.id],
+      value: selectedVariant.price,
+      currency: selectedVariant.currency,
+    });
+    useWizardStore.getState().goTo(4);
   };
 
   return (
