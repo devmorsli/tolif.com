@@ -27,8 +27,8 @@ async function getTrackingIds(): Promise<TrackingIds> {
       "http://localhost:5000";
 
     const res = await fetch(`${base}/api/settings/tracking`, {
-      // Revalidate every 5 minutes — admin changes propagate quickly
-      next: { revalidate: 300 },
+      // No cache — pixel ID changes in admin must apply immediately
+      cache: "no-store",
     });
 
     if (!res.ok) return {};
