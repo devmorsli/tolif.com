@@ -71,6 +71,9 @@ public static class DbSeeder
         await UpsertSettingAsync(db, "resend.apiKey",      "");
 
         // ── Products ───────────────────────────────────────────────────────
+        // Only seeds on first run. Once products/variants exist they are managed
+        // entirely through the admin panel — we never overwrite or delete them on
+        // subsequent startups so that Printful variant ID assignments are preserved.
         if (!await db.Products.AnyAsync())
         {
             var digital = new Product { Name = "Digital Download", Type = ProductType.Digital, SortOrder = 0 };
@@ -79,30 +82,31 @@ public static class DbSeeder
             var canvas  = new Product { Name = "Canvas",           Type = ProductType.Canvas,  SortOrder = 3 };
 
             db.Products.AddRange(digital, poster, framed, canvas);
-        }
 
-        // ── Sync variants to match storefront prices/sizes (runs on every startup) ─
-        // Sizes mirror the frontend SIZES array: 12×16 in = 30 × 40 cm,
-        //   18×24 in = 45 × 60 cm, 24×36 in = 60 × 90 cm.
-        // Prices mirror the frontend POSTER_BASE / CANVAS_BASE / FRAME_ADDON / DIGITAL_PRICE.
-        await SyncVariantsAsync(db, ProductType.Digital, [
-            ("Digital (High-Res PNG)", 49m, "USD"),
-        ]);
-        await SyncVariantsAsync(db, ProductType.Poster, [
-            ("30 × 40 cm",  49m, "USD"),
-            ("45 × 60 cm",  69m, "USD"),
-            ("60 × 90 cm",  99m, "USD"),
-        ]);
-        await SyncVariantsAsync(db, ProductType.FramedPrint, [
-            ("30 × 40 cm",  99m, "USD"),
-            ("45 × 60 cm", 119m, "USD"),
-            ("60 × 90 cm", 149m, "USD"),
-        ]);
-        await SyncVariantsAsync(db, ProductType.Canvas, [
-            ("30 × 40 cm",  69m, "USD"),
-            ("45 × 60 cm",  99m, "USD"),
-            ("60 × 90 cm", 149m, "USD"),
-        ]);
+            // Save first so EF has the product IDs before adding variants
+            await db.SaveChangesAsync();
+
+            // Seed initial variants — only on brand-new installs.
+            // Sizes mirror the frontend SIZES array: 12×16 in = 30×40 cm etc.
+            await SyncVariantsAsync(db, ProductType.Digital, [
+                ("Digital (High-Res PNG)", 49m, "USD"),
+            ]);
+            await SyncVariantsAsync(db, ProductType.Poster, [
+                ("30 × 40 cm",  49m, "USD"),
+                ("45 × 60 cm",  69m, "USD"),
+                ("60 × 90 cm",  99m, "USD"),
+            ]);
+            await SyncVariantsAsync(db, ProductType.FramedPrint, [
+                ("30 × 40 cm",  99m, "USD"),
+                ("45 × 60 cm", 119m, "USD"),
+                ("60 × 90 cm", 149m, "USD"),
+            ]);
+            await SyncVariantsAsync(db, ProductType.Canvas, [
+                ("30 × 40 cm",  69m, "USD"),
+                ("45 × 60 cm",  99m, "USD"),
+                ("60 × 90 cm", 149m, "USD"),
+            ]);
+        }
 
         // ── Templates (6 across categories) ───────────────────────────────
         if (!await db.Templates.AnyAsync())

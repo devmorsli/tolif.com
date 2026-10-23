@@ -27,19 +27,24 @@ public class AdminOrdersController(
     // ── GET /api/admin/orders ─────────────────────────────────────────────────
     [HttpGet]
     public async Task<IActionResult> GetAll(
-        [FromQuery] int       page        = 1,
-        [FromQuery] int       pageSize    = 20,
-        [FromQuery] string?   status      = null,
-        [FromQuery] string?   printStatus = null,
-        [FromQuery] string?   search      = null,
-        [FromQuery] DateTime? from        = null,
-        [FromQuery] DateTime? to          = null,
+        [FromQuery] int       page           = 1,
+        [FromQuery] int       pageSize       = 20,
+        [FromQuery] string?   status         = null,
+        [FromQuery] string?   printStatus    = null,
+        [FromQuery] string?   search         = null,
+        [FromQuery] DateTime? from           = null,
+        [FromQuery] DateTime? to             = null,
+        [FromQuery] bool      includePending = false,
         CancellationToken ct = default)
     {
         page     = Math.Max(1, page);
         pageSize = Math.Clamp(pageSize, 1, 100);
 
         var query = db.Orders.AsQueryable();
+
+        // By default exclude Pending orders — they live in the Leads page
+        if (!includePending && string.IsNullOrWhiteSpace(status))
+            query = query.Where(o => o.Status != OrderStatus.Pending);
 
         if (!string.IsNullOrWhiteSpace(status) &&
             Enum.TryParse<OrderStatus>(status, ignoreCase: true, out var parsedStatus))

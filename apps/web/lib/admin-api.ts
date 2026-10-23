@@ -257,6 +257,8 @@ export async function getOrders(
   if (search) q.set("search", search);
   if (from) q.set("from", from);
   if (to) q.set("to", to);
+  // Orders page only shows paid/completed orders; Pending lives in Leads
+  q.set("includePending", "false");
   return apiFetch<OrdersPage>(`/api/admin/orders?${q}`);
 }
 
@@ -608,4 +610,95 @@ export async function updateAdminReview(id: number, form: FormData): Promise<Adm
 
 export async function deleteAdminReview(id: number): Promise<void> {
   return apiFetch<void>(`/api/admin/reviews/${id}`, { method: "DELETE" });
+}
+
+// ── Leads ─────────────────────────────────────────────────────────────────────
+
+export interface LeadsStats {
+  totalSessions: number;
+  gotPreview: number;
+  capturedEmail: number;
+  addedToCart: number;
+  converted: number;
+  abandonedCarts: number;
+  todayLeads: number;
+  conversionRate: number;
+}
+
+export interface LeadSession {
+  id: string;
+  customerEmail: string;
+  templateName: string;
+  status: string;
+  regenerationCount: number;
+  hasPreview: boolean;
+  createdAt: string;
+  hasPendingOrder: boolean;
+  pendingOrderId?: string;
+}
+
+export interface LeadSessionsPage {
+  items: LeadSession[];
+  total: number;
+  page: number;
+  pageSize: number;
+}
+
+export interface LeadSessionDetail {
+  id: string;
+  customerEmail: string;
+  templateName: string;
+  templateSlug: string;
+  status: string;
+  regenerationCount: number;
+  hasPreview: boolean;
+  createdAt: string;
+  uploadedFiles: Record<string, string | null>;
+  generationLogs: {
+    id: string;
+    provider: string;
+    model: string;
+    status: string;
+    durationMs?: number;
+    costUsd?: number;
+    isHighRes: boolean;
+    errorMessage?: string;
+    createdAt: string;
+  }[];
+}
+
+export async function getLeadsStats() {
+  return apiFetch<LeadsStats>("/api/admin/leads/stats");
+}
+
+export async function getLeadSessions(
+  page = 1, pageSize = 20, search = "",
+  from?: string, to?: string
+) {
+  const q = new URLSearchParams({ page: String(page), pageSize: String(pageSize) });
+  if (search) q.set("search", search);
+  if (from) q.set("from", from);
+  if (to) q.set("to", to);
+  return apiFetch<LeadSessionsPage>(`/api/admin/leads/sessions?${q}`);
+}
+
+export async function getLeadSession(id: string) {
+  return apiFetch<LeadSessionDetail>(`/api/admin/leads/sessions/${id}`);
+}
+
+export async function deleteLeadSession(id: string) {
+  return apiFetch<void>(`/api/admin/leads/sessions/${id}`, { method: "DELETE" });
+}
+
+export async function sendLeadEmail(id: string) {
+  return apiFetch<{ success: boolean }>(`/api/admin/leads/sessions/${id}/send-email`, {
+    method: "POST",
+  });
+}
+
+export async function sendLeadCampaign() {
+  return apiFetch<{ sent: number; failed: number; total: number }>(
+    "/api/admin/leads/sessions/send-campaign",
+    { method: "POST" }
+  );
 }

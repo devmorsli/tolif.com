@@ -2,17 +2,17 @@
 
 import { useEffect, useState, useCallback } from "react";
 import {
-  Search, TrendingUp, ShoppingBag, AlertCircle, Mail,
-  Clock, Calendar, X, RefreshCw, Send, CheckCircle, Printer, Hourglass,
+  Search, TrendingUp, ShoppingBag,
+  Calendar, X, RefreshCw, CheckCircle, Printer, Hourglass, AlertCircle,
 } from "lucide-react";
+import Link from "next/link";
 import { AdminGuard } from "@/components/admin/AdminGuard";
 import { AdminSidebar } from "@/components/admin/AdminSidebar";
 import {
-  getOrders, getOrderStats, getAbandonedCarts,
-  sendAbandonmentEmail, sendAbandonmentCampaign,
+  getOrders, getOrderStats,
   submitOrderToPrintful, bulkSubmitOrdersToPrintful, submitUnprintedOrders,
   type OrderListItem, type OrdersPage,
-  type OrderStats, type AbandonedCartItem, type AbandonedCartsPage,
+  type OrderStats,
 } from "@/lib/admin-api";
 
 const PRINT_STATUS_LABELS: Record<string, string> = {
@@ -21,9 +21,6 @@ const PRINT_STATUS_LABELS: Record<string, string> = {
   pending_printful:   "Waiting at Printful",
   failed:             "Print failed",
 };
-import Link from "next/link";
-
-const API_BASE = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:5000";
 
 // ── Status config ─────────────────────────────────────────────────────────────
 
@@ -40,7 +37,6 @@ const STATUS_COLORS: Record<string, string> = {
 
 const STATUS_LABELS: Record<string, string> = {
   "":                 "All statuses",
-  Pending:            "Pending",
   Paid:               "Paid",
   GeneratingHighRes:  "Generating",
   Ready:              "Ready",
@@ -575,193 +571,9 @@ function OrdersView() {
 
 // ── Abandoned carts view ──────────────────────────────────────────────────────
 
-function AbandonedCartsView() {
-  const [data,       setData]       = useState<AbandonedCartsPage | null>(null);
-  const [loading,    setLoading]    = useState(true);
-  const [sending,    setSending]    = useState<string | null>(null);    // id being emailed
-  const [sentIds,    setSentIds]    = useState<Set<string>>(new Set());
-  const [campaignState, setCampaignState] = useState<"idle" | "confirm" | "sending" | "done">("idle");
-  const [campaignResult, setCampaignResult] = useState<{ sent: number; failed: number; total: number } | null>(null);
-
-  useEffect(() => {
-    getAbandonedCarts()
-      .then(setData)
-      .catch(() => {})
-      .finally(() => setLoading(false));
-  }, []);
-
-  const handleSendOne = async (id: string) => {
-    setSending(id);
-    try {
-      await sendAbandonmentEmail(id);
-      setSentIds(prev => new Set(prev).add(id));
-    } catch { /* silent — button reverts */ }
-    finally { setSending(null); }
-  };
-
-  const handleCampaign = async () => {
-    if (campaignState === "idle") { setCampaignState("confirm"); return; }
-    if (campaignState === "confirm") {
-      setCampaignState("sending");
-      try {
-        const result = await sendAbandonmentCampaign();
-        setCampaignResult(result);
-        setCampaignState("done");
-        // Mark all as sent
-        if (data) setSentIds(new Set(data.items.map(i => i.id)));
-      } catch {
-        setCampaignState("idle");
-      }
-    }
-  };
-
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center py-16">
-        <div className="w-7 h-7 border-2 border-[#C4622D] border-t-transparent rounded-full animate-spin" />
-      </div>
-    );
-  }
-
-  if (!data || data.items.length === 0) {
-    return (
-      <div className="bg-white rounded-2xl border border-[#E4D8CC] p-12 text-center">
-        <CheckCircle size={32} className="text-green-500 mx-auto mb-3" />
-        <p className="font-medium text-[#1A1714] mb-1">No abandoned carts</p>
-        <p className="text-sm text-[#8C7B6B]">All pending orders are fresh or already paid.</p>
-      </div>
-    );
-  }
-
-  return (
-    <div>
-      {/* Campaign header */}
-      <div className="flex items-center justify-between mb-4">
-        <p className="text-sm text-[#8C7B6B]">
-          <span className="font-semibold text-[#1A1714]">{data.total}</span> abandoned cart{data.total !== 1 ? "s" : ""} — orders left at checkout without payment
-        </p>
-
-        {campaignState === "done" && campaignResult ? (
-          <div className="flex items-center gap-2 text-sm text-green-700 bg-green-50 border border-green-200 rounded-xl px-4 py-2">
-            <CheckCircle size={14} />
-            Sent {campaignResult.sent}/{campaignResult.total}
-            {campaignResult.failed > 0 && ` · ${campaignResult.failed} failed`}
-          </div>
-        ) : (
-          <div className="flex items-center gap-2">
-            {campaignState === "confirm" && (
-              <button
-                onClick={() => setCampaignState("idle")}
-                className="text-xs text-[#8C7B6B] hover:text-[#1A1714] px-3 py-2 transition-colors"
-              >
-                Cancel
-              </button>
-            )}
-            <button
-              onClick={handleCampaign}
-              disabled={campaignState === "sending"}
-              className={`flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-semibold transition-all duration-200 ${
-                campaignState === "confirm"
-                  ? "bg-[#C4622D] text-white hover:bg-[#9E4A1E]"
-                  : "bg-[#1A1714] text-white hover:bg-[#2A2420]"
-              } disabled:opacity-60`}
-            >
-              {campaignState === "sending" ? (
-                <><div className="w-3.5 h-3.5 border-2 border-white/40 border-t-white rounded-full animate-spin" /> Sending…</>
-              ) : campaignState === "confirm" ? (
-                <><Send size={13} /> Confirm — send to all {data.total}</>
-              ) : (
-                <><Send size={13} /> Email all abandoned carts</>
-              )}
-            </button>
-          </div>
-        )}
-      </div>
-
-      {/* Table */}
-      <div className="bg-white rounded-2xl border border-[#E4D8CC] overflow-hidden">
-        <div className="grid grid-cols-[auto_1fr_auto_auto_auto] gap-4 px-6 py-3 bg-[#FAF6F0] border-b border-[#E4D8CC] text-xs font-semibold text-[#8C7B6B] uppercase tracking-wider">
-          <span>Preview</span>
-          <span>Customer</span>
-          <span>Amount</span>
-          <span>Abandoned</span>
-          <span>Action</span>
-        </div>
-
-        {data.items.map((cart: AbandonedCartItem) => {
-          const isSent    = sentIds.has(cart.id);
-          const isSending = sending === cart.id;
-
-          return (
-            <div
-              key={cart.id}
-              className="grid grid-cols-[auto_1fr_auto_auto_auto] gap-4 items-center px-6 py-4 border-b border-[#F2EAE0] last:border-0"
-            >
-              {/* Portrait thumbnail */}
-              <div className="w-10 h-10 rounded-lg overflow-hidden bg-[#F0E8DC] flex items-center justify-center shrink-0">
-                {cart.hasPreview && cart.sessionId ? (
-                  // eslint-disable-next-line @next/next/no-img-element
-                  <img
-                    src={`${API_BASE}/api/portraits/${cart.sessionId}/preview`}
-                    alt=""
-                    className="w-full h-full object-cover"
-                  />
-                ) : (
-                  <AlertCircle size={14} className="text-[#C8BAB0]" />
-                )}
-              </div>
-
-              {/* Customer info */}
-              <div>
-                {cart.customerName && (
-                  <p className="text-sm font-medium text-[#1A1714]">{cart.customerName}</p>
-                )}
-                <p className="text-sm text-[#8C7B6B]">{cart.customerEmail}</p>
-                <p className="text-xs text-[#A89080] font-mono mt-0.5">{cart.orderNumber}</p>
-              </div>
-
-              {/* Amount */}
-              <span className="text-sm font-semibold text-[#1A1714]">
-                {cart.currency} {cart.totalAmount.toFixed(2)}
-              </span>
-
-              {/* Date */}
-              <span className="text-xs text-[#8C7B6B] flex items-center gap-1">
-                <Clock size={11} />
-                {new Date(cart.createdAt).toLocaleDateString()}
-              </span>
-
-              {/* Send button */}
-              <button
-                onClick={() => handleSendOne(cart.id)}
-                disabled={isSending || isSent}
-                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all duration-200 ${
-                  isSent
-                    ? "bg-green-50 text-green-700 border border-green-200 cursor-default"
-                    : "bg-[#F5F0EA] text-[#5A4E46] hover:bg-[#C4622D] hover:text-white border border-[#E4D8CC] hover:border-[#C4622D]"
-                } disabled:opacity-60`}
-              >
-                {isSending ? (
-                  <div className="w-3 h-3 border-2 border-current border-t-transparent rounded-full animate-spin" />
-                ) : isSent ? (
-                  <CheckCircle size={11} />
-                ) : (
-                  <Mail size={11} />
-                )}
-                {isSent ? "Sent" : "Send email"}
-              </button>
-            </div>
-          );
-        })}
-      </div>
-    </div>
-  );
-}
-
 // ── Main content ──────────────────────────────────────────────────────────────
 
 function OrdersContent() {
-  const [view,  setView]  = useState<"orders" | "abandoned">("orders");
   const [stats, setStats] = useState<OrderStats | null>(null);
 
   useEffect(() => {
@@ -776,7 +588,7 @@ function OrdersContent() {
           {/* Header */}
           <div className="mb-7">
             <h1 className="text-3xl font-display font-light text-[#1A1714]">Orders</h1>
-            <p className="text-[#8C7B6B] text-sm mt-1">All customer orders and abandoned carts.</p>
+            <p className="text-[#8C7B6B] text-sm mt-1">Completed and paid orders only. Unpaid leads are in the Leads page.</p>
           </div>
 
           {/* Stats bar */}
@@ -801,41 +613,15 @@ function OrdersContent() {
               accent="bg-blue-100 text-blue-700"
             />
             <StatCard
-              label="Abandoned carts"
-              value={stats?.abandonedCount ?? "—"}
-              sub="awaiting payment"
-              icon={AlertCircle}
-              accent="bg-yellow-100 text-yellow-700"
+              label="This month"
+              value={stats != null ? `€${stats.monthRevenue.toFixed(2)}` : "—"}
+              sub="revenue"
+              icon={TrendingUp}
+              accent="bg-purple-100 text-purple-700"
             />
           </div>
 
-          {/* View tabs */}
-          <div className="flex gap-2 mb-6 border-b border-[#E4D8CC] pb-0">
-            {(["orders", "abandoned"] as const).map((v) => (
-              <button
-                key={v}
-                onClick={() => setView(v)}
-                className={`pb-3 px-1 text-sm font-semibold border-b-2 transition-all duration-200 ${
-                  view === v
-                    ? "border-[#C4622D] text-[#C4622D]"
-                    : "border-transparent text-[#8C7B6B] hover:text-[#1A1714]"
-                }`}
-              >
-                {v === "orders" ? "All Orders" : (
-                  <>
-                    Abandoned Carts
-                    {stats?.abandonedCount ? (
-                      <span className="ml-2 bg-yellow-100 text-yellow-800 text-[10px] font-bold px-1.5 py-0.5 rounded-full">
-                        {stats.abandonedCount}
-                      </span>
-                    ) : null}
-                  </>
-                )}
-              </button>
-            ))}
-          </div>
-
-          {view === "orders" ? <OrdersView /> : <AbandonedCartsView />}
+          <OrdersView />
         </div>
       </div>
     </div>
