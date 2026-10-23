@@ -16,6 +16,12 @@ public static class DbSeeder
     {
         await db.Database.MigrateAsync();
 
+        // Safety: ensure SourceRef column exists even if migration was rolled back
+        await db.Database.ExecuteSqlRawAsync("""
+            ALTER TABLE "PortraitSessions"
+            ADD COLUMN IF NOT EXISTS "SourceRef" character varying(500) NULL;
+            """);
+
         // ── Roles ──────────────────────────────────────────────────────────
         foreach (var role in new[] { "Admin", "Staff" })
         {
