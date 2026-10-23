@@ -235,6 +235,86 @@ public class CheckoutController(
         }
     }
 
+    // ── POST /api/checkout/resume-order/{accessToken} ────────────────────────
+    /// <summary>
+    /// Creates a fresh Stripe Checkout Session for an existing Pending order so
+    /// the customer can complete payment after abandoning (the original Stripe
+    /// session may have expired).
+    /// </summary>
+    [HttpPost("resume-order/{accessToken}")]
+    public async Task<IActionResult> ResumeOrder(string accessToken, CancellationToken ct)
+    {
+        var order = await db.Orders
+            .Include(o => o.Items)
+                .ThenInclude(i => i.ProductVariant)
+                    .ThenInclude(v => v!.Product)
+            .Include(o => o.DiscountCode)
+            .FirstOrDefaultAsync(o => o.AccessToken == accessToken && o.Status == OrderStatus.Pending, ct);
+
+        if (order is null) return NotFound(new { message = "Pending order not found." });
+
+        var stripeSecretKey = await settings.GetAsync("stripe.secretKey", ct);
+        if (string.IsNullOrWhiteSpace(stripeSecretKey))
+            return StatusCode(500, new { message = "Stripe is not configured." });
+
+        StripeConfiguration.ApiKey = stripeSecretKey;
+        var siteUrl = await settings.GetAsync("site.url", ct) ?? "https://tolif.com";
+
+        var isPhysical = order.Items.Any(i => i.ProductVariant?.Product?.Type != ProductType.Digital);
+
+        var lineItems = order.Items.Select(item => new SessionLineItemOptions
+        {
+            PriceData = new SessionLineItemPriceDataOptions
+            {
+                Currency    = item.Currency.ToLowerInvariant(),
+                UnitAmount  = (long)Math.Round(item.UnitPrice * 100),
+                ProductData = new SessionLineItemPriceDataProductDataOptions
+                {
+                    Name        = $"{item.ProductVariant?.Product?.Name ?? "AI Portrait"} — {item.ProductVariant?.Size}",
+                    Description = "Custom AI-generated portrait by Tolif",
+                },
+            },
+            Quantity = item.Quantity,
+        }).ToList();
+
+        var options = new SessionCreateOptions
+        {
+            PaymentMethodTypes = ["card"],
+            LineItems          = lineItems,
+            Mode               = "payment",
+            CustomerEmail      = order.CustomerEmail,
+            SuccessUrl         = $"{siteUrl}/order/{order.AccessToken}?success=1",
+            CancelUrl          = $"{siteUrl}/order/{order.AccessToken}",
+            Metadata           = new Dictionary<string, string>
+            {
+                ["orderId"]    = order.Id.ToString(),
+                ["sessionIds"] = string.Join(",", order.Items.Select(i => i.PortraitSessionId.ToString())),
+            },
+            ShippingAddressCollection = isPhysical
+                ? new SessionShippingAddressCollectionOptions
+                  {
+                      AllowedCountries = ["FR", "DE", "GB", "US", "CA", "NL", "BE", "ES", "IT", "PT"]
+                  }
+                : null,
+        };
+
+        try
+        {
+            var service       = new SessionService();
+            var stripeSession = await service.CreateAsync(options, cancellationToken: ct);
+
+            order.StripeSessionId = stripeSession.Id;
+            await db.SaveChangesAsync(ct);
+
+            return Ok(new { checkoutUrl = stripeSession.Url });
+        }
+        catch (StripeException ex)
+        {
+            logger.LogError(ex, "Stripe resume-order failed for order {OrderId}", order.Id);
+            return StatusCode(500, new { message = "Could not create Stripe checkout session.", detail = ex.Message });
+        }
+    }
+
     private sealed record ResolvedItem(Guid SessionId, ProductVariant Variant, int Quantity);
 }
 

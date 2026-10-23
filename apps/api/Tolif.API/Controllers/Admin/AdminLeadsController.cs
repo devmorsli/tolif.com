@@ -285,11 +285,11 @@ public class AdminLeadsController(
                           <table role="presentation" cellspacing="0" cellpadding="0">
                             <tr>
                               <td style="border-radius:12px;background:#C4622D;">
-                                <a href="{siteUrl}"
+                                <a href="{siteUrl}/create?session={session.Id}"
                                    style="display:inline-block;padding:14px 32px;font-family:Georgia,serif;
                                           font-size:15px;font-weight:400;color:#FFFFFF;text-decoration:none;
                                           letter-spacing:0.3px;">
-                                  Get my portrait →
+                                  View &amp; order my portrait →
                                 </a>
                               </td>
                             </tr>
@@ -377,8 +377,8 @@ public class AdminLeadsController(
                     <p style="font-size:15px;line-height:1.7;color:#5A4E46;margin:0 0 20px;">
                     You created a <strong>{session.Template.Name}</strong> portrait — come back and make it yours.
                     </p>
-                    <a href="{siteUrl}" style="display:inline-block;padding:14px 32px;background:#C4622D;color:#FFF;text-decoration:none;border-radius:12px;font-size:15px;">
-                    Get my portrait →
+                    <a href="{siteUrl}/create?session={session.Id}" style="display:inline-block;padding:14px 32px;background:#C4622D;color:#FFF;text-decoration:none;border-radius:12px;font-size:15px;">
+                    View &amp; order my portrait →
                     </a>
                     </td></tr>
                     <tr><td style="padding:24px 40px 36px;border-top:1px solid #F0E8DF;">

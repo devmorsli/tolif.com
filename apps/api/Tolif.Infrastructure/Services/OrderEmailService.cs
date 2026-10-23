@@ -324,6 +324,8 @@ public class OrderEmailService(IEmailService email, ISettingsService settings) :
         var siteUrl     = await settings.GetAsync("site.url", ct) ?? "https://tolif.com";
         var apiUrl      = await settings.GetAsync("api.url",  ct) ?? siteUrl;
         var orderNumber = OrderHelper.FormatNumber(order);
+        // resumeUrl goes to the order page — for Pending orders it now shows a
+        // "Complete your payment" UI with a fresh Stripe checkout button.
         var resumeUrl   = $"{siteUrl}/order/{order.AccessToken}";
         var newUrl      = $"{siteUrl}/create";
         var greeting    = order.CustomerName is { Length: > 0 } n ? $"Hi {n}," : "Hello,";

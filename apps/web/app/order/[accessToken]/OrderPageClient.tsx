@@ -221,7 +221,9 @@ export function OrderPageClient({
     year: "numeric",
   });
 
-  const [copied, setCopied] = useState(false);
+  const [copied,          setCopied]          = useState(false);
+  const [resumeLoading,   setResumeLoading]   = useState(false);
+  const [resumeError,     setResumeError]     = useState<string | null>(null);
   const copyTracking = () => {
     if (!order.trackingNumber) return;
     navigator.clipboard.writeText(order.trackingNumber).then(() => {
@@ -230,8 +232,23 @@ export function OrderPageClient({
     });
   };
 
-  const isPaid   = ["Paid", "GeneratingHighRes", "Ready", "SubmittedToPrinter", "Shipped"].includes(order.status);
+  const isPending = order.status === "Pending";
+  const isPaid    = ["Paid", "GeneratingHighRes", "Ready", "SubmittedToPrinter", "Shipped"].includes(order.status);
   const isShipped = order.status === "Shipped";
+
+  const handleResumeCheckout = async () => {
+    setResumeLoading(true);
+    setResumeError(null);
+    try {
+      const res = await fetch(`${apiBase}/api/checkout/resume-order/${accessToken}`, { method: "POST" });
+      if (!res.ok) throw new Error((await res.json()).message ?? "Failed");
+      const { checkoutUrl } = await res.json();
+      window.location.href = checkoutUrl;
+    } catch (e: unknown) {
+      setResumeError(e instanceof Error ? e.message : "Something went wrong. Please try again.");
+      setResumeLoading(false);
+    }
+  };
 
   // Find the first item that has a final (watermark-free) image ready
   const downloadItem = order.items.find(i => i.hasFinalImage && i.sessionId);
@@ -254,7 +271,92 @@ export function OrderPageClient({
 
       <main className="max-w-2xl mx-auto px-4 py-12 pb-20">
 
-        {/* ── Hero confirmation ────────────────────────────────────────────── */}
+        {/* ── Pending: complete payment UI ─────────────────────────────────── */}
+        {isPending && (
+          <motion.div
+            initial={{ opacity: 0, y: 24 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.6, ease: [0.22, 1, 0.36, 1] }}
+          >
+            {/* Portrait preview */}
+            {order.items[0]?.hasPreview && order.items[0]?.sessionId && (
+              <div className="rounded-2xl overflow-hidden mb-8 shadow-lg"
+                   style={{ maxHeight: 360, background: "#1A1714" }}>
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img
+                  src={`${apiBase}/api/portraits/${order.items[0].sessionId}/preview`}
+                  alt="Your portrait"
+                  className="w-full object-cover"
+                  style={{ maxHeight: 360 }}
+                />
+              </div>
+            )}
+
+            <div className="text-center mb-8">
+              <div className="w-16 h-16 rounded-full bg-[#C4622D]/10 flex items-center justify-center mx-auto mb-5">
+                <Clock size={28} className="text-[#C4622D]" />
+              </div>
+              <p className="text-xs font-semibold tracking-[4px] text-[#C4622D] uppercase mb-2">
+                Payment not completed
+              </p>
+              <h1 className="font-display font-light text-3xl md:text-4xl text-[#1A1714] mb-3">
+                Your portrait is ready &amp; waiting
+              </h1>
+              <p className="text-[#5A4E46] text-sm leading-relaxed max-w-md mx-auto">
+                You created a beautiful portrait but didn&apos;t complete the payment.
+                Your order is still saved — click below to complete your purchase.
+              </p>
+            </div>
+
+            {/* Order summary */}
+            <div className="bg-white rounded-2xl border border-[#E4D8CC] p-6 mb-6">
+              <p className="text-[10px] font-bold tracking-[3px] uppercase text-[#A89080] mb-4">Your order</p>
+              {order.items.map(item => (
+                <div key={item.id} className="flex justify-between items-center py-2 border-b border-[#F0E8DF] last:border-0">
+                  <div>
+                    <p className="text-sm font-medium text-[#1A1714]">{item.productName}</p>
+                    {item.size && <p className="text-xs text-[#A89080]">{item.size}</p>}
+                  </div>
+                  <p className="text-sm font-semibold text-[#1A1714]">
+                    {item.currency} {(item.unitPrice * item.quantity).toFixed(2)}
+                  </p>
+                </div>
+              ))}
+              <div className="flex justify-between items-center pt-3 mt-1">
+                <p className="text-xs font-bold uppercase tracking-wider text-[#1A1714]">Total</p>
+                <p className="text-xl font-bold text-[#C4622D]">{order.currency} {order.totalAmount.toFixed(2)}</p>
+              </div>
+            </div>
+
+            {resumeError && (
+              <p className="text-sm text-red-600 bg-red-50 border border-red-200 rounded-xl px-4 py-3 mb-4 text-center">
+                {resumeError}
+              </p>
+            )}
+
+            <button
+              onClick={handleResumeCheckout}
+              disabled={resumeLoading}
+              className="w-full py-4 rounded-2xl bg-[#C4622D] text-white text-base font-semibold hover:bg-[#9E4A1E] transition-colors disabled:opacity-60 flex items-center justify-center gap-2"
+            >
+              {resumeLoading ? (
+                <><div className="w-4 h-4 border-2 border-white/40 border-t-white rounded-full animate-spin" /> Preparing checkout…</>
+              ) : (
+                <>Complete my order →</>
+              )}
+            </button>
+
+            <p className="text-center text-xs text-[#A89080] mt-4">
+              Changed your mind?{" "}
+              <Link href="/create" className="underline hover:text-[#1A1714] transition-colors">
+                Start a new portrait instead
+              </Link>
+            </p>
+          </motion.div>
+        )}
+
+        {/* ── Paid: hero confirmation ──────────────────────────────────────── */}
+        {!isPending && (
         <motion.div
           initial={{ opacity: 0, y: 24 }}
           animate={{ opacity: 1, y: 0 }}
@@ -572,6 +674,7 @@ export function OrderPageClient({
           <br />
           Order reference: <span className="font-mono text-[#8C7B6B]">{order.orderNumber}</span>
         </motion.p>
+        )} {/* end !isPending */}
 
       </main>
     </div>

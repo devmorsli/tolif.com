@@ -332,6 +332,35 @@ public class PortraitsController(
         return Ok(new { saved = true });
     }
 
+    // ── GET /api/portraits/{sessionId}/info ──────────────────────────────────
+    /// <summary>
+    /// Public endpoint used by the "resume from email" flow.
+    /// Returns just enough info to reload the wizard at the right step.
+    /// </summary>
+    [HttpGet("{sessionId}/info")]
+    public async Task<IActionResult> Info(Guid sessionId, CancellationToken ct)
+    {
+        var session = await db.PortraitSessions
+            .Include(s => s.Template)
+            .AsNoTracking()
+            .FirstOrDefaultAsync(s => s.Id == sessionId, ct);
+
+        if (session is null) return NotFound();
+
+        return Ok(new
+        {
+            sessionId  = session.Id,
+            status     = session.Status.ToString(),
+            hasPreview = session.WatermarkedPreviewKey != null,
+            template   = session.Template == null ? null : new
+            {
+                id   = session.Template.Id,
+                slug = session.Template.Slug,
+                name = session.Template.Name,
+            },
+        });
+    }
+
     // ── GET /api/portraits/{sessionId}/preview ────────────────────────────────
     // HEAD is used by the frontend poller to check readiness without downloading bytes.
     /// <summary>Streams the watermarked preview image for the given session.</summary>

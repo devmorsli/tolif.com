@@ -21,14 +21,46 @@ const stepComponents = {
   4: Step4Cart,
 };
 
+const API_BASE = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:5000";
+
 // Reads ?template=slug, ?templates=slug1,slug2,... and ?category=X from the URL.
 // ?templates= pins those templates to the top of the picker (multi-template ad links).
 // ?template=  auto-selects a single template.
+// ?session=   resumes a portrait session from a recovery email link.
 function TemplateAutoSelect() {
   const searchParams = useSearchParams();
-  const { selectedTemplate, selectTemplate, step, setPreferredCategory, setPinnedTemplateSlugs } = useWizardStore();
+  const { selectedTemplate, selectTemplate, step, setPreferredCategory, setPinnedTemplateSlugs, setSessionId, goTo } = useWizardStore();
 
   useEffect(() => {
+    // ── Session resume from recovery email (?session=guid) ────────────────
+    const sessionParam = searchParams.get("session");
+    if (sessionParam && step === 1) {
+      fetch(`${API_BASE}/api/portraits/${sessionParam}/info`)
+        .then(r => r.ok ? r.json() : null)
+        .then(async (info) => {
+          if (!info?.template?.slug) return;
+          const t = await getPublicTemplate(info.template.slug);
+          if (!t) return;
+          selectTemplate({
+            id: t.id,
+            slug: t.slug,
+            name: t.name,
+            category: t.category,
+            style: t.style,
+            templateImageKey: t.templateImageKey,
+            uploadSlots: parseUploadSlots(t.uploadSlotsJson),
+            extraPersonsAllowed: t.extraPersonsAllowed ?? 0,
+            extraPetsAllowed: t.extraPetsAllowed ?? 0,
+          });
+          setSessionId(sessionParam);
+          // Go to preview step if they already have a preview, otherwise upload step
+          if (info.status === "PreviewReady") goTo(3);
+          // status Generating / Failed etc. → stay at step 1 so they can re-upload
+        })
+        .catch(() => {});
+      return;
+    }
+
     // If we're already past step 1 (came from template detail page), don't touch state
     if (step > 1) return;
 
