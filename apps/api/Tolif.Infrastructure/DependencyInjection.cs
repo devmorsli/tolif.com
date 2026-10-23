@@ -26,7 +26,8 @@ public static class DependencyInjection
         var connectionString = BuildConnectionString(config);
         services.AddDbContext<ApplicationDbContext>(opts =>
             opts.UseNpgsql(connectionString,
-                npgsql => npgsql.MigrationsAssembly(typeof(ApplicationDbContext).Assembly.GetName().Name)));
+                npgsql => npgsql.MigrationsAssembly(typeof(ApplicationDbContext).Assembly.GetName().Name))
+               .ConfigureWarnings(w => w.Ignore(Microsoft.EntityFrameworkCore.Diagnostics.RelationalEventId.PendingModelChangesWarning)));
 
         services.AddScoped<IApplicationDbContext>(sp => sp.GetRequiredService<ApplicationDbContext>());
         services.AddScoped<ISettingsService, SettingsService>();
