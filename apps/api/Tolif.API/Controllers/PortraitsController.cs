@@ -59,6 +59,13 @@ public class PortraitsController(
                 customerEmail = emailTrimmed;
         }
 
+        // Capture traffic source (utm params passed as form field, or HTTP Referer fallback)
+        string? sourceRef = null;
+        if (!string.IsNullOrWhiteSpace(req.Source))
+            sourceRef = req.Source.Trim()[..Math.Min(500, req.Source.Trim().Length)];
+        else if (Request.Headers.TryGetValue("Referer", out var referer) && !string.IsNullOrWhiteSpace(referer))
+            sourceRef = referer.ToString()[..Math.Min(500, referer.ToString().Length)];
+
         // Create session
         var session = new PortraitSession
         {
@@ -67,6 +74,7 @@ public class PortraitsController(
             Status        = PortraitSessionStatus.Uploading,
             IpAddress     = HttpContext.Connection.RemoteIpAddress?.ToString(),
             CustomerEmail = customerEmail,
+            SourceRef     = sourceRef,
             CreatedAt     = DateTime.UtcNow,
             UpdatedAt     = DateTime.UtcNow,
         };
@@ -359,7 +367,7 @@ public class PortraitsController(
     }
 }
 
-public record StartPortraitRequest(string TemplateId, string? CustomerEmail = null);
+public record StartPortraitRequest(string TemplateId, string? CustomerEmail = null, string? Source = null);
 public record SetEmailRequest(string Email);
 
 // Used to parse template.UploadSlotsJson

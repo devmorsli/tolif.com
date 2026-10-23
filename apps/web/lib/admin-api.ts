@@ -633,6 +633,7 @@ export interface LeadSession {
   regenerationCount: number;
   hasPreview: boolean;
   createdAt: string;
+  sourceRef?: string;
   hasPendingOrder: boolean;
   pendingOrderId?: string;
 }
@@ -653,6 +654,7 @@ export interface LeadSessionDetail {
   regenerationCount: number;
   hasPreview: boolean;
   createdAt: string;
+  sourceRef?: string;
   uploadedFiles: Record<string, string | null>;
   generationLogs: {
     id: string;
@@ -701,4 +703,15 @@ export async function sendLeadCampaign() {
     "/api/admin/leads/sessions/send-campaign",
     { method: "POST" }
   );
+}
+
+export async function adminRegenerateSession(id: string) {
+  return apiFetch<{ success: boolean; previewKey: string }>(
+    `/api/admin/leads/sessions/${id}/regenerate`,
+    { method: "POST" }
+  );
+}
+
+export async function deleteAbandonedCart(id: string) {
+  return apiFetch<void>(`/api/admin/orders/${id}`, { method: "DELETE" });
 }

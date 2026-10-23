@@ -4,14 +4,14 @@ import { useEffect, useState, useCallback } from "react";
 import {
   Search, Users, Mail, ShoppingCart, TrendingUp, Calendar, X,
   RefreshCw, CheckCircle, Send, AlertCircle, Clock, ImageOff,
-  Trash2, Eye, ChevronDown, ChevronRight,
+  Trash2, Eye, ChevronDown, ChevronRight, Zap, Link2,
 } from "lucide-react";
 import { AdminGuard } from "@/components/admin/AdminGuard";
 import { AdminSidebar } from "@/components/admin/AdminSidebar";
 import {
   getLeadsStats, getLeadSessions, getLeadSession, deleteLeadSession,
-  sendLeadEmail, sendLeadCampaign,
-  getAbandonedCarts, sendAbandonmentEmail, sendAbandonmentCampaign,
+  sendLeadEmail, sendLeadCampaign, adminRegenerateSession,
+  getAbandonedCarts, sendAbandonmentEmail, sendAbandonmentCampaign, deleteAbandonedCart,
   type LeadsStats, type LeadSession, type LeadSessionsPage, type LeadSessionDetail,
   type AbandonedCartItem, type AbandonedCartsPage,
 } from "@/lib/admin-api";
@@ -152,6 +152,12 @@ function SessionDetailDrawer({
                   <span className="text-[#8C7B6B]">Created</span>
                   <span className="text-[#1A1714]">{new Date(detail.createdAt).toLocaleString()}</span>
                 </div>
+                {detail.sourceRef && (
+                  <div className="flex justify-between text-sm">
+                    <span className="text-[#8C7B6B]">Source</span>
+                    <span className="text-[#1A1714] text-right max-w-[60%] break-all">{detail.sourceRef}</span>
+                  </div>
+                )}
               </div>
             </div>
 
@@ -253,6 +259,8 @@ function LeadSessionsView() {
   const [sending,       setSending]       = useState<string | null>(null);
   const [sentIds,       setSentIds]       = useState<Set<string>>(new Set());
   const [deleting,      setDeleting]      = useState<string | null>(null);
+  const [regenerating,  setRegenerating]  = useState<string | null>(null);
+  const [regenDoneIds,  setRegenDoneIds]  = useState<Set<string>>(new Set());
   const [detailId,      setDetailId]      = useState<string | null>(null);
   const [campaignState, setCampaignState] = useState<"idle" | "confirm" | "sending" | "done">("idle");
   const [campaignResult, setCampaignResult] = useState<{ sent: number; failed: number; total: number } | null>(null);
@@ -292,6 +300,16 @@ function LeadSessionsView() {
       } : prev);
     } catch { /* silent */ }
     finally { setDeleting(null); }
+  };
+
+  const handleRegenerate = async (id: string) => {
+    if (!confirm("Regenerate portrait for this session using the current admin prompt? This will start a new AI generation.")) return;
+    setRegenerating(id);
+    try {
+      await adminRegenerateSession(id);
+      setRegenDoneIds(prev => new Set(prev).add(id));
+    } catch { /* silent */ }
+    finally { setRegenerating(null); }
   };
 
   const handleCampaign = async () => {
@@ -384,11 +402,12 @@ function LeadSessionsView() {
 
       {/* Table */}
       <div className="bg-white rounded-2xl border border-[#E4D8CC] overflow-hidden">
-        <div className="grid grid-cols-[auto_1fr_auto_auto_auto_auto] gap-3 px-6 py-3 bg-[#FAF6F0] border-b border-[#E4D8CC] text-xs font-semibold text-[#8C7B6B] uppercase tracking-wider">
+        <div className="grid grid-cols-[auto_1fr_auto_auto_auto_auto_auto] gap-3 px-6 py-3 bg-[#FAF6F0] border-b border-[#E4D8CC] text-xs font-semibold text-[#8C7B6B] uppercase tracking-wider">
           <span>Preview</span>
           <span>Customer</span>
           <span>Template</span>
           <span>Step Reached</span>
+          <span>Source</span>
           <span>Date</span>
           <span>Actions</span>
         </div>
@@ -407,15 +426,17 @@ function LeadSessionsView() {
         )}
 
         {!loading && data?.items.map((session: LeadSession) => {
-          const step      = getStep(session);
-          const isSent    = sentIds.has(session.id);
-          const isSending = sending === session.id;
-          const isDeleting = deleting === session.id;
+          const step         = getStep(session);
+          const isSent       = sentIds.has(session.id);
+          const isSending    = sending === session.id;
+          const isDeleting   = deleting === session.id;
+          const isRegenerating = regenerating === session.id;
+          const isRegenDone  = regenDoneIds.has(session.id);
 
           return (
             <div
               key={session.id}
-              className="grid grid-cols-[auto_1fr_auto_auto_auto_auto] gap-3 items-center px-6 py-4 border-b border-[#F2EAE0] last:border-0 hover:bg-[#FAF6F0] transition-colors"
+              className="grid grid-cols-[auto_1fr_auto_auto_auto_auto_auto] gap-3 items-center px-6 py-4 border-b border-[#F2EAE0] last:border-0 hover:bg-[#FAF6F0] transition-colors"
             >
               {/* Preview thumbnail */}
               <div className="w-10 h-10 rounded-lg overflow-hidden bg-[#F0E8DC] flex items-center justify-center shrink-0">
@@ -445,6 +466,18 @@ function LeadSessionsView() {
                 {step.label}
               </span>
 
+              {/* Source */}
+              <div className="max-w-[120px]">
+                {session.sourceRef ? (
+                  <span title={session.sourceRef} className="flex items-center gap-1 text-[10px] text-[#8C7B6B] bg-[#F5F0EA] rounded-md px-1.5 py-0.5 truncate max-w-full">
+                    <Link2 size={9} className="shrink-0" />
+                    <span className="truncate">{session.sourceRef}</span>
+                  </span>
+                ) : (
+                  <span className="text-[10px] text-[#C8BAB0]">—</span>
+                )}
+              </div>
+
               {/* Date */}
               <span className="text-xs text-[#8C7B6B] flex items-center gap-1 whitespace-nowrap">
                 <Clock size={11} />
@@ -460,6 +493,22 @@ function LeadSessionsView() {
                   className="p-1.5 rounded-lg text-[#8C7B6B] hover:bg-[#F0E8DC] hover:text-[#1A1714] transition-colors"
                 >
                   <Eye size={14} />
+                </button>
+
+                {/* Regenerate portrait */}
+                <button
+                  onClick={() => handleRegenerate(session.id)}
+                  disabled={isRegenerating || isRegenDone}
+                  title={isRegenDone ? "Regeneration queued" : "Regenerate portrait (admin, bypasses limit)"}
+                  className={`p-1.5 rounded-lg transition-colors ${
+                    isRegenDone
+                      ? "text-purple-600 bg-purple-50 cursor-default"
+                      : "text-[#8C7B6B] hover:bg-purple-50 hover:text-purple-600 disabled:opacity-50"
+                  }`}
+                >
+                  {isRegenerating
+                    ? <div className="w-3.5 h-3.5 border border-current border-t-transparent rounded-full animate-spin" />
+                    : isRegenDone ? <CheckCircle size={14} /> : <Zap size={14} />}
                 </button>
 
                 {/* Send email */}
@@ -529,6 +578,7 @@ function AbandonedCartsView() {
   const [loading,       setLoading]       = useState(true);
   const [sending,       setSending]       = useState<string | null>(null);
   const [sentIds,       setSentIds]       = useState<Set<string>>(new Set());
+  const [deleting,      setDeleting]      = useState<string | null>(null);
   const [campaignState, setCampaignState] = useState<"idle" | "confirm" | "sending" | "done">("idle");
   const [campaignResult, setCampaignResult] = useState<{ sent: number; failed: number; total: number } | null>(null);
 
@@ -543,6 +593,20 @@ function AbandonedCartsView() {
       setSentIds(prev => new Set(prev).add(id));
     } catch { /* silent */ }
     finally { setSending(null); }
+  };
+
+  const handleDeleteCart = async (id: string) => {
+    if (!confirm("Delete this abandoned cart? This cannot be undone.")) return;
+    setDeleting(id);
+    try {
+      await deleteAbandonedCart(id);
+      setData(prev => prev ? {
+        ...prev,
+        items: prev.items.filter(c => c.id !== id),
+        total: prev.total - 1,
+      } : prev);
+    } catch { /* silent */ }
+    finally { setDeleting(null); }
   };
 
   const handleCampaign = async () => {
@@ -615,20 +679,22 @@ function AbandonedCartsView() {
       </div>
 
       <div className="bg-white rounded-2xl border border-[#E4D8CC] overflow-hidden">
-        <div className="grid grid-cols-[auto_1fr_auto_auto_auto] gap-4 px-6 py-3 bg-[#FAF6F0] border-b border-[#E4D8CC] text-xs font-semibold text-[#8C7B6B] uppercase tracking-wider">
+        <div className="grid grid-cols-[auto_1fr_auto_auto_auto_auto] gap-4 px-6 py-3 bg-[#FAF6F0] border-b border-[#E4D8CC] text-xs font-semibold text-[#8C7B6B] uppercase tracking-wider">
           <span>Preview</span>
           <span>Customer</span>
           <span>Amount</span>
           <span>Abandoned</span>
           <span>Action</span>
+          <span></span>
         </div>
 
         {data.items.map((cart: AbandonedCartItem) => {
-          const isSent    = sentIds.has(cart.id);
-          const isSending = sending === cart.id;
+          const isSent      = sentIds.has(cart.id);
+          const isSending   = sending === cart.id;
+          const isDeleting  = deleting === cart.id;
 
           return (
-            <div key={cart.id} className="grid grid-cols-[auto_1fr_auto_auto_auto] gap-4 items-center px-6 py-4 border-b border-[#F2EAE0] last:border-0">
+            <div key={cart.id} className="grid grid-cols-[auto_1fr_auto_auto_auto_auto] gap-4 items-center px-6 py-4 border-b border-[#F2EAE0] last:border-0">
               <div className="w-10 h-10 rounded-lg overflow-hidden bg-[#F0E8DC] flex items-center justify-center shrink-0">
                 {cart.hasPreview && cart.sessionId ? (
                   // eslint-disable-next-line @next/next/no-img-element
@@ -662,6 +728,18 @@ function AbandonedCartsView() {
               >
                 {isSending ? <div className="w-3 h-3 border-2 border-current border-t-transparent rounded-full animate-spin" /> : isSent ? <CheckCircle size={11} /> : <Mail size={11} />}
                 {isSent ? "Sent" : "Send email"}
+              </button>
+
+              {/* Delete cart */}
+              <button
+                onClick={() => handleDeleteCart(cart.id)}
+                disabled={isDeleting}
+                title="Delete abandoned cart"
+                className="p-1.5 rounded-lg text-[#8C7B6B] hover:bg-red-50 hover:text-red-600 transition-colors disabled:opacity-50"
+              >
+                {isDeleting
+                  ? <div className="w-3.5 h-3.5 border border-current border-t-transparent rounded-full animate-spin" />
+                  : <Trash2 size={14} />}
               </button>
             </div>
           );

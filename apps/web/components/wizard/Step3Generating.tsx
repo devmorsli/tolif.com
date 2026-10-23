@@ -391,6 +391,14 @@ export function Step3Generating() {
           form.append("templateId", selectedTemplate.id);
           if (email) form.append("customerEmail", email);
 
+          // Capture traffic source from URL utm params for lead attribution
+          try {
+            const sp = new URLSearchParams(window.location.search);
+            const parts = [sp.get("utm_source"), sp.get("utm_medium"), sp.get("utm_campaign")].filter(Boolean);
+            const source = parts.length > 0 ? parts.join("/") : (document.referrer || null);
+            if (source) form.append("source", source.slice(0, 500));
+          } catch { /* non-critical */ }
+
           let hasFiles = false;
           for (const slot of uploadSlots) {
             if (slot.file) { form.append(slot.name, slot.file, slot.file.name); hasFiles = true; }

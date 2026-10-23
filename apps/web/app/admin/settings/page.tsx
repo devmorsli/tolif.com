@@ -55,6 +55,13 @@ const SETTING_GROUPS = [
       { key: "ai.gemini.apiKey", label: "Google Gemini API Key", type: "password", placeholder: "AIza…", sensitive: true },
       { key: "ai.gemini.textModel", label: "Gemini Text Model (metadata / SEO generation)", type: "text", placeholder: "gemini-2.0-flash" },
       { key: "ai.gemini.model", label: "Gemini Image Model (portrait generation)", type: "text", placeholder: "gemini-2.0-flash-exp" },
+      {
+        key: "ai.generation.extra_rules",
+        label: "Portrait Generation — Extra Rules",
+        type: "textarea",
+        placeholder: "Add extra instructions for the AI (appended after the built-in rules). Leave empty to use defaults.",
+        hint: "Examples: 'Always paint in a warm golden-hour light.' · 'Never add text or watermarks to the image.' · 'Add a subtle vignette effect.'",
+      },
       { key: "ai.falai.apiKey", label: "fal.ai API Key", type: "password", placeholder: "fal-…", sensitive: true },
       { key: "ai.openai.apiKey", label: "OpenAI API Key", type: "password", placeholder: "sk-…", sensitive: true },
       { key: "ai.openai.model", label: "OpenAI Model", type: "text", placeholder: "gpt-image-1" },
@@ -191,7 +198,7 @@ function SettingField({
           <p className="text-xs text-[#8C7B6B] mt-1 leading-snug">{def.hint}</p>
         )}
       </div>
-      <div className="flex items-center gap-2 w-72 shrink-0">
+      <div className={`flex items-start gap-2 shrink-0 ${def.type === "textarea" ? "w-full mt-2" : "w-72"}`}>
         {def.type === "select" ? (
           <select
             value={value}
@@ -201,6 +208,14 @@ function SettingField({
             {!value && <option value="">— select —</option>}
             {def.options?.map((o) => <option key={o} value={o}>{o}</option>)}
           </select>
+        ) : def.type === "textarea" ? (
+          <textarea
+            value={value}
+            onChange={(e) => onChange(e.target.value)}
+            placeholder={def.placeholder}
+            rows={5}
+            className="flex-1 bg-[#FAF6F0] border border-[#E4D8CC] rounded-xl px-3 py-2 text-sm text-[#1A1714] placeholder:text-[#C8BAB0] focus:outline-none focus:ring-2 focus:ring-[#C4622D]/30 focus:border-[#C4622D] transition-colors resize-y font-mono"
+          />
         ) : (
           <div className="relative flex-1">
             <input
@@ -221,7 +236,7 @@ function SettingField({
             )}
           </div>
         )}
-        {saved && <CheckCircle size={16} className="text-green-500 shrink-0" />}
+        {saved && <CheckCircle size={16} className="text-green-500 shrink-0 mt-2" />}
       </div>
     </div>
   );

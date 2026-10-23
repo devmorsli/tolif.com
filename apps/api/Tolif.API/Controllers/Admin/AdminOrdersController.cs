@@ -427,6 +427,24 @@ public class AdminOrdersController(
 
         return Ok(new { sent, failed, total = orders.Count });
     }
+
+    // ── DELETE /api/admin/orders/{id} ─────────────────────────────────────────
+    /// <summary>
+    /// Deletes a Pending (abandoned) order. Refuses to delete paid/fulfilled orders.
+    /// </summary>
+    [HttpDelete("{id:guid}")]
+    public async Task<IActionResult> DeleteOrder(Guid id, CancellationToken ct)
+    {
+        var order = await db.Orders.FirstOrDefaultAsync(o => o.Id == id, ct);
+        if (order is null) return NotFound();
+
+        if (order.Status != OrderStatus.Pending)
+            return BadRequest(new { error = "Only pending (unpaid) orders can be deleted." });
+
+        db.Orders.Remove(order);
+        await db.SaveChangesAsync(ct);
+        return NoContent();
+    }
 }
 
 public record BulkSubmitRequest(List<Guid> Ids);

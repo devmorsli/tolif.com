@@ -28,6 +28,12 @@ public class PortraitSession : BaseEntity
     /// <summary>Customer email collected during generation for lead capture.</summary>
     public string? CustomerEmail { get; set; }
 
+    /// <summary>
+    /// Traffic source recorded at generation start (e.g. utm_source/utm_medium/utm_campaign
+    /// from the landing URL, or the HTTP Referer). Helps identify which campaign drove the lead.
+    /// </summary>
+    public string? SourceRef { get; set; }
+
     public DateTime? PhotosDeletedAt { get; set; }
     public DateTime? AbandonedAt { get; set; }
 

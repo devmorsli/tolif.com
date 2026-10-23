@@ -53,7 +53,6 @@ public class GeminiImageGenerationProvider(
             }
 
             // ── Build the prompt ─────────────────────────────────────────────
-            // Compute subject summary from slot metadata when available
             int personCount, petCount;
             if (request.SubjectSlots is { Count: > 0 })
             {
@@ -67,53 +66,87 @@ public class GeminiImageGenerationProvider(
             }
 
             int uploadedCount = personCount + petCount;
-            int expectedCount = request.ExpectedSubjectCount > 0 ? request.ExpectedSubjectCount : uploadedCount;
-            int targetCount   = Math.Max(uploadedCount, expectedCount); // use the larger to avoid losing subjects
+
+            // targetCount = exactly what the customer provided.
+            // The template may have been designed for a different number — we ALWAYS
+            // follow the customer's actual upload count, not the template's slot count.
+            int targetCount = uploadedCount;
 
             var subjectParts = new List<string>();
             if (personCount > 0) subjectParts.Add($"{personCount} {(personCount == 1 ? "person" : "people")}");
             if (petCount    > 0) subjectParts.Add($"{petCount} {(petCount == 1 ? "pet" : "pets")}");
-            var uploadedSummary = subjectParts.Count > 0 ? string.Join(" and ", subjectParts) : $"{uploadedCount} subject(s)";
+            var uploadedSummary = subjectParts.Count > 0
+                ? string.Join(" and ", subjectParts)
+                : $"{uploadedCount} subject(s)";
 
-            // Build the multi-photo hint only when fewer photos were uploaded than expected
-            var multiSubjectHint = "";
-            if (expectedCount > uploadedCount)
-            {
-                multiSubjectHint = $"""
-
-                    ⚠ IMPORTANT — FEWER PHOTOS THAN EXPECTED:
-                    The template is designed for {expectedCount} subject(s), but only {uploadedCount} photo(s) were provided.
-                    Carefully examine each provided photo: if a single photo contains multiple distinct people or pets, treat
-                    each visible individual as a separate subject. Extract all {expectedCount} subject(s) needed by scanning
-                    across all provided images. If you can only find {uploadedCount} distinct subject(s) total, paint exactly
-                    those {uploadedCount} — never invent or clone subjects to fill the count.
-                    """;
-            }
+            // Admin-editable extra rules (empty by default — set in Settings → AI Providers)
+            var extraRules = await settingsService.GetAsync("ai.generation.extra_rules", ct) ?? "";
+            var extraRulesSection = string.IsNullOrWhiteSpace(extraRules)
+                ? ""
+                : $"\n══ ADDITIONAL INSTRUCTIONS FROM STUDIO ══\n{extraRules.Trim()}\n";
 
             var instruction = $"""
-                You are an AI portrait artist. You will receive two types of images:
+                You are a professional AI portrait artist creating museum-quality painterly portraits.
 
-                IMAGE 1 — STYLE REFERENCE ONLY (the template):
-                Defines ONLY the art style, medium, colour palette, lighting, and composition.
-                The people/pets shown are anonymous PLACEHOLDERS — discard their faces entirely.
-                Never copy, blend, or carry over any identity from this image.
+                ── IMAGE ROLES ──────────────────────────────────────────────────────────
+                IMAGE 1 — STYLE REFERENCE (the template):
+                  Use ONLY for: art style, painting medium, colour palette, lighting mood,
+                  and overall composition. The subjects shown are anonymous PLACEHOLDERS —
+                  discard every face and identity from this image entirely.
+                  Never carry over, blend, or reference any person or pet from this image.
 
-                IMAGES 2+ — CUSTOMER PHOTOS (the actual subjects):
-                The customer uploaded {uploadedCount} photo(s) showing: {uploadedSummary}.
-                These are the ONLY real faces/likenesses to use.{multiSubjectHint}
+                IMAGES 2+ — CUSTOMER PHOTOS (the real subjects):
+                  The customer provided {uploadedCount} photo(s) containing: {uploadedSummary}.
+                  These are the ONLY faces and likenesses allowed in the final portrait.
 
-                ══ RULES ══
-                1. Paint exactly {targetCount} subject(s) in the final portrait — no more, no fewer.
-                   • If the style-reference shows MORE: remove the extras completely.
-                   • If the style-reference shows FEWER: add the extra subjects naturally.
-                2. Every face/likeness must come EXCLUSIVELY from the customer photos.
-                3. Preserve the art style, colour palette, lighting, and composition of the style reference.
-                4. Adjust the layout so all {targetCount} subject(s) fill the scene naturally — no empty chairs, no ghost silhouettes.
-                5. Deliver a seamless, high-quality result that looks professionally hand-crafted in that art style.
+                ── MANDATORY RULES ──────────────────────────────────────────────────────
+                1. EXACT SUBJECT COUNT
+                   Paint exactly {targetCount} subject(s) — no more, no fewer.
+                   The template may show a different count; IGNORE IT completely.
+                   • Template shows MORE subjects → remove the extras entirely.
+                   • Template shows FEWER subjects → add the extra ones naturally.
 
-                Template context: {request.Prompt}
+                2. GROUP PHOTOS
+                   If a single customer photo contains multiple people or pets, treat
+                   EACH visible individual as a separate, distinct subject and count
+                   them individually toward the {targetCount} total.
 
-                Generate the final portrait now.
+                3. FACE & IDENTITY FIDELITY
+                   Reproduce every face EXACTLY as it appears in the customer photo:
+                   same bone structure, eye shape, eye colour, nose, mouth, hair colour,
+                   hair style, and any distinguishing features (glasses, beard, etc.).
+                   Do NOT idealise, average, or blend with any other face.
+
+                4. SKIN-TONE CONSISTENCY
+                   The skin colour of every face MUST match the neck, ears, hands, and
+                   any other exposed skin on the same person — seamlessly, no line or
+                   colour shift between head and body.
+
+                5. COLOUR RESTORATION FOR OLD PHOTOS
+                   If a customer photo appears aged, faded, yellowed, desaturated, or
+                   low-contrast, FIRST restore it to natural, vibrant, true-to-life
+                   colours BEFORE applying the art style. Never carry the faded palette
+                   into the final portrait.
+
+                6. ART STYLE FIDELITY
+                   Replicate the painting style, brushwork, colour palette, and lighting
+                   of the reference image exactly. The output must look like it was
+                   hand-crafted in that specific medium by a skilled artist.
+
+                7. COMPOSITION & LAYOUT
+                   Rearrange the composition so all {targetCount} subject(s) fill the
+                   scene naturally. No empty chairs, no ghost silhouettes, no blank
+                   spaces where a removed subject used to be.
+
+                8. FINAL QUALITY
+                   Deliver a seamless, high-resolution result. No artifacts, no visible
+                   seams, no half-rendered or blurry subjects. Every subject must be
+                   fully painted and sharply defined.
+                {extraRulesSection}
+                ── TEMPLATE CONTEXT ─────────────────────────────────────────────────────
+                {request.Prompt}
+
+                Generate the portrait now.
                 """;
 
             // ── Assemble the Gemini request ──────────────────────────────────

@@ -3,6 +3,7 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using Tolif.Application.Interfaces;
+using Tolif.Domain.Entities;
 using Tolif.Domain.Enums;
 
 namespace Tolif.API.Controllers.Admin;
@@ -11,10 +12,12 @@ namespace Tolif.API.Controllers.Admin;
 [Route("api/admin/leads")]
 [Authorize(Roles = "Admin")]
 public class AdminLeadsController(
-    IApplicationDbContext db,
-    IEmailService         email,
-    ISettingsService      settings,
-    IStorageService       storage) : ControllerBase
+    IApplicationDbContext    db,
+    IEmailService            email,
+    ISettingsService         settings,
+    IStorageService          storage,
+    IImageGenerationProvider imageGenerationProvider,
+    IWatermarkService        watermarkService) : ControllerBase
 {
     private static readonly OrderStatus[] PaidStatuses =
     [
@@ -117,6 +120,7 @@ public class AdminLeadsController(
                 s.RegenerationCount,
                 hasPreview      = s.WatermarkedPreviewKey != null,
                 s.CreatedAt,
+                s.SourceRef,
                 hasPendingOrder = db.OrderItems
                     .Any(i => i.PortraitSessionId == s.Id && i.Order.Status == OrderStatus.Pending),
                 pendingOrderId  = (Guid?)db.OrderItems
@@ -191,6 +195,7 @@ public class AdminLeadsController(
             session.RegenerationCount,
             hasPreview         = session.WatermarkedPreviewKey != null,
             session.CreatedAt,
+            session.SourceRef,
             uploadedFiles,
             generationLogs,
         });
@@ -396,4 +401,99 @@ public class AdminLeadsController(
 
         return Ok(new { sent, failed, total = sessions.Count });
     }
+
+    // ── POST /api/admin/leads/sessions/{id}/regenerate ────────────────────────
+    /// <summary>
+    /// Admin-only regeneration — bypasses the per-session regen limit.
+    /// Used to fix a bad result without penalising the customer.
+    /// </summary>
+    [HttpPost("sessions/{id:guid}/regenerate")]
+    public async Task<IActionResult> AdminRegenerate(Guid id, CancellationToken ct)
+    {
+        var session = await db.PortraitSessions
+            .Include(s => s.Template)
+            .Include(s => s.GenerationLogs)
+            .FirstOrDefaultAsync(s => s.Id == id, ct);
+
+        if (session is null) return NotFound();
+
+        if (string.IsNullOrWhiteSpace(session.Template?.TemplateImageKey))
+            return BadRequest(new { error = "Template has no reference image." });
+
+        var uploadedKeys = new Dictionary<string, string>();
+        if (!string.IsNullOrEmpty(session.UploadedFilesJson))
+        {
+            try { uploadedKeys = JsonSerializer.Deserialize<Dictionary<string, string>>(session.UploadedFilesJson) ?? []; }
+            catch { /* ignore */ }
+        }
+
+        if (uploadedKeys.Count == 0)
+            return BadRequest(new { error = "No uploaded photos found for this session." });
+
+        session.Status    = PortraitSessionStatus.Generating;
+        session.UpdatedAt = DateTime.UtcNow;
+        await db.SaveChangesAsync(ct);
+
+        // Build slot metadata
+        var baseSlots = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+        try
+        {
+            var slotDefs = JsonSerializer.Deserialize<List<SlotDefinition>>(session.Template.UploadSlotsJson ?? "[]");
+            if (slotDefs is not null)
+                foreach (var sd in slotDefs) baseSlots[sd.name] = sd.type;
+        }
+        catch { }
+
+        var subjectSlots = uploadedKeys.Keys.Select(slotName =>
+        {
+            if (baseSlots.TryGetValue(slotName, out var t)) return new SubjectSlot(slotName, t);
+            if (slotName.StartsWith("extra_pet", StringComparison.OrdinalIgnoreCase)) return new SubjectSlot(slotName, "pet");
+            return new SubjectSlot(slotName, "person");
+        }).ToList();
+
+        var genRequest = new GenerationRequest(
+            SessionId:            session.Id,
+            TemplateImageKey:     session.Template.TemplateImageKey,
+            Prompt:               session.Template.Prompt ?? session.Template.Name,
+            UploadedImageKeys:    [.. uploadedKeys.Values],
+            SubjectSlots:         subjectSlots,
+            ExpectedSubjectCount: subjectSlots.Count);
+
+        var result = await imageGenerationProvider.GenerateAsync(genRequest, ct);
+
+        db.AiGenerationLogs.Add(new AiGenerationLog
+        {
+            Id                = Guid.NewGuid(),
+            PortraitSessionId = session.Id,
+            Provider          = imageGenerationProvider.ProviderType,
+            Model             = await settings.GetAsync("ai.gemini.model", ct) ?? "gemini-2.0-flash-exp",
+            Status            = result.Status,
+            DurationMs        = result.DurationMs,
+            ErrorMessage      = result.ErrorMessage,
+            CreatedAt         = DateTime.UtcNow,
+        });
+
+        if (!result.Success || result.ImageData is null)
+        {
+            session.Status    = PortraitSessionStatus.Failed;
+            session.UpdatedAt = DateTime.UtcNow;
+            await db.SaveChangesAsync(ct);
+            return StatusCode(500, new { error = "Regeneration failed.", detail = result.ErrorMessage });
+        }
+
+        var watermarked = watermarkService.Apply(result.ImageData);
+        var previewKey  = $"portraits/{session.Id}/preview.jpg";
+        await storage.UploadAsync(previewKey, watermarked, "image/jpeg", ct);
+
+        session.WatermarkedPreviewKey = previewKey;
+        session.Status                = PortraitSessionStatus.PreviewReady;
+        session.RegenerationCount++;
+        session.UpdatedAt             = DateTime.UtcNow;
+        await db.SaveChangesAsync(ct);
+
+        return Ok(new { success = true, previewKey });
+    }
 }
+
+// ── Local record alias so the controller can deserialize slot definitions ─────
+file record SlotDefinition(string name, string type, string? label = null, bool required = false);

@@ -69,6 +69,8 @@ public static class DbSeeder
         await UpsertSettingAsync(db, "email.fromAddress",  "noreply@tolif.com");
         await UpsertSettingAsync(db, "email.fromName",     "Tolif");
         await UpsertSettingAsync(db, "resend.apiKey",      "");
+        // AI generation — extra rules editable from admin panel (empty = use built-in rules only)
+        await UpsertSettingAsync(db, "ai.generation.extra_rules", "");
 
         // ── Products ───────────────────────────────────────────────────────
         // Only seeds on first run. Once products/variants exist they are managed
