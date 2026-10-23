@@ -386,7 +386,7 @@ public class PortraitsController(
         try
         {
             var bytes = await storageService.DownloadAsync(session.WatermarkedPreviewKey, ct);
-            Response.Headers.CacheControl = "private, max-age=3600";
+            Response.Headers.CacheControl = "no-cache, no-store";
             return File(bytes, "image/jpeg");
         }
         catch

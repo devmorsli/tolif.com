@@ -29,7 +29,7 @@ const API_BASE = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:5000";
 // ?session=   resumes a portrait session from a recovery email link.
 function TemplateAutoSelect() {
   const searchParams = useSearchParams();
-  const { selectedTemplate, selectTemplate, step, setPreferredCategory, setPinnedTemplateSlugs, setSessionId, goTo } = useWizardStore();
+  const { selectedTemplate, selectTemplate, step, setPreferredCategory, setPinnedTemplateSlugs, setSessionId, setPreviewUrl, goTo } = useWizardStore();
 
   useEffect(() => {
     // ── Session resume from recovery email (?session=guid) ────────────────
@@ -53,6 +53,7 @@ function TemplateAutoSelect() {
             extraPetsAllowed: t.extraPetsAllowed ?? 0,
           });
           setSessionId(sessionParam);
+          setPreviewUrl(`${API_BASE}/api/portraits/${sessionParam}/preview`);
           // Go to preview step if they already have a preview, otherwise upload step
           if (info.status === "PreviewReady") goTo(3);
           // status Generating / Failed etc. → stay at step 1 so they can re-upload
