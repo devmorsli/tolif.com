@@ -7,6 +7,7 @@ import { useEffect, Suspense } from "react";
 import { useSearchParams } from "next/navigation";
 import { useWizardStore } from "@/store/wizardStore";
 import { getPublicTemplate, parseUploadSlots } from "@/lib/public-api";
+
 import { WizardProgress } from "@/components/wizard/WizardProgress";
 import { Step1SetupPortrait } from "@/components/wizard/Step1SetupPortrait";
 import { Step3Generating } from "@/components/wizard/Step3Generating";
@@ -20,24 +21,33 @@ const stepComponents = {
   4: Step4Cart,
 };
 
-// Reads ?template=slug and ?category=X from the URL.
-// Pre-selects the template (for FB ads links) or pre-sets the category filter.
+// Reads ?template=slug, ?templates=slug1,slug2,... and ?category=X from the URL.
+// ?templates= pins those templates to the top of the picker (multi-template ad links).
+// ?template=  auto-selects a single template.
 function TemplateAutoSelect() {
   const searchParams = useSearchParams();
-  const { selectedTemplate, selectTemplate, step, setPreferredCategory } = useWizardStore();
+  const { selectedTemplate, selectTemplate, step, setPreferredCategory, setPinnedTemplateSlugs } = useWizardStore();
 
   useEffect(() => {
     // If we're already past step 1 (came from template detail page), don't touch state
     if (step > 1) return;
 
-    const slug     = searchParams.get("template");
-    const category = searchParams.get("category");
+    const slug      = searchParams.get("template");
+    const slugsRaw  = searchParams.get("templates");
+    const category  = searchParams.get("category");
 
-    // Pre-select category filter (FB ads use case)
+    // Pre-select category filter
     if (category) setPreferredCategory(category);
 
-    if (!slug || selectedTemplate) return;
+    // Multi-template campaign link: pin those slugs to top of picker
+    if (slugsRaw) {
+      const slugs = slugsRaw.split(",").map((s) => s.trim()).filter(Boolean);
+      setPinnedTemplateSlugs(slugs);
+      return; // don't auto-select in multi mode — let user pick
+    }
 
+    // Single template auto-select
+    if (!slug || selectedTemplate) return;
     getPublicTemplate(slug).then((t) => {
       if (!t) return;
       selectTemplate({

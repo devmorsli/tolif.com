@@ -103,11 +103,13 @@ function TemplatePicker({
   selected,
   onPick,
   initialCategory,
+  pinnedSlugs,
 }: {
   templates: PublicTemplate[];
   selected: Template | null;
   onPick: (t: PublicTemplate) => void;
   initialCategory?: string | null;
+  pinnedSlugs?: string[];
 }) {
   const [activeCategory, setCategory] = useState(initialCategory && ALL_CATEGORIES.includes(initialCategory as typeof ALL_CATEGORIES[number]) ? initialCategory : "All");
 
@@ -116,12 +118,23 @@ function TemplatePicker({
     (cat) => cat !== "All" && templates.some((t) => t.category === cat)
   )];
 
+  // Sort: pinned templates first (in their specified order), then the rest
+  const sortedTemplates = (() => {
+    if (!pinnedSlugs || pinnedSlugs.length === 0) return templates;
+    const pinned = pinnedSlugs
+      .map((slug) => templates.find((t) => t.slug === slug))
+      .filter((t): t is PublicTemplate => !!t);
+    const pinnedIds = new Set(pinned.map((t) => t.id));
+    const rest = templates.filter((t) => !pinnedIds.has(t.id));
+    return [...pinned, ...rest];
+  })();
+
   const filtered = activeCategory === "All"
-    ? templates
-    : templates.filter((t) => t.category === activeCategory);
+    ? sortedTemplates
+    : sortedTemplates.filter((t) => t.category === activeCategory);
 
   // If currently selected category has no templates, fall back to All
-  const visibleFiltered = filtered.length === 0 ? templates : filtered;
+  const visibleFiltered = filtered.length === 0 ? sortedTemplates : filtered;
   const visible = visibleFiltered.slice(0, 6);
 
   return (
@@ -149,11 +162,20 @@ function TemplatePicker({
       </div>
 
       {/* Grid */}
+      {pinnedSlugs && pinnedSlugs.length > 0 && (
+        <p className="text-[11px] font-semibold text-[#C4622D] uppercase tracking-widest mb-3 flex items-center gap-1.5">
+          <span className="inline-block w-4 h-px bg-[#C4622D]" />
+          Featured styles
+          <span className="inline-block w-4 h-px bg-[#C4622D]" />
+        </p>
+      )}
+
       <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
         {visible.map((t, i) => {
           const isSelected = selected?.id === t.id;
           const imgUrl     = templateImageUrl(t.templateImageKey);
           const slotCount  = parseUploadSlots(t.uploadSlotsJson).length;
+          const isPinned   = pinnedSlugs?.includes(t.slug) ?? false;
 
           return (
             <motion.button
@@ -201,6 +223,13 @@ function TemplatePicker({
                     <div className="w-9 h-9 rounded-full bg-[#C4622D] flex items-center justify-center shadow-lg">
                       <Check size={16} className="text-white" />
                     </div>
+                  </div>
+                )}
+
+                {/* Pinned badge */}
+                {isPinned && !isSelected && (
+                  <div className="absolute top-2 left-2 z-10 bg-[#C4622D] text-white text-[9px] font-bold px-2 py-0.5 rounded-full uppercase tracking-wide">
+                    Featured
                   </div>
                 )}
 
@@ -357,7 +386,7 @@ export function Step1SetupPortrait() {
   const {
     selectedTemplate, selectTemplate,
     uploadSlots, gdprConsent, setGdprConsent, next,
-    preferredCategory,
+    preferredCategory, pinnedTemplateSlugs,
   } = useWizardStore();
 
   const [templates,        setTemplates]        = useState<PublicTemplate[]>([]);
@@ -446,6 +475,7 @@ export function Step1SetupPortrait() {
                     selected={selectedTemplate}
                     onPick={pickTemplate}
                     initialCategory={preferredCategory}
+                    pinnedSlugs={pinnedTemplateSlugs}
                   />
                 )}
               </AnimatePresence>

@@ -65,6 +65,7 @@ interface WizardState {
   selectedShipping: ShippingOption | null;
   cartItems: CartItem[];
   preferredCategory: string | null;
+  pinnedTemplateSlugs: string[];
   customerEmail: string | null;
   customerName: string | null;
 
@@ -74,6 +75,7 @@ interface WizardState {
   back: () => void;
   selectTemplate: (template: Template) => void;
   setPreferredCategory: (category: string | null) => void;
+  setPinnedTemplateSlugs: (slugs: string[]) => void;
   setUploadSlot: (slotName: string, file: File, previewUrl: string) => void;
   setGdprConsent: (v: boolean) => void;
   setGenerationStatus: (s: WizardState["generationStatus"]) => void;
@@ -106,6 +108,7 @@ const initialState = {
   selectedShipping: null,
   cartItems: [] as CartItem[],
   preferredCategory: null as string | null,
+  pinnedTemplateSlugs: [] as string[],
   customerEmail: null as string | null,
   customerName: null as string | null,
 };
@@ -117,6 +120,7 @@ export const useWizardStore = create<WizardState>()(
 
       goTo: (step) => set({ step }),
       setPreferredCategory: (category) => set({ preferredCategory: category }),
+      setPinnedTemplateSlugs: (slugs) => set({ pinnedTemplateSlugs: slugs }),
       next: () => set((s) => ({ step: Math.min(4, s.step + 1) as WizardStep })),
       back: () => set((s) => ({ step: Math.max(1, s.step - 1) as WizardStep })),
 

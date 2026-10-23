@@ -12,12 +12,16 @@ import { getAdminTemplates, getSettings, saveSetting, type AdminTemplate } from 
 
 const SETTINGS_KEY = "admin_campaign_links";
 
+interface LinkedTemplate {
+  slug: string;
+  name: string;
+  imageKey?: string;
+}
+
 interface CampaignLink {
   id: string;
   name: string;
-  templateSlug: string;
-  templateName: string;
-  templateImageKey?: string;
+  templates: LinkedTemplate[];
   createdAt: string;
   utmSource?: string;
   utmMedium?: string;
@@ -30,7 +34,12 @@ function generateId() {
 
 function buildUrl(base: string, link: CampaignLink): string {
   const params = new URLSearchParams();
-  params.set("template", link.templateSlug);
+  const slugs = link.templates.map((t) => t.slug);
+  if (slugs.length === 1) {
+    params.set("template", slugs[0]);
+  } else if (slugs.length > 1) {
+    params.set("templates", slugs.join(","));
+  }
   if (link.utmSource)   params.set("utm_source",   link.utmSource);
   if (link.utmMedium)   params.set("utm_medium",   link.utmMedium);
   if (link.utmCampaign) params.set("utm_campaign", link.utmCampaign);
@@ -49,21 +58,22 @@ function CreateLinkModal({
   onSave: (link: CampaignLink) => void;
   onClose: () => void;
 }) {
-  const [name,        setName]        = useState("");
-  const [templateId,  setTemplateId]  = useState("");
-  const [utmSource,   setUtmSource]   = useState("");
-  const [utmMedium,   setUtmMedium]   = useState("");
-  const [utmCampaign, setUtmCampaign] = useState("");
-  const [search,      setSearch]      = useState("");
-  const [catFilter,   setCatFilter]   = useState("All");
+  const [name,           setName]        = useState("");
+  const [selected,       setSelected]    = useState<LinkedTemplate[]>([]);
+  const [utmSource,      setUtmSource]   = useState("");
+  const [utmMedium,      setUtmMedium]   = useState("");
+  const [utmCampaign,    setUtmCampaign] = useState("");
+  const [search,         setSearch]      = useState("");
+  const [catFilter,      setCatFilter]   = useState("All");
 
+  const API_BASE = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:5000";
   const activeTemplates = templates.filter((t) => t.isActive);
+
   const filtered = activeTemplates.filter((t) => {
-    const matchesCat = catFilter === "All" || t.category === catFilter;
+    const matchesCat    = catFilter === "All" || t.category === catFilter;
     const matchesSearch = !search || t.name.toLowerCase().includes(search.toLowerCase()) || t.category.toLowerCase().includes(search.toLowerCase());
     return matchesCat && matchesSearch;
   });
-  const selected = templates.find((t) => t.id === templateId);
 
   useEffect(() => {
     const handler = (e: KeyboardEvent) => { if (e.key === "Escape") onClose(); };
@@ -71,16 +81,26 @@ function CreateLinkModal({
     return () => document.removeEventListener("keydown", handler);
   }, [onClose]);
 
-  const canSave = name.trim() && templateId;
+  const isTemplateSelected = (slug: string) => selected.some((s) => s.slug === slug);
+
+  const toggleTemplate = (t: AdminTemplate) => {
+    if (isTemplateSelected(t.slug)) {
+      setSelected((prev) => prev.filter((s) => s.slug !== t.slug));
+    } else {
+      setSelected((prev) => [...prev, { slug: t.slug, name: t.name, imageKey: t.templateImageKey }]);
+    }
+  };
+
+  const removeSelected = (slug: string) => setSelected((prev) => prev.filter((s) => s.slug !== slug));
+
+  const canSave = name.trim() && selected.length > 0;
 
   const handleSave = () => {
-    if (!canSave || !selected) return;
+    if (!canSave) return;
     onSave({
       id: generateId(),
       name: name.trim(),
-      templateSlug: selected.slug,
-      templateName: selected.name,
-      templateImageKey: selected.templateImageKey,
+      templates: selected,
       createdAt: new Date().toISOString(),
       utmSource:   utmSource.trim()   || undefined,
       utmMedium:   utmMedium.trim()   || undefined,
@@ -88,24 +108,22 @@ function CreateLinkModal({
     });
   };
 
-  const API_BASE = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:5000";
-
   return createPortal(
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4"
       onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}>
       <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={onClose} />
-      <div className="relative w-full max-w-lg bg-white rounded-2xl shadow-2xl overflow-hidden">
+      <div className="relative w-full max-w-lg bg-white rounded-2xl shadow-2xl overflow-hidden flex flex-col max-h-[90vh]">
 
         {/* Header */}
-        <div className="flex items-center justify-between px-6 py-5 border-b border-[#E4D8CC] bg-[#FAF6F0]">
+        <div className="flex items-center justify-between px-6 py-5 border-b border-[#E4D8CC] bg-[#FAF6F0] shrink-0">
           <div>
             <h2 className="text-base font-semibold text-[#1A1714]">Create Campaign Link</h2>
-            <p className="text-xs text-[#8C7B6B] mt-0.5">A shareable link that opens the create page with a pre-selected template</p>
+            <p className="text-xs text-[#8C7B6B] mt-0.5">Choose multiple templates — they appear first when the link is opened</p>
           </div>
           <button onClick={onClose} className="text-[#8C7B6B] hover:text-[#1A1714]"><X size={18} /></button>
         </div>
 
-        <div className="px-6 py-5 space-y-5 max-h-[70vh] overflow-y-auto">
+        <div className="overflow-y-auto flex-1 px-6 py-5 space-y-5">
 
           {/* Link name */}
           <div>
@@ -122,10 +140,67 @@ function CreateLinkModal({
             />
           </div>
 
-          {/* Template selector */}
+          {/* Selected templates (in order) */}
           <div>
-            <label className="text-xs font-semibold text-[#8C7B6B] uppercase tracking-wider block mb-1.5">
-              Template <span className="text-red-400">*</span>
+            <div className="flex items-center justify-between mb-2">
+              <label className="text-xs font-semibold text-[#8C7B6B] uppercase tracking-wider">
+                Selected templates <span className="text-red-400">*</span>
+                {selected.length > 0 && (
+                  <span className="ml-1.5 bg-[#C4622D] text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full">
+                    {selected.length}
+                  </span>
+                )}
+              </label>
+              {selected.length > 0 && (
+                <button onClick={() => setSelected([])} className="text-[10px] text-[#8C7B6B] hover:text-red-500 transition-colors">
+                  Clear all
+                </button>
+              )}
+            </div>
+
+            {selected.length === 0 ? (
+              <div className="border-2 border-dashed border-[#E4D8CC] rounded-xl py-4 text-center">
+                <p className="text-xs text-[#B0A090]">Click templates below to add them — order matters</p>
+              </div>
+            ) : (
+              <div className="flex flex-col gap-1.5">
+                {selected.map((t, idx) => (
+                  <div key={t.slug} className="flex items-center gap-3 bg-[#FFF5F0] border border-[#F0CDB8] rounded-xl px-3 py-2">
+                    {/* Order number */}
+                    <div className="w-5 h-5 rounded-full bg-[#C4622D] text-white text-[10px] font-bold flex items-center justify-center shrink-0">
+                      {idx + 1}
+                    </div>
+                    {/* Thumbnail */}
+                    <div className="w-8 h-8 rounded-lg overflow-hidden bg-[#F2EAE0] shrink-0">
+                      {t.imageKey ? (
+                        // eslint-disable-next-line @next/next/no-img-element
+                        <img
+                          src={`${API_BASE}/api/storage/preview?key=${encodeURIComponent(t.imageKey)}`}
+                          alt={t.name}
+                          className="w-full h-full object-cover"
+                          onError={(e) => { (e.target as HTMLImageElement).style.display = "none"; }}
+                        />
+                      ) : <div className="w-full h-full flex items-center justify-center"><ImageIcon size={12} className="text-[#C8BAB0]" /></div>}
+                    </div>
+                    {/* Name */}
+                    <p className="text-xs font-semibold text-[#1A1714] flex-1 truncate">{t.name}</p>
+                    {/* Remove */}
+                    <button
+                      onClick={() => removeSelected(t.slug)}
+                      className="text-[#C8BAB0] hover:text-red-500 transition-colors shrink-0"
+                    >
+                      <X size={13} />
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+
+          {/* Template picker */}
+          <div>
+            <label className="text-xs font-semibold text-[#8C7B6B] uppercase tracking-wider block mb-2">
+              Add templates
             </label>
 
             {/* Search */}
@@ -161,41 +236,48 @@ function CreateLinkModal({
             <div className="max-h-52 overflow-y-auto border border-[#E4D8CC] rounded-xl divide-y divide-[#F2EAE0]">
               {filtered.length === 0 ? (
                 <p className="text-xs text-[#8C7B6B] text-center py-6">No templates found</p>
-              ) : filtered.map((t) => (
-                <button
-                  key={t.id}
-                  type="button"
-                  onClick={() => setTemplateId(t.id)}
-                  className={`w-full flex items-center gap-3 px-3 py-2.5 text-left transition-colors ${
-                    templateId === t.id
-                      ? "bg-[#FFF5F0] border-l-2 border-l-[#C4622D]"
-                      : "hover:bg-[#FAF6F0]"
-                  }`}
-                >
-                  <div className="w-9 h-9 rounded-lg overflow-hidden bg-[#F2EAE0] shrink-0">
-                    {t.templateImageKey ? (
-                      // eslint-disable-next-line @next/next/no-img-element
-                      <img
-                        src={`${API_BASE}/api/storage/preview?key=${encodeURIComponent(t.templateImageKey)}`}
-                        alt={t.name}
-                        className="w-full h-full object-cover"
-                        onError={(e) => { (e.target as HTMLImageElement).style.display = "none"; }}
-                      />
-                    ) : (
-                      <div className="w-full h-full flex items-center justify-center">
-                        <ImageIcon size={14} className="text-[#C8BAB0]" />
-                      </div>
-                    )}
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <p className="text-xs font-semibold text-[#1A1714] truncate">{t.name}</p>
-                    <p className="text-[10px] text-[#8C7B6B]">{t.category}{t.style ? ` · ${t.style}` : ""}</p>
-                  </div>
-                  {templateId === t.id && (
-                    <Check size={14} className="text-[#C4622D] shrink-0" />
-                  )}
-                </button>
-              ))}
+              ) : filtered.map((t) => {
+                const sel = isTemplateSelected(t.slug);
+                const idx = selected.findIndex((s) => s.slug === t.slug);
+                return (
+                  <button
+                    key={t.id}
+                    type="button"
+                    onClick={() => toggleTemplate(t)}
+                    className={`w-full flex items-center gap-3 px-3 py-2.5 text-left transition-colors ${
+                      sel ? "bg-[#FFF5F0]" : "hover:bg-[#FAF6F0]"
+                    }`}
+                  >
+                    <div className="w-9 h-9 rounded-lg overflow-hidden bg-[#F2EAE0] shrink-0">
+                      {t.templateImageKey ? (
+                        // eslint-disable-next-line @next/next/no-img-element
+                        <img
+                          src={`${API_BASE}/api/storage/preview?key=${encodeURIComponent(t.templateImageKey)}`}
+                          alt={t.name}
+                          className="w-full h-full object-cover"
+                          onError={(e) => { (e.target as HTMLImageElement).style.display = "none"; }}
+                        />
+                      ) : (
+                        <div className="w-full h-full flex items-center justify-center">
+                          <ImageIcon size={14} className="text-[#C8BAB0]" />
+                        </div>
+                      )}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-xs font-semibold text-[#1A1714] truncate">{t.name}</p>
+                      <p className="text-[10px] text-[#8C7B6B]">{t.category}{t.style ? ` · ${t.style}` : ""}</p>
+                    </div>
+                    {/* Badge: order number if selected, + if not */}
+                    <div className={`w-6 h-6 rounded-full flex items-center justify-center shrink-0 text-[11px] font-bold transition-all ${
+                      sel
+                        ? "bg-[#C4622D] text-white"
+                        : "bg-[#F2EAE0] text-[#C4622D]"
+                    }`}>
+                      {sel ? idx + 1 : "+"}
+                    </div>
+                  </button>
+                );
+              })}
             </div>
           </div>
 
@@ -223,7 +305,7 @@ function CreateLinkModal({
           </div>
         </div>
 
-        <div className="px-6 py-4 border-t border-[#E4D8CC] bg-[#FAF6F0] flex gap-3">
+        <div className="px-6 py-4 border-t border-[#E4D8CC] bg-[#FAF6F0] flex gap-3 shrink-0">
           <button onClick={onClose} className="flex-1 border border-[#E4D8CC] text-[#8C7B6B] text-sm font-medium py-2.5 rounded-xl hover:bg-white transition-colors">
             Cancel
           </button>
@@ -304,13 +386,15 @@ function LinksContent() {
   const filtered = search.trim()
     ? links.filter((l) =>
         l.name.toLowerCase().includes(search.toLowerCase()) ||
-        l.templateName.toLowerCase().includes(search.toLowerCase())
+        l.templates.some((t) => t.name.toLowerCase().includes(search.toLowerCase()))
       )
     : links;
 
   // Group by template for the "templates with links" overview
   const templateLinkCount = links.reduce<Record<string, number>>((acc, l) => {
-    acc[l.templateSlug] = (acc[l.templateSlug] ?? 0) + 1;
+    for (const t of l.templates) {
+      acc[t.slug] = (acc[t.slug] ?? 0) + 1;
+    }
     return acc;
   }, {});
 
@@ -422,17 +506,30 @@ function LinksContent() {
                       const done = copied === link.id;
                       return (
                         <div key={link.id} className="flex items-center gap-4 px-5 py-4 hover:bg-[#FAF6F0] transition-colors">
-                          {/* Template thumbnail */}
-                          <div className="w-10 h-10 rounded-xl overflow-hidden bg-[#F2EAE0] shrink-0">
-                            {link.templateImageKey ? (
-                              // eslint-disable-next-line @next/next/no-img-element
-                              <img
-                                src={`${API_BASE}/api/storage/preview?key=${encodeURIComponent(link.templateImageKey)}`}
-                                alt={link.templateName}
-                                className="w-full h-full object-cover"
-                                onError={(e) => { (e.target as HTMLImageElement).style.display = "none"; }}
-                              />
-                            ) : <div className="w-full h-full flex items-center justify-center"><ImageIcon size={14} className="text-[#C8BAB0]" /></div>}
+                          {/* Template thumbnails stacked */}
+                          <div className="flex shrink-0">
+                            {link.templates.slice(0, 3).map((t, i) => (
+                              <div
+                                key={t.slug}
+                                className="w-10 h-10 rounded-xl overflow-hidden bg-[#F2EAE0] border-2 border-white"
+                                style={{ marginLeft: i > 0 ? -10 : 0, zIndex: 3 - i }}
+                              >
+                                {t.imageKey ? (
+                                  // eslint-disable-next-line @next/next/no-img-element
+                                  <img
+                                    src={`${API_BASE}/api/storage/preview?key=${encodeURIComponent(t.imageKey)}`}
+                                    alt={t.name}
+                                    className="w-full h-full object-cover"
+                                    onError={(e) => { (e.target as HTMLImageElement).style.display = "none"; }}
+                                  />
+                                ) : <div className="w-full h-full flex items-center justify-center"><ImageIcon size={12} className="text-[#C8BAB0]" /></div>}
+                              </div>
+                            ))}
+                            {link.templates.length > 3 && (
+                              <div className="w-10 h-10 rounded-xl bg-[#F2EAE0] border-2 border-white flex items-center justify-center text-[10px] font-bold text-[#8C7B6B]" style={{ marginLeft: -10 }}>
+                                +{link.templates.length - 3}
+                              </div>
+                            )}
                           </div>
 
                           {/* Info */}
@@ -440,7 +537,7 @@ function LinksContent() {
                             <p className="font-semibold text-sm text-[#1A1714] truncate">{link.name}</p>
                             <div className="flex items-center gap-2 mt-0.5 flex-wrap">
                               <span className="text-[11px] text-[#C4622D] bg-[#FFF5F0] border border-[#F0CDB8] px-2 py-0.5 rounded-full font-medium">
-                                {link.templateName}
+                                {link.templates.length} template{link.templates.length !== 1 ? "s" : ""}
                               </span>
                               {link.utmSource && (
                                 <span className="text-[10px] text-[#8C7B6B] bg-[#F5F0E8] px-1.5 py-0.5 rounded-full">
