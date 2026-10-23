@@ -706,8 +706,15 @@ export async function sendLeadCampaign() {
 }
 
 export async function adminRegenerateSession(id: string) {
-  return apiFetch<{ success: boolean; previewKey: string }>(
+  return apiFetch<{ success: boolean; previewUrl: string }>(
     `/api/admin/leads/sessions/${id}/regenerate`,
+    { method: "POST" }
+  );
+}
+
+export async function adminRegenerateApply(id: string) {
+  return apiFetch<{ success: boolean }>(
+    `/api/admin/leads/sessions/${id}/regenerate-apply`,
     { method: "POST" }
   );
 }

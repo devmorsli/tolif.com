@@ -404,8 +404,9 @@ public class AdminLeadsController(
 
     // ── POST /api/admin/leads/sessions/{id}/regenerate ────────────────────────
     /// <summary>
-    /// Admin-only regeneration — bypasses the per-session regen limit.
-    /// Used to fix a bad result without penalising the customer.
+    /// Step 1 of admin regeneration. Generates a new portrait into a TEMP key
+    /// so the user's existing preview is NOT overwritten yet. Returns a signed
+    /// URL for the admin to preview. Call /regenerate-apply to commit it.
     /// </summary>
     [HttpPost("sessions/{id:guid}/regenerate")]
     public async Task<IActionResult> AdminRegenerate(Guid id, CancellationToken ct)
@@ -429,10 +430,6 @@ public class AdminLeadsController(
 
         if (uploadedKeys.Count == 0)
             return BadRequest(new { error = "No uploaded photos found for this session." });
-
-        session.Status    = PortraitSessionStatus.Generating;
-        session.UpdatedAt = DateTime.UtcNow;
-        await db.SaveChangesAsync(ct);
 
         // Build slot metadata
         var baseSlots = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
@@ -472,26 +469,52 @@ public class AdminLeadsController(
             ErrorMessage      = result.ErrorMessage,
             CreatedAt         = DateTime.UtcNow,
         });
+        await db.SaveChangesAsync(ct);
 
         if (!result.Success || result.ImageData is null)
-        {
-            session.Status    = PortraitSessionStatus.Failed;
-            session.UpdatedAt = DateTime.UtcNow;
-            await db.SaveChangesAsync(ct);
             return StatusCode(500, new { error = "Regeneration failed.", detail = result.ErrorMessage });
-        }
 
+        // Store in a TEMP key — do NOT touch the user's current preview yet
         var watermarked = watermarkService.Apply(result.ImageData);
-        var previewKey  = $"portraits/{session.Id}/preview.jpg";
-        await storage.UploadAsync(previewKey, watermarked, "image/jpeg", ct);
+        var tempKey     = $"portraits/{session.Id}/regen-preview.jpg";
+        await storage.UploadAsync(tempKey, watermarked, "image/jpeg", ct);
 
-        session.WatermarkedPreviewKey = previewKey;
+        var previewUrl = await storage.GenerateDownloadUrlAsync(tempKey, TimeSpan.FromHours(2), ct);
+
+        return Ok(new { success = true, previewUrl });
+    }
+
+    // ── POST /api/admin/leads/sessions/{id}/regenerate-apply ─────────────────
+    /// <summary>
+    /// Step 2: admin confirmed the new portrait looks good — swap it into the
+    /// live preview key so the customer sees it.
+    /// </summary>
+    [HttpPost("sessions/{id:guid}/regenerate-apply")]
+    public async Task<IActionResult> AdminRegenerateApply(Guid id, CancellationToken ct)
+    {
+        var session = await db.PortraitSessions
+            .FirstOrDefaultAsync(s => s.Id == id, ct);
+
+        if (session is null) return NotFound();
+
+        var tempKey = $"portraits/{session.Id}/regen-preview.jpg";
+
+        // Download the temp image and re-upload it to the live preview key
+        // (no CopyAsync on IStorageService — download+reupload is the safe path)
+        byte[]? tempData;
+        try { tempData = await storage.DownloadAsync(tempKey, ct); }
+        catch { return BadRequest(new { error = "Temp preview not found. Please regenerate first." }); }
+
+        var liveKey = $"portraits/{session.Id}/preview.jpg";
+        await storage.UploadAsync(liveKey, tempData, "image/jpeg", ct);
+
+        session.WatermarkedPreviewKey = liveKey;
         session.Status                = PortraitSessionStatus.PreviewReady;
         session.RegenerationCount++;
         session.UpdatedAt             = DateTime.UtcNow;
         await db.SaveChangesAsync(ct);
 
-        return Ok(new { success = true, previewKey });
+        return Ok(new { success = true });
     }
 }
 

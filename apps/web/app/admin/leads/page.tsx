@@ -10,7 +10,7 @@ import { AdminGuard } from "@/components/admin/AdminGuard";
 import { AdminSidebar } from "@/components/admin/AdminSidebar";
 import {
   getLeadsStats, getLeadSessions, getLeadSession, deleteLeadSession,
-  sendLeadEmail, sendLeadCampaign, adminRegenerateSession,
+  sendLeadEmail, sendLeadCampaign, adminRegenerateSession, adminRegenerateApply,
   getAbandonedCarts, sendAbandonmentEmail, sendAbandonmentCampaign, deleteAbandonedCart,
   type LeadsStats, type LeadSession, type LeadSessionsPage, type LeadSessionDetail,
   type AbandonedCartItem, type AbandonedCartsPage,
@@ -246,6 +246,109 @@ function SessionDetailDrawer({
   );
 }
 
+// ── Regen Confirm Modal ───────────────────────────────────────────────────────
+
+function RegenConfirmModal({
+  sessionId,
+  newPreviewUrl,
+  currentPreviewUrl,
+  onApply,
+  onDiscard,
+}: {
+  sessionId: string;
+  newPreviewUrl: string;
+  currentPreviewUrl: string | null;
+  onApply: () => void;
+  onDiscard: () => void;
+}) {
+  const [applying, setApplying] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const handleApply = async () => {
+    setApplying(true);
+    setError(null);
+    try {
+      await adminRegenerateApply(sessionId);
+      onApply();
+    } catch {
+      setError("Failed to apply. Please try again.");
+      setApplying(false);
+    }
+  };
+
+  return (
+    <>
+      <div className="fixed inset-0 bg-black/60 z-50" onClick={onDiscard} />
+      <div className="fixed inset-0 z-50 flex items-center justify-center p-4 pointer-events-none">
+        <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl pointer-events-auto overflow-hidden">
+          {/* Header */}
+          <div className="px-6 py-5 border-b border-[#E4D8CC] flex items-center justify-between">
+            <div>
+              <p className="font-semibold text-[#1A1714]">Review New Portrait</p>
+              <p className="text-xs text-[#8C7B6B] mt-0.5">Apply to replace the user&apos;s current portrait, or discard.</p>
+            </div>
+            <button onClick={onDiscard} className="text-[#8C7B6B] hover:text-[#1A1714] transition-colors">
+              <X size={18} />
+            </button>
+          </div>
+
+          {/* Images */}
+          <div className="grid grid-cols-2 gap-4 p-6">
+            {/* Current */}
+            <div>
+              <p className="text-[10px] font-bold tracking-[3px] uppercase text-[#A89080] mb-2">Current (user sees this)</p>
+              <div className="rounded-xl overflow-hidden bg-[#F0E8DC] aspect-square">
+                {currentPreviewUrl ? (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img src={currentPreviewUrl} alt="Current portrait" className="w-full h-full object-cover" />
+                ) : (
+                  <div className="w-full h-full flex items-center justify-center">
+                    <ImageOff size={24} className="text-[#C8BAB0]" />
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* New */}
+            <div>
+              <p className="text-[10px] font-bold tracking-[3px] uppercase text-purple-500 mb-2">New (generated now)</p>
+              <div className="rounded-xl overflow-hidden bg-[#F0E8DC] aspect-square ring-2 ring-purple-300">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src={newPreviewUrl} alt="New portrait" className="w-full h-full object-cover" />
+              </div>
+            </div>
+          </div>
+
+          {error && (
+            <p className="mx-6 mb-2 text-sm text-red-600 bg-red-50 rounded-lg px-3 py-2">{error}</p>
+          )}
+
+          {/* Actions */}
+          <div className="px-6 pb-6 flex items-center justify-end gap-3">
+            <button
+              onClick={onDiscard}
+              disabled={applying}
+              className="px-5 py-2.5 rounded-xl border border-[#E4D8CC] text-sm font-semibold text-[#5A4E46] hover:bg-[#FAF6F0] transition-colors disabled:opacity-50"
+            >
+              Discard
+            </button>
+            <button
+              onClick={handleApply}
+              disabled={applying}
+              className="flex items-center gap-2 px-5 py-2.5 rounded-xl bg-purple-600 text-white text-sm font-semibold hover:bg-purple-700 transition-colors disabled:opacity-60"
+            >
+              {applying
+                ? <><div className="w-3.5 h-3.5 border-2 border-white/40 border-t-white rounded-full animate-spin" /> Applying…</>
+                : <><CheckCircle size={14} /> Apply to user</>
+              }
+            </button>
+          </div>
+        </div>
+      </div>
+    </>
+  );
+}
+
 // ── Lead Sessions view ────────────────────────────────────────────────────────
 
 function LeadSessionsView() {
@@ -260,6 +363,7 @@ function LeadSessionsView() {
   const [sentIds,       setSentIds]       = useState<Set<string>>(new Set());
   const [deleting,      setDeleting]      = useState<string | null>(null);
   const [regenerating,  setRegenerating]  = useState<string | null>(null);
+  const [regenConfirm,  setRegenConfirm]  = useState<{ id: string; newUrl: string } | null>(null);
   const [regenDoneIds,  setRegenDoneIds]  = useState<Set<string>>(new Set());
   const [detailId,      setDetailId]      = useState<string | null>(null);
   const [campaignState, setCampaignState] = useState<"idle" | "confirm" | "sending" | "done">("idle");
@@ -303,13 +407,23 @@ function LeadSessionsView() {
   };
 
   const handleRegenerate = async (id: string) => {
-    if (!confirm("Regenerate portrait for this session using the current admin prompt? This will start a new AI generation.")) return;
     setRegenerating(id);
     try {
-      await adminRegenerateSession(id);
-      setRegenDoneIds(prev => new Set(prev).add(id));
+      const { previewUrl } = await adminRegenerateSession(id);
+      setRegenConfirm({ id, newUrl: previewUrl });
     } catch { /* silent */ }
     finally { setRegenerating(null); }
+  };
+
+  const handleRegenApply = (id: string) => {
+    setRegenConfirm(null);
+    setRegenDoneIds(prev => new Set(prev).add(id));
+    // Refresh the row preview by reloading
+    load();
+  };
+
+  const handleRegenDiscard = () => {
+    setRegenConfirm(null);
   };
 
   const handleCampaign = async () => {
@@ -567,6 +681,23 @@ function LeadSessionsView() {
       {detailId && (
         <SessionDetailDrawer sessionId={detailId} onClose={() => setDetailId(null)} />
       )}
+
+      {/* Regen confirm modal */}
+      {regenConfirm && (() => {
+        const session = data?.items.find(s => s.id === regenConfirm.id);
+        const currentUrl = session?.hasPreview
+          ? `${API_BASE}/api/portraits/${regenConfirm.id}/preview`
+          : null;
+        return (
+          <RegenConfirmModal
+            sessionId={regenConfirm.id}
+            newPreviewUrl={regenConfirm.newUrl}
+            currentPreviewUrl={currentUrl}
+            onApply={() => handleRegenApply(regenConfirm.id)}
+            onDiscard={handleRegenDiscard}
+          />
+        );
+      })()}
     </div>
   );
 }
