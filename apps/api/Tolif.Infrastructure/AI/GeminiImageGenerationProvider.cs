@@ -85,75 +85,103 @@ public class GeminiImageGenerationProvider(
                 ? ""
                 : $"\n══ ADDITIONAL INSTRUCTIONS FROM STUDIO ══\n{extraRules.Trim()}\n";
 
+            // Build per-slot subject descriptions for the strict cast list
+            var castLines = new List<string>();
+            for (int i = 0; i < request.SubjectSlots.Count; i++)
+            {
+                var slot = request.SubjectSlots[i];
+                castLines.Add($"  • Subject {i + 1}: from Customer Photo {i + 1} — a {slot.SlotType}");
+            }
+            var castList = castLines.Count > 0
+                ? string.Join("\n", castLines)
+                : $"  • {targetCount} subject(s) from the customer photos above";
+
             var instruction = $"""
-                You are a professional AI portrait artist creating museum-quality painterly portraits.
+                You are a professional AI portrait artist. Your ONLY job is to paint the
+                EXACT subjects from the customer photos, in the exact art style of the
+                style reference, with zero deviation from either.
 
-                ── IMAGE ROLES ──────────────────────────────────────────────────────────
-                IMAGE 1 — STYLE REFERENCE (the template):
-                  Use ONLY for: art style, painting medium, colour palette, lighting mood,
-                  and overall composition. The subjects shown are anonymous PLACEHOLDERS —
-                  discard every face and identity from this image entirely.
-                  Never carry over, blend, or reference any person or pet from this image.
+                ══ ABSOLUTE PROHIBITIONS — violating any one = complete failure ══════════
+                ✗ NEVER include any face, person, or pet from the style reference image
+                ✗ NEVER add any person or pet that does not appear in a customer photo
+                ✗ NEVER change anyone's gender — a man is always painted as a man,
+                  a woman is always painted as a woman, regardless of what the template shows
+                ✗ NEVER put feminine/women's clothing on a male subject
+                ✗ NEVER put masculine/men's clothing on a female subject
+                ✗ NEVER replace a missing or unclear subject with anyone from the template
+                ✗ NEVER blend a customer face with a template face
+                ✗ NEVER invent a new character not present in the customer photos
 
-                IMAGES 2+ — CUSTOMER PHOTOS (the real subjects):
-                  The customer provided {uploadedCount} photo(s) containing: {uploadedSummary}.
-                  These are the ONLY faces and likenesses allowed in the final portrait.
+                ══ THE COMPLETE CAST OF THE OUTPUT (exactly these, nothing else) ═════════
+                {castList}
+                Total: exactly {targetCount} subject(s). Adding or removing even one is a failure.
 
-                ── MANDATORY RULES ──────────────────────────────────────────────────────
+                ══ IMAGE ROLES ═════════════════════════════════════════════════════════════
+                The NEXT image is the STYLE REFERENCE:
+                  → Extract ONLY: painting medium, brushwork, colour palette, lighting mood,
+                    background, and overall composition.
+                  → The people/pets shown are ANONYMOUS MANNEQUINS. Ignore their faces,
+                    genders, clothing, and identities completely. They do not exist.
+
+                The FOLLOWING {uploadedCount} image(s) are CUSTOMER PHOTOS:
+                  → These contain the REAL subjects: {uploadedSummary}.
+                  → Every face in the final portrait must come exclusively from these photos.
+
+                ══ MANDATORY RULES ══════════════════════════════════════════════════════════
                 1. EXACT SUBJECT COUNT
-                   Paint exactly {targetCount} subject(s) — no more, no fewer.
-                   The template may show a different count; IGNORE IT completely.
-                   • Template shows MORE subjects → remove the extras entirely.
-                   • Template shows FEWER subjects → add the extra ones naturally.
+                   Paint exactly {targetCount} subject(s).
+                   • Template shows MORE → remove the extras, fill space naturally.
+                   • Template shows FEWER → add the missing ones naturally.
+                   • Never leave ghost silhouettes or empty spots.
 
                 2. GROUP PHOTOS
-                   If a single customer photo contains multiple people or pets, treat
-                   EACH visible individual as a separate, distinct subject and count
-                   them individually toward the {targetCount} total.
+                   One customer photo may contain multiple people. Count each visible
+                   individual separately toward the {targetCount} total.
 
-                3. FACE & IDENTITY FIDELITY
-                   Reproduce every face EXACTLY as it appears in the customer photo:
-                   same bone structure, eye shape, eye colour, nose, mouth, hair colour,
-                   hair style, and any distinguishing features (glasses, beard, etc.).
-                   Do NOT idealise, average, or blend with any other face.
+                3. GENDER & CLOTHING LOCK
+                   Determine each subject's gender from THEIR customer photo only.
+                   Paint them in gender-appropriate clothing that fits the portrait's
+                   art style and era. The template's clothing is a style guide for
+                   cut and formality — never for gender assignment.
+                   If the template shows a woman in a dress but the customer photo shows
+                   a man, paint the man in equivalent formal/period-appropriate men's attire.
 
-                4. SKIN-TONE CONSISTENCY
-                   The skin colour of every face MUST match the neck, ears, hands, and
-                   any other exposed skin on the same person — seamlessly, no line or
-                   colour shift between head and body.
+                4. FACE & IDENTITY FIDELITY
+                   Reproduce every face EXACTLY: bone structure, eye shape, eye colour,
+                   nose, mouth, hair colour, hair style, and distinguishing features
+                   (glasses, beard, freckles, etc.). Do NOT idealise or alter.
 
-                5. COLOUR RESTORATION FOR OLD PHOTOS
-                   If a customer photo appears aged, faded, yellowed, desaturated, or
-                   low-contrast, FIRST restore it to natural, vibrant, true-to-life
-                   colours BEFORE applying the art style. Never carry the faded palette
-                   into the final portrait.
+                5. SKIN-TONE CONSISTENCY
+                   Face skin colour MUST match neck, ears, hands, and all exposed skin
+                   on the same person. Zero visible line or colour shift.
 
-                6. ART STYLE FIDELITY
-                   Replicate the painting style, brushwork, colour palette, and lighting
-                   of the reference image exactly. The output must look like it was
-                   hand-crafted in that specific medium by a skilled artist.
+                6. COLOUR RESTORATION FOR OLD PHOTOS
+                   If a customer photo is faded, yellowed, or desaturated, restore it to
+                   natural vibrant colours before applying the art style.
 
-                7. COMPOSITION & LAYOUT
-                   Rearrange the composition so all {targetCount} subject(s) fill the
-                   scene naturally. No empty chairs, no ghost silhouettes, no blank
-                   spaces where a removed subject used to be.
+                7. ART STYLE FIDELITY
+                   Replicate the painting technique, palette, and lighting of the
+                   style reference exactly. Output must look hand-crafted in that medium.
 
-                8. FINAL QUALITY
-                   Deliver a seamless, high-resolution result. No artifacts, no visible
-                   seams, no half-rendered or blurry subjects. Every subject must be
-                   fully painted and sharply defined.
+                8. COMPOSITION & LAYOUT
+                   Arrange all {targetCount} subject(s) so they fill the scene naturally.
+
+                9. FINAL QUALITY
+                   High-resolution, no artifacts, no blurry subjects, no seams.
                 {extraRulesSection}
-                ── TEMPLATE CONTEXT ─────────────────────────────────────────────────────
+                ══ PORTRAIT THEME / CONTEXT ════════════════════════════════════════════════
                 {request.Prompt}
 
                 Generate the portrait now.
                 """;
 
             // ── Assemble the Gemini request ──────────────────────────────────
+            // Inline text labels before each image help the model know which
+            // image is the style reference vs. which are the customer photos.
             var parts = new List<object>
             {
                 new { text = instruction },
-                // Template image (art-style reference)
+                new { text = "━━ STYLE REFERENCE — use for art style only, ignore all faces/identities ━━" },
                 new
                 {
                     inline_data = new
@@ -163,8 +191,19 @@ public class GeminiImageGenerationProvider(
                     }
                 }
             };
-            // Add customer photos after
-            parts.AddRange(customerParts);
+
+            // Label each customer photo individually
+            for (int i = 0; i < customerParts.Count; i++)
+            {
+                var slot = (i < request.SubjectSlots.Count) ? request.SubjectSlots[i] : null;
+                var slotLabel = slot != null
+                    ? $"━━ CUSTOMER PHOTO {i + 1} — real subject to paint ({slot.SlotType}) ━━"
+                    : $"━━ CUSTOMER PHOTO {i + 1} — real subject to paint ━━";
+                parts.Add(new { text = slotLabel });
+                parts.Add(customerParts[i]);
+            }
+
+            parts.Add(new { text = $"Now paint exactly {targetCount} subject(s) from the customer photos above, in the style of the style reference. Follow all rules strictly." });
 
             var body = new
             {
