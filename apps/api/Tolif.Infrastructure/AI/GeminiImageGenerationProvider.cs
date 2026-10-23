@@ -111,6 +111,11 @@ public class GeminiImageGenerationProvider(
                 ✗ NEVER replace a missing or unclear subject with anyone from the template
                 ✗ NEVER blend a customer face with a template face
                 ✗ NEVER invent a new character not present in the customer photos
+                ✗ NEVER place any subject behind furniture, chairs, objects, or other subjects
+                ✗ NEVER give a person two hairstyles, two sets of hair, or duplicate hair
+                ✗ NEVER leave a subject partially cut off by the frame edge
+                ✗ NEVER carry blur, noise, or low resolution from a customer photo into
+                  the final portrait — always reconstruct faces at full sharpness
 
                 ══ THE COMPLETE CAST OF THE OUTPUT (exactly these, nothing else) ═════════
                 {castList}
@@ -151,23 +156,44 @@ public class GeminiImageGenerationProvider(
                    nose, mouth, hair colour, hair style, and distinguishing features
                    (glasses, beard, freckles, etc.). Do NOT idealise or alter.
 
-                5. SKIN-TONE CONSISTENCY
-                   Face skin colour MUST match neck, ears, hands, and all exposed skin
-                   on the same person. Zero visible line or colour shift.
+                5. HAIR — ONE HAIRSTYLE PER PERSON
+                   Every person has exactly ONE hairstyle: the one visible in their
+                   customer photo. Do not double the hair, do not layer two hairstyles,
+                   do not add hair elements from the template. The hair should flow and
+                   sit naturally, matching the customer photo in colour, length, and style.
 
-                6. COLOUR RESTORATION FOR OLD PHOTOS
-                   If a customer photo is faded, yellowed, or desaturated, restore it to
-                   natural vibrant colours before applying the art style.
+                6. SKIN-TONE CONSISTENCY — CRITICAL
+                   Measure the exact skin colour from the customer photo face.
+                   Apply that SAME colour to neck, ears, hands, arms, and every centimetre
+                   of exposed skin on that person. A face that is lighter or darker than
+                   the neck is an absolute failure — recheck every skin boundary.
 
-                7. ART STYLE FIDELITY
+                7. BLUR & LOW-QUALITY PHOTO RECOVERY
+                   If a customer photo is blurry, low-resolution, grainy, or out of focus:
+                   RECONSTRUCT the face with maximum clarity and sharpness using the visible
+                   facial structure as a guide. Render every feature — eyes, nose, mouth,
+                   hair — at the full resolution of the output. Never replicate blur.
+
+                8. COLOUR RESTORATION FOR OLD PHOTOS
+                   If a customer photo is faded, yellowed, sepia-toned, or desaturated,
+                   restore it to natural vibrant true-to-life colours BEFORE painting.
+
+                9. ART STYLE FIDELITY
                    Replicate the painting technique, palette, and lighting of the
                    style reference exactly. Output must look hand-crafted in that medium.
 
-                8. COMPOSITION & LAYOUT
-                   Arrange all {targetCount} subject(s) so they fill the scene naturally.
+                10. COMPOSITION & FRAMING — ALL SUBJECTS FULLY VISIBLE
+                    Every subject must be:
+                    • Fully within the frame — no cropping at head, shoulders, or body edges
+                    • Clearly visible in the front layer — NOT behind chairs, tables, other
+                      people, plants, or any objects
+                    • Roughly on the same depth plane, all facing the viewer
+                    • Naturally spaced so no one overlaps another's face
+                    Rearrange the composition freely to meet these requirements.
 
-                9. FINAL QUALITY
-                   High-resolution, no artifacts, no blurry subjects, no seams.
+                11. FINAL QUALITY
+                    High-resolution output. Every face razor-sharp. No artifacts, no seams,
+                    no half-rendered limbs, no floating objects, no doubled body parts.
                 {extraRulesSection}
                 ══ PORTRAIT THEME / CONTEXT ════════════════════════════════════════════════
                 {request.Prompt}

@@ -365,6 +365,8 @@ function LeadSessionsView() {
   const [regenerating,  setRegenerating]  = useState<string | null>(null);
   const [regenConfirm,  setRegenConfirm]  = useState<{ id: string; newUrl: string } | null>(null);
   const [regenDoneIds,  setRegenDoneIds]  = useState<Set<string>>(new Set());
+  // Maps sessionId → cache-bust timestamp so the browser re-fetches after apply
+  const [previewBust,   setPreviewBust]   = useState<Record<string, number>>({});
   const [detailId,      setDetailId]      = useState<string | null>(null);
   const [campaignState, setCampaignState] = useState<"idle" | "confirm" | "sending" | "done">("idle");
   const [campaignResult, setCampaignResult] = useState<{ sent: number; failed: number; total: number } | null>(null);
@@ -418,7 +420,8 @@ function LeadSessionsView() {
   const handleRegenApply = (id: string) => {
     setRegenConfirm(null);
     setRegenDoneIds(prev => new Set(prev).add(id));
-    // Refresh the row preview by reloading
+    // Bust the browser's cached preview image for this session
+    setPreviewBust(prev => ({ ...prev, [id]: Date.now() }));
     load();
   };
 
@@ -556,7 +559,7 @@ function LeadSessionsView() {
               <div className="w-10 h-10 rounded-lg overflow-hidden bg-[#F0E8DC] flex items-center justify-center shrink-0">
                 {session.hasPreview ? (
                   // eslint-disable-next-line @next/next/no-img-element
-                  <img src={`${API_BASE}/api/portraits/${session.id}/preview`} alt="" className="w-full h-full object-cover" />
+                  <img src={`${API_BASE}/api/portraits/${session.id}/preview${previewBust[session.id] ? `?v=${previewBust[session.id]}` : ""}`} alt="" className="w-full h-full object-cover" />
                 ) : (
                   <ImageOff size={14} className="text-[#C8BAB0]" />
                 )}
@@ -686,7 +689,7 @@ function LeadSessionsView() {
       {regenConfirm && (() => {
         const session = data?.items.find(s => s.id === regenConfirm.id);
         const currentUrl = session?.hasPreview
-          ? `${API_BASE}/api/portraits/${regenConfirm.id}/preview`
+          ? `${API_BASE}/api/portraits/${regenConfirm.id}/preview?v=${Date.now()}`
           : null;
         return (
           <RegenConfirmModal

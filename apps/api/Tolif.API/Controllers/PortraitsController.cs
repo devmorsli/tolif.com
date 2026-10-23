@@ -379,7 +379,7 @@ public class PortraitsController(
         if (HttpContext.Request.Method == HttpMethods.Head)
         {
             Response.Headers.ContentType   = "image/jpeg";
-            Response.Headers.CacheControl  = "private, max-age=3600";
+            Response.Headers.CacheControl  = "no-cache, no-store";
             return Ok();
         }
 
