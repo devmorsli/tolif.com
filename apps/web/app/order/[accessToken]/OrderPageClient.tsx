@@ -357,6 +357,7 @@ export function OrderPageClient({
 
         {/* ── Paid: hero confirmation ──────────────────────────────────────── */}
         {!isPending && (
+        <>
         <motion.div
           initial={{ opacity: 0, y: 24 }}
           animate={{ opacity: 1, y: 0 }}
@@ -674,7 +675,8 @@ export function OrderPageClient({
           <br />
           Order reference: <span className="font-mono text-[#8C7B6B]">{order.orderNumber}</span>
         </motion.p>
-        )} {/* end !isPending */}
+        </>
+        )}
 
       </main>
     </div>
