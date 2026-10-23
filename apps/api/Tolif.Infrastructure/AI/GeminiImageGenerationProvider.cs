@@ -194,6 +194,16 @@ public class GeminiImageGenerationProvider(
                 11. FINAL QUALITY
                     High-resolution output. Every face razor-sharp. No artifacts, no seams,
                     no half-rendered limbs, no floating objects, no doubled body parts.
+
+                12. OUTPUT DIMENSIONS — PRINTFUL COMPATIBLE (MANDATORY)
+                    Generate the image in PORTRAIT orientation with a strict 3:4 aspect
+                    ratio (width : height = 3 : 4).
+                    This matches Printful's standard print sizes:
+                      • 12×16 in  (30×40 cm)
+                      • 18×24 in  (45×60 cm)
+                      • 24×36 in  (60×90 cm)
+                    Do NOT produce a square, landscape, or any other ratio.
+                    The canvas must be taller than it is wide.
                 {extraRulesSection}
                 ══ PORTRAIT THEME / CONTEXT ════════════════════════════════════════════════
                 {request.Prompt}

@@ -17,6 +17,8 @@ import {
 } from "@/lib/admin-api";
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:5000";
+// Fixed per page-load so thumbnails always re-fetch on refresh but don't flicker on re-render
+const pageLoadTime = Date.now();
 
 // ── Step label helpers ────────────────────────────────────────────────────────
 
@@ -168,7 +170,7 @@ function SessionDetailDrawer({
                 <div className="rounded-xl overflow-hidden bg-[#F0E8DC]">
                   {/* eslint-disable-next-line @next/next/no-img-element */}
                   <img
-                    src={`${API_BASE}/api/portraits/${detail.id}/preview`}
+                    src={`${API_BASE}/api/portraits/${detail.id}/preview?v=${Date.now()}`}
                     alt="Portrait preview"
                     className="w-full h-auto"
                   />
@@ -559,7 +561,7 @@ function LeadSessionsView() {
               <div className="w-10 h-10 rounded-lg overflow-hidden bg-[#F0E8DC] flex items-center justify-center shrink-0">
                 {session.hasPreview ? (
                   // eslint-disable-next-line @next/next/no-img-element
-                  <img src={`${API_BASE}/api/portraits/${session.id}/preview${previewBust[session.id] ? `?v=${previewBust[session.id]}` : ""}`} alt="" className="w-full h-full object-cover" />
+                  <img src={`${API_BASE}/api/portraits/${session.id}/preview?v=${previewBust[session.id] ?? pageLoadTime}`} alt="" className="w-full h-full object-cover" />
                 ) : (
                   <ImageOff size={14} className="text-[#C8BAB0]" />
                 )}
