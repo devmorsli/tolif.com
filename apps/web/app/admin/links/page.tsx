@@ -32,6 +32,24 @@ function generateId() {
   return Math.random().toString(36).slice(2, 10);
 }
 
+// Migrate old single-template format to new multi-template format
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function migrateLink(raw: any): CampaignLink {
+  if (Array.isArray(raw.templates)) return raw as CampaignLink;
+  // Old format had templateSlug / templateName / templateImageKey
+  return {
+    id: raw.id,
+    name: raw.name,
+    templates: raw.templateSlug
+      ? [{ slug: raw.templateSlug, name: raw.templateName ?? raw.templateSlug, imageKey: raw.templateImageKey }]
+      : [],
+    createdAt: raw.createdAt,
+    utmSource: raw.utmSource,
+    utmMedium: raw.utmMedium,
+    utmCampaign: raw.utmCampaign,
+  };
+}
+
 function buildUrl(base: string, link: CampaignLink): string {
   const params = new URLSearchParams();
   const slugs = link.templates.map((t) => t.slug);
@@ -353,7 +371,7 @@ function LinksContent() {
         setTemplates(tmpl);
         const stored = settings.find((s) => s.key === SETTINGS_KEY);
         if (stored?.value) {
-          try { setLinks(JSON.parse(stored.value)); } catch { /* ignore */ }
+          try { setLinks((JSON.parse(stored.value) as unknown[]).map(migrateLink)); } catch { /* ignore */ }
         }
       })
       .finally(() => setLoading(false));
