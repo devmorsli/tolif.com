@@ -1,10 +1,10 @@
 import { DigitalHeader } from "./DigitalHeader";
+import { DigitalFooter } from "./DigitalFooter";
 import { DigitalHeroSection } from "./DigitalHeroSection";
 import { DigitalHowItWorks } from "./DigitalHowItWorks";
 import { DigitalPricingSection } from "./DigitalPricingSection";
+import { DigitalReviewsSection } from "./DigitalReviewsSection";
 import { DigitalFaqSection } from "./DigitalFaqSection";
-import { Footer } from "@/components/layout/Footer";
-import { ReviewsSection } from "@/components/home/ReviewsSection";
 
 export function DigitalHomePage() {
   return (
@@ -14,10 +14,10 @@ export function DigitalHomePage() {
         <DigitalHeroSection />
         <DigitalHowItWorks />
         <DigitalPricingSection />
-        <ReviewsSection />
+        <DigitalReviewsSection />
         <DigitalFaqSection />
       </main>
-      <Footer />
+      <DigitalFooter />
     </>
   );
 }
