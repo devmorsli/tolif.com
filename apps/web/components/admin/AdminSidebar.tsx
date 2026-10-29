@@ -2,14 +2,15 @@
 
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { LayoutDashboard, Palette, ShoppingBag, Settings, LogOut, Menu, X, Printer, Package, MessageSquare, Link2, Users } from "lucide-react";
+import { LayoutDashboard, Palette, ShoppingBag, Settings, LogOut, Menu, X, Printer, Package, MessageSquare, Link2, Users, Layers } from "lucide-react";
 import { useState } from "react";
 import { adminLogout } from "@/lib/admin-api";
 
 const nav = [
   { href: "/admin/dashboard", label: "Dashboard", icon: LayoutDashboard },
   { href: "/admin/templates", label: "Templates",  icon: Palette },
-  { href: "/admin/products",  label: "Products",   icon: Package },
+  { href: "/admin/products",         label: "Products",         icon: Package },
+  { href: "/admin/digital-products", label: "Digital Products",  icon: Layers },
   { href: "/admin/orders",    label: "Orders",     icon: ShoppingBag },
   { href: "/admin/leads",     label: "Leads",      icon: Users },
   { href: "/admin/reviews",   label: "Reviews",    icon: MessageSquare },

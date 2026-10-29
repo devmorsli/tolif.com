@@ -722,3 +722,131 @@ export async function adminRegenerateApply(id: string) {
 export async function deleteAbandonedCart(id: string) {
   return apiFetch<void>(`/api/admin/orders/${id}`, { method: "DELETE" });
 }
+
+// ── Digital Products ──────────────────────────────────────────────────────────
+
+export interface AdminDigitalFile {
+  id: string;
+  fileName: string;
+  storageKey: string;
+  fileSizeBytes: number;
+  contentType: string;
+  sortOrder: number;
+}
+
+export interface AdminDigitalTier {
+  id: string;
+  digitalProductId: string;
+  tierName: string;
+  displayName: string;
+  price: number;
+  currency: string;
+  featuresJson: string;
+  stripePriceId?: string;
+  isActive: boolean;
+  sortOrder: number;
+  files: AdminDigitalFile[];
+}
+
+export interface AdminDigitalProduct {
+  id: string;
+  name: string;
+  slug: string;
+  tagline: string;
+  description: string;
+  heroImageKey?: string;
+  featuresJson: string;
+  isActive: boolean;
+  sortOrder: number;
+  tiers: AdminDigitalTier[];
+}
+
+export async function getDigitalProducts() {
+  return apiFetch<AdminDigitalProduct[]>("/api/admin/digital-products");
+}
+
+export async function getDigitalProduct(id: string) {
+  return apiFetch<AdminDigitalProduct>(`/api/admin/digital-products/${id}`);
+}
+
+export async function createDigitalProduct(data: {
+  name: string; slug?: string; tagline?: string; description?: string;
+  heroImageKey?: string; featuresJson?: string; isActive: boolean; sortOrder: number;
+}) {
+  return apiFetch<AdminDigitalProduct>("/api/admin/digital-products", {
+    method: "POST",
+    body: JSON.stringify(data),
+  });
+}
+
+export async function updateDigitalProduct(id: string, data: {
+  name: string; slug?: string; tagline?: string; description?: string;
+  heroImageKey?: string; featuresJson?: string; isActive: boolean; sortOrder: number;
+}) {
+  return apiFetch<AdminDigitalProduct>(`/api/admin/digital-products/${id}`, {
+    method: "PUT",
+    body: JSON.stringify(data),
+  });
+}
+
+export async function deleteDigitalProduct(id: string) {
+  return apiFetch<void>(`/api/admin/digital-products/${id}`, { method: "DELETE" });
+}
+
+export async function createDigitalTier(productId: string, data: {
+  tierName: string; displayName: string; price: number; currency?: string;
+  featuresJson?: string; stripePriceId?: string; isActive: boolean; sortOrder: number;
+}) {
+  return apiFetch<AdminDigitalTier>(`/api/admin/digital-products/${productId}/tiers`, {
+    method: "POST",
+    body: JSON.stringify(data),
+  });
+}
+
+export async function updateDigitalTier(tierId: string, data: {
+  tierName: string; displayName: string; price: number; currency?: string;
+  featuresJson?: string; stripePriceId?: string; isActive: boolean; sortOrder: number;
+}) {
+  return apiFetch<AdminDigitalTier>(`/api/admin/digital-products/tiers/${tierId}`, {
+    method: "PUT",
+    body: JSON.stringify(data),
+  });
+}
+
+export async function deleteDigitalTier(tierId: string) {
+  return apiFetch<void>(`/api/admin/digital-products/tiers/${tierId}`, { method: "DELETE" });
+}
+
+export async function uploadDigitalFile(tierId: string, file: File): Promise<AdminDigitalFile> {
+  const token = typeof window !== "undefined" ? localStorage.getItem("admin_token") : null;
+  const formData = new FormData();
+  formData.append("file", file);
+  const base = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:5000";
+  const res = await fetch(`${base}/api/admin/digital-products/tiers/${tierId}/files`, {
+    method: "POST",
+    headers: token ? { Authorization: `Bearer ${token}` } : {},
+    body: formData,
+    credentials: "include",
+  });
+  if (!res.ok) throw new Error(await res.text());
+  return res.json();
+}
+
+export async function deleteDigitalFile(fileId: string) {
+  return apiFetch<void>(`/api/admin/digital-products/files/${fileId}`, { method: "DELETE" });
+}
+
+export async function uploadDigitalProductImage(file: File): Promise<{ key: string; url: string }> {
+  const token = typeof window !== "undefined" ? localStorage.getItem("admin_token") : null;
+  const formData = new FormData();
+  formData.append("file", file);
+  const base = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:5000";
+  const res = await fetch(`${base}/api/admin/digital-products/upload-image`, {
+    method: "POST",
+    headers: token ? { Authorization: `Bearer ${token}` } : {},
+    body: formData,
+    credentials: "include",
+  });
+  if (!res.ok) throw new Error(await res.text());
+  return res.json();
+}

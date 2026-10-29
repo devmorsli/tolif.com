@@ -7,8 +7,32 @@ import { ReviewsSection } from "@/components/home/ReviewsSection";
 import { TrustBadges } from "@/components/home/TrustBadges";
 import { FaqSection } from "@/components/home/FaqSection";
 import { CtaSection } from "@/components/home/CtaSection";
+import { DigitalHomePage } from "@/components/digital/DigitalHomePage";
 
-export default function HomePage() {
+async function getStoreMode(): Promise<"physical" | "digital"> {
+  try {
+    const base =
+      process.env.API_INTERNAL_URL ??
+      process.env.NEXT_PUBLIC_API_URL ??
+      "http://localhost:5000";
+    const res = await fetch(`${base}/api/settings/store-mode`, {
+      cache: "no-store",
+    });
+    if (!res.ok) return "physical";
+    const data: { mode: string } = await res.json();
+    return data.mode === "digital" ? "digital" : "physical";
+  } catch {
+    return "physical";
+  }
+}
+
+export default async function HomePage() {
+  const mode = await getStoreMode();
+
+  if (mode === "digital") {
+    return <DigitalHomePage />;
+  }
+
   return (
     <>
       <Header />

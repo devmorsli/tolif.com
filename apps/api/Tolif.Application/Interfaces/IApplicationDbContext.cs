@@ -18,6 +18,11 @@ public interface IApplicationDbContext
     DbSet<Setting> Settings { get; }
     DbSet<AnalyticsEvent> AnalyticsEvents { get; }
     DbSet<Review> Reviews { get; }
+    DbSet<DigitalProduct> DigitalProducts { get; }
+    DbSet<DigitalProductTier> DigitalProductTiers { get; }
+    DbSet<DigitalFile> DigitalFiles { get; }
+    DbSet<DigitalOrder> DigitalOrders { get; }
+    DbSet<DigitalDownloadToken> DigitalDownloadTokens { get; }
 
     Task<int> SaveChangesAsync(CancellationToken cancellationToken = default);
 }

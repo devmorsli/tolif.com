@@ -17,6 +17,7 @@ type TrackingIds = {
   "tracking.gtmId"?:         string;
   "tracking.googleAdsId"?:   string;
   "tracking.tiktokPixelId"?: string;
+  "tracking.xPixelId"?:      string;
 };
 
 async function getTrackingIds(): Promise<TrackingIds> {
@@ -46,9 +47,10 @@ export async function Analytics() {
   const GTM_ID          = ids["tracking.gtmId"];
   const GOOGLE_ADS_ID   = ids["tracking.googleAdsId"];
   const TIKTOK_PIXEL_ID = ids["tracking.tiktokPixelId"];
+  const X_PIXEL_ID      = ids["tracking.xPixelId"];
 
   // Nothing configured yet — render nothing
-  if (!FB_PIXEL_ID && !GA_ID && !GTM_ID && !GOOGLE_ADS_ID && !TIKTOK_PIXEL_ID) {
+  if (!FB_PIXEL_ID && !GA_ID && !GTM_ID && !GOOGLE_ADS_ID && !TIKTOK_PIXEL_ID && !X_PIXEL_ID) {
     return null;
   }
 
@@ -146,6 +148,16 @@ export async function Analytics() {
           ttq.load('${TIKTOK_PIXEL_ID}');
           ttq.page();
           }(window,document,'ttq');`}
+        </Script>
+      )}
+
+      {/* ── X (Twitter) Universal Website Tag ──────────────────────────────────
+          Set "tracking.xPixelId" in admin.
+      ────────────────────────────────────────────────────────────────────────── */}
+      {X_PIXEL_ID && (
+        <Script id="x-pixel-init" strategy="afterInteractive">
+          {`!function(e,t,n,s,u,a){e.twq||(s=e.twq=function(){s.exe?s.exe.apply(s,arguments):s.queue.push(arguments);},s.version='1.1',s.queue=[],u=t.createElement(n),u.async=!0,u.src='https://static.ads-twitter.com/uwt.js',a=t.getElementsByTagName(n)[0],a.parentNode.insertBefore(u,a))}(window,document,'script');
+          twq('config','${X_PIXEL_ID}');`}
         </Script>
       )}
     </>

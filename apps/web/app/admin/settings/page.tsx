@@ -9,6 +9,20 @@ import { getSettings, saveSetting, type Setting } from "@/lib/admin-api";
 // All known settings grouped for the UI
 const SETTING_GROUPS = [
   {
+    title: "Store Mode",
+    description: "Switch between physical portrait store and digital product store",
+    icon: "🏪",
+    settings: [
+      {
+        key: "store.mode",
+        label: "Active Store Mode",
+        type: "select",
+        options: ["physical", "digital"],
+        hint: "physical = AI portrait store (current) · digital = spreadsheet / digital product store. Changes go live within 30 seconds — no redeploy needed.",
+      },
+    ],
+  },
+  {
     title: "Templates & Display",
     description: "How templates are shown to customers",
     icon: "🖼️",
@@ -175,6 +189,13 @@ const SETTING_GROUPS = [
         type: "text",
         placeholder: "XXXXXXXXXXXXXXXXXX",
         hint: "Find in: ads.tiktok.com → Assets → Events → Web Events → your pixel",
+      },
+      {
+        key: "tracking.xPixelId",
+        label: "X (Twitter) Pixel ID",
+        type: "text",
+        placeholder: "XXXXXXXXXXXXXXXXXX",
+        hint: "Find in: ads.twitter.com → Tools → Conversion Tracking → your pixel",
       },
     ],
   },

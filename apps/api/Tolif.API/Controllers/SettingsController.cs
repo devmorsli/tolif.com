@@ -19,6 +19,7 @@ public class SettingsController(ISettingsService settingsService) : ControllerBa
         "tracking.gtmId",
         "tracking.googleAdsId",
         "tracking.tiktokPixelId",
+        "tracking.xPixelId",
     ];
 
     // GET /api/settings/maintenance
@@ -51,6 +52,14 @@ public class SettingsController(ISettingsService settingsService) : ControllerBa
     }
 
     public record UnlockRequest(string Password);
+
+    // GET /api/settings/store-mode — which storefront is active
+    [HttpGet("store-mode")]
+    public async Task<IActionResult> GetStoreMode(CancellationToken ct)
+    {
+        var mode = await settingsService.GetAsync("store.mode", ct) ?? "physical";
+        return Ok(new { mode });
+    }
 
     // GET /api/settings/ui — non-sensitive UI/display settings safe to expose publicly
     [HttpGet("ui")]

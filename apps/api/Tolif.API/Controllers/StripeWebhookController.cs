@@ -104,6 +104,13 @@ public class StripeWebhookController(
     // ── checkout.session.completed ────────────────────────────────────────────
     private async Task HandleCheckoutSessionCompleted(Stripe.Checkout.Session session, CancellationToken ct)
     {
+        // ── Check if this is a digital product order ───────────────────────
+        if (session.Metadata?.ContainsKey("digitalOrderId") == true)
+        {
+            await HandleDigitalCheckoutCompleted(session, ct);
+            return;
+        }
+
         var order = await db.Orders
             .FirstOrDefaultAsync(o =>
                 o.StripeSessionId == session.Id ||
@@ -148,6 +155,53 @@ public class StripeWebhookController(
         _ = analytics.TrackAsync(AnalyticsEventType.OrderPaid, null,
             new { orderId = order.Id, amount = order.TotalAmount, currency = order.Currency });
         EnqueuePostPaymentJobs(order.Id);
+    }
+
+    // ── Digital order fulfillment ─────────────────────────────────────────────
+    private async Task HandleDigitalCheckoutCompleted(Stripe.Checkout.Session session, CancellationToken ct)
+    {
+        if (!session.Metadata!.TryGetValue("digitalOrderId", out var orderIdStr) ||
+            !Guid.TryParse(orderIdStr, out var digitalOrderId))
+        {
+            logger.LogWarning("Digital checkout session {Id} missing digitalOrderId", session.Id);
+            return;
+        }
+
+        var order = await db.DigitalOrders
+            .Include(o => o.DigitalProductTier)
+                .ThenInclude(t => t!.Files)
+            .FirstOrDefaultAsync(o => o.Id == digitalOrderId, ct);
+
+        if (order is null)
+        {
+            logger.LogWarning("No digital order found for id {Id}", digitalOrderId);
+            return;
+        }
+
+        if (order.Status == "paid") return; // idempotent
+
+        order.Status = "paid";
+        if (!string.IsNullOrEmpty(session.PaymentIntentId))
+            order.StripePaymentIntentId = session.PaymentIntentId;
+
+        // Create time-limited download tokens for every file in this tier
+        var files = order.DigitalProductTier?.Files ?? [];
+        foreach (var file in files)
+        {
+            db.DigitalDownloadTokens.Add(new Domain.Entities.DigitalDownloadToken
+            {
+                DigitalOrderId = order.Id,
+                DigitalFileId  = file.Id,
+                Token          = Guid.NewGuid().ToString("N"),
+                ExpiresAt      = DateTime.UtcNow.AddDays(7),
+                MaxDownloads   = 10,
+            });
+        }
+
+        await db.SaveChangesAsync(ct);
+        logger.LogInformation(
+            "Digital order {OrderId} paid — created {Count} download tokens",
+            order.Id, files.Count());
     }
 
     // ── payment_intent.payment_failed ─────────────────────────────────────────

@@ -24,6 +24,11 @@ public class ApplicationDbContext : IdentityDbContext<AdminUser>, IApplicationDb
     public DbSet<Setting> Settings => Set<Setting>();
     public DbSet<AnalyticsEvent> AnalyticsEvents => Set<AnalyticsEvent>();
     public DbSet<Review> Reviews => Set<Review>();
+    public DbSet<DigitalProduct> DigitalProducts => Set<DigitalProduct>();
+    public DbSet<DigitalProductTier> DigitalProductTiers => Set<DigitalProductTier>();
+    public DbSet<DigitalFile> DigitalFiles => Set<DigitalFile>();
+    public DbSet<DigitalOrder> DigitalOrders => Set<DigitalOrder>();
+    public DbSet<DigitalDownloadToken> DigitalDownloadTokens => Set<DigitalDownloadToken>();
 
     protected override void OnModelCreating(ModelBuilder builder)
     {
